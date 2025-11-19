@@ -64,38 +64,53 @@ export class BrowserDownloadService {
    * Generate appropriate filename from URL or metadata
    */
   private generateFilename(item: IDownloadItem, blob: Blob): string {
-    // Try to get filename from URL
-    let filename = this.getFilenameFromUrl(item.url);
+    // Get the proper file extension from MIME type (most reliable)
+    const ext = this.getExtensionFromMimeType(blob.type);
 
-    // If no extension, detect from blob type
-    if (!filename.includes('.')) {
-      const ext = this.getExtensionFromMimeType(blob.type);
-      filename = filename + ext;
-    }
+    // Prefer title over URL-based filename
+    let baseName: string;
 
-    // Sanitize filename
-    filename = this.sanitizeFilename(filename);
-
-    // If we have a title, use it but keep the extension
     if (item.editedMetadata?.title || item.metadata?.title) {
-      const title = item.editedMetadata?.title || item.metadata?.title || '';
-      const ext = this.getExtension(filename);
-      filename = this.sanitizeFilename(title) + ext;
+      // Use title if available
+      baseName = item.editedMetadata?.title || item.metadata?.title || 'download';
+    } else {
+      // Try to extract meaningful name from URL
+      baseName = this.getBaseNameFromUrl(item.url);
     }
 
-    return filename;
+    // Sanitize and combine
+    const sanitizedName = this.sanitizeFilename(baseName);
+    return sanitizedName + ext;
   }
 
   /**
-   * Extract filename from URL
+   * Extract base filename from URL (without extension)
    */
-  private getFilenameFromUrl(url: string): string {
+  private getBaseNameFromUrl(url: string): string {
     try {
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const segments = pathname.split('/');
-      const lastSegment = segments[segments.length - 1] || 'download';
-      return decodeURIComponent(lastSegment);
+      const segments = pathname.split('/').filter(s => s.length > 0);
+
+      if (segments.length === 0) return 'download';
+
+      let lastSegment = decodeURIComponent(segments[segments.length - 1]);
+
+      // Remove extension if it's not a valid media extension
+      const invalidExtensions = ['.php', '.asp', '.aspx', '.jsp', '.cgi', '.html', '.htm'];
+      for (const invalidExt of invalidExtensions) {
+        if (lastSegment.toLowerCase().endsWith(invalidExt)) {
+          lastSegment = lastSegment.substring(0, lastSegment.length - invalidExt.length);
+          break;
+        }
+      }
+
+      // If segment is now empty or too short, use domain name
+      if (lastSegment.length < 3) {
+        return urlObj.hostname.replace(/^www\./, '').split('.')[0] || 'download';
+      }
+
+      return lastSegment;
     } catch {
       return 'download';
     }

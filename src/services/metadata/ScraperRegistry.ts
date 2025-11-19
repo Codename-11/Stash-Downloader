@@ -4,6 +4,8 @@
 
 import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { GenericScraper } from './GenericScraper';
+import { HTMLScraper } from './HTMLScraper';
+import { PornhubScraper } from './PornhubScraper';
 import { extractDomain } from '@/utils';
 
 export class ScraperRegistry {
@@ -12,6 +14,11 @@ export class ScraperRegistry {
 
   constructor() {
     this.fallbackScraper = new GenericScraper();
+
+    // Register built-in scrapers
+    // Order matters: more specific scrapers first, generic ones last
+    this.register(new PornhubScraper());
+    this.register(new HTMLScraper());
   }
 
   /**
@@ -25,21 +32,29 @@ export class ScraperRegistry {
    * Find appropriate scraper for URL
    */
   findScraper(url: string): IMetadataScraper {
-    const domain = extractDomain(url);
+    // Use canHandle method for more accurate matching
+    // Prioritize specific scrapers over wildcard scrapers
+    const specificScraper = this.scrapers.find(
+      (s) => !s.supportedDomains.includes('*') && s.canHandle(url)
+    );
 
-    if (!domain) {
-      return this.fallbackScraper;
+    if (specificScraper) {
+      console.log(`[ScraperRegistry] Using ${specificScraper.name} for ${url}`);
+      return specificScraper;
     }
 
-    // Find first scraper that can handle this URL
-    const scraper = this.scrapers.find((s) => {
-      if (s.supportedDomains.includes('*')) return true;
-      return s.supportedDomains.some(
-        (d) => domain === d || domain.endsWith(`.${d}`)
-      );
-    });
+    // Fall back to wildcard scrapers
+    const wildcardScraper = this.scrapers.find(
+      (s) => s.supportedDomains.includes('*') && s.canHandle(url)
+    );
 
-    return scraper ?? this.fallbackScraper;
+    if (wildcardScraper) {
+      console.log(`[ScraperRegistry] Using ${wildcardScraper.name} for ${url}`);
+      return wildcardScraper;
+    }
+
+    console.log(`[ScraperRegistry] Using fallback scraper for ${url}`);
+    return this.fallbackScraper;
   }
 
   /**

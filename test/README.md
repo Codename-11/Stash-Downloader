@@ -23,7 +23,12 @@ The test app will open at `http://localhost:3000` with the plugin fully function
 
 **✅ Auto-Start CORS Proxy:** The CORS proxy starts automatically when you run `npm test` - **no separate terminal needed!** Just toggle it on in the UI if you want to download from sites that block CORS (pornhub, onlyfans, etc.).
 
-See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for full details about CORS.
+**✅ Real Metadata Scraping:** The plugin includes intelligent scrapers that fetch and parse metadata from websites:
+- **PornhubScraper** - Extracts title, performers, tags, description, duration from pornhub.com
+- **HTMLScraper** - Extracts Open Graph tags from any website
+- **GenericScraper** - Fallback for basic URL parsing
+
+See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for CORS details and [../ADDING_SCRAPERS.md](../ADDING_SCRAPERS.md) for adding custom scrapers.
 
 ## What's Included
 
