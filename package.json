@@ -9,9 +9,10 @@
     "build": "tsc && vite build",
     "test": "cross-env VITE_TEST=true vite --mode test",
     "test:build": "cross-env VITE_TEST=true vite build --mode test",
+    "test:proxy": "node test/cors-proxy.js",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directs --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css,md}\""
   },
   "keywords": [

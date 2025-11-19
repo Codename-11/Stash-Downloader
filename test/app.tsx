@@ -47,9 +47,27 @@ const routes = (mockApi as any)._getRoutes();
 // Create test app wrapper
 const TestApp: React.FC = () => {
   const [currentRoute, setCurrentRoute] = React.useState('/downloader');
+  const [corsProxyEnabled, setCorsProxyEnabled] = React.useState(
+    localStorage.getItem('corsProxyEnabled') === 'true'
+  );
+  const [corsProxyUrl, setCorsProxyUrl] = React.useState(
+    localStorage.getItem('corsProxyUrl') || 'http://localhost:8080'
+  );
 
   // Get the component for the current route
   const RouteComponent = routes[currentRoute];
+
+  // Handle CORS proxy toggle
+  const handleCorsProxyToggle = (enabled: boolean) => {
+    setCorsProxyEnabled(enabled);
+    localStorage.setItem('corsProxyEnabled', String(enabled));
+  };
+
+  // Handle CORS proxy URL change
+  const handleCorsProxyUrlChange = (url: string) => {
+    setCorsProxyUrl(url);
+    localStorage.setItem('corsProxyUrl', url);
+  };
 
   return (
     <div className="test-app">
@@ -74,6 +92,52 @@ const TestApp: React.FC = () => {
             <li><strong>Real downloads enabled</strong> - Files will actually be fetched from URLs</li>
             <li>Current route: <code>{currentRoute}</code></li>
           </ul>
+        </div>
+
+        {/* CORS Proxy Settings */}
+        <div className="card">
+          <div className="card-body">
+            <h6 className="card-title">CORS Proxy Settings</h6>
+            <div className="form-check form-switch mb-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="corsProxyToggle"
+                checked={corsProxyEnabled}
+                onChange={(e) => handleCorsProxyToggle(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="corsProxyToggle">
+                Enable CORS Proxy {corsProxyEnabled ? '✅' : ''}
+              </label>
+            </div>
+            {corsProxyEnabled && (
+              <div className="mb-2">
+                <label className="form-label small">Proxy URL:</label>
+                <input
+                  type="text"
+                  className="form-control form-control-sm"
+                  value={corsProxyUrl}
+                  onChange={(e) => handleCorsProxyUrlChange(e.target.value)}
+                  placeholder="http://localhost:8080"
+                />
+              </div>
+            )}
+            <small className="text-muted">
+              {corsProxyEnabled ? (
+                <>
+                  ✅ CORS proxy is <strong>enabled</strong>. All downloads will be proxied through{' '}
+                  <code>{corsProxyUrl}</code>. Make sure the proxy server is running:{' '}
+                  <code>npm run test:proxy</code>
+                </>
+              ) : (
+                <>
+                  ⚠️ CORS proxy is <strong>disabled</strong>. Only sites with CORS headers will work.
+                  Enable proxy to download from sites like pornhub. See{' '}
+                  <a href="test/CORS_LIMITATIONS.md" target="_blank">CORS_LIMITATIONS.md</a>
+                </>
+              )}
+            </small>
+          </div>
         </div>
       </div>
 

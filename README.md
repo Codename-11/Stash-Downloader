@@ -432,8 +432,9 @@ That's it! The content is now in your Stash library with all metadata.
 1. Check URL is direct link to file
 2. Verify internet connection
 3. Some sites block automated downloads
-4. Check CORS restrictions in browser console
-5. Try different URL or download manually first
+4. **CORS errors in test mode**: Expected behavior - many sites block cross-origin requests. This works in production with Stash. See `test/CORS_LIMITATIONS.md` for details
+5. Authentication required - some sites need login/cookies
+6. Try different URL or download manually first
 
 **Performers/Tags not found:**
 1. Autocomplete searches existing Stash data

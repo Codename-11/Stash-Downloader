@@ -11,6 +11,31 @@ export interface IDownloadOptions {
 
 export class DownloadService {
   /**
+   * Check if CORS proxy is enabled (for test environment)
+   */
+  private isCorsProxyEnabled(): boolean {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('corsProxyEnabled') === 'true';
+  }
+
+  /**
+   * Get CORS proxy URL from settings
+   */
+  private getCorsProxyUrl(): string {
+    if (typeof window === 'undefined') return 'http://localhost:8080';
+    return localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
+  }
+
+  /**
+   * Wrap URL with CORS proxy if enabled
+   */
+  private wrapWithProxy(url: string): string {
+    if (!this.isCorsProxyEnabled()) return url;
+    const proxyUrl = this.getCorsProxyUrl();
+    return `${proxyUrl}/${url}`;
+  }
+
+  /**
    * Download file from URL
    */
   async download(
@@ -18,8 +43,9 @@ export class DownloadService {
     options: IDownloadOptions = {}
   ): Promise<Blob> {
     const { onProgress, signal } = options;
+    const fetchUrl = this.wrapWithProxy(url);
 
-    const response = await fetch(url, { signal });
+    const response = await fetch(fetchUrl, { signal });
 
     if (!response.ok) {
       throw new Error(`Download failed: ${response.statusText}`);
@@ -95,7 +121,8 @@ export class DownloadService {
    */
   async detectContentType(url: string): Promise<string | null> {
     try {
-      const response = await fetch(url, { method: 'HEAD' });
+      const fetchUrl = this.wrapWithProxy(url);
+      const response = await fetch(fetchUrl, { method: 'HEAD' });
       return response.headers.get('content-type');
     } catch {
       return null;

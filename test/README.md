@@ -19,6 +19,21 @@ The test app will open at `http://localhost:3000` with the plugin fully function
 
 **⚠️ Real Downloads Enabled:** The test environment actually downloads files from the internet! See [TEST_URLS.md](TEST_URLS.md) for safe test URLs.
 
+**⚠️ CORS Limitations:** Many websites block cross-origin downloads. If you see CORS errors, this is expected browser security behavior.
+
+**✅ CORS Bypass Solution:** To test with sites like pornhub, onlyfans, etc.:
+```bash
+# In one terminal, start the CORS proxy:
+npm run test:proxy
+
+# In another terminal, start the test app:
+npm test
+
+# Then in the browser, enable "CORS Proxy" in the settings panel
+```
+
+See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for full details and other solutions.
+
 ## What's Included
 
 ### Mock PluginApi (`mocks/mockPluginApi.ts`)

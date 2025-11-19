@@ -2,6 +2,8 @@
 
 These are real, publicly accessible test files you can use:
 
+**⚠️ IMPORTANT**: These URLs work because they have CORS (Cross-Origin Resource Sharing) enabled. Most websites (pornhub, onlyfans, etc.) will show CORS errors in the test environment. See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for details.
+
 ### Video Files (Small, Fast)
 
 ```
