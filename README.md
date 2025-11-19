@@ -2,6 +2,9 @@
 
 A React-based web-UI plugin for Stash that enables downloading images and videos from external sources with automatic metadata extraction, tagging, and organization.
 
+📖 **[Quick Reference Guide](USAGE_QUICK_REFERENCE.md)** - Common tasks and commands
+🧪 **[Test Environment Guide](test/README.md)** - Develop without Stash
+
 ## Features
 
 - **URL-based Downloads**: Download videos and images from direct URLs or supported sites
