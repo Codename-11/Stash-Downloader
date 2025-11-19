@@ -83,15 +83,20 @@ const TestApp: React.FC = () => {
 
       {/* Debug panel */}
       <div className="container-fluid mb-3">
-        <div className="alert alert-info">
+        <div className="alert alert-success">
           <h6>Test Environment Active</h6>
           <ul className="mb-0 small">
-            <li>Mock PluginApi installed</li>
-            <li>Mock data loaded: {mockPerformers.length} performers, {mockTags.length} tags, {mockStudios.length} studios</li>
-            <li>Mock scraper registered</li>
-            <li><strong>Real downloads enabled</strong> - Files will actually be fetched from URLs</li>
+            <li>✅ Mock PluginApi installed</li>
+            <li>✅ Mock data loaded: {mockPerformers.length} performers, {mockTags.length} tags, {mockStudios.length} studios</li>
+            <li>✅ Mock scraper registered</li>
+            <li>✅ <strong>CORS proxy running</strong> on <code>http://localhost:8080</code></li>
+            <li>✅ <strong>Files save to Downloads folder</strong> with Stash-compatible metadata</li>
             <li>Current route: <code>{currentRoute}</code></li>
           </ul>
+          <small className="text-muted d-block mt-2">
+            💡 <strong>Tip:</strong> Downloaded files are saved with <code>.json</code> metadata sidecar files
+            that Stash can read when you import them!
+          </small>
         </div>
 
         {/* CORS Proxy Settings */}

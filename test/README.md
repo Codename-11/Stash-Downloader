@@ -17,22 +17,13 @@ npm run test:build
 
 The test app will open at `http://localhost:3000` with the plugin fully functional using mock data.
 
-**⚠️ Real Downloads Enabled:** The test environment actually downloads files from the internet! See [TEST_URLS.md](TEST_URLS.md) for safe test URLs.
+**✅ Real Downloads Enabled:** The test environment actually downloads files from the internet! See [TEST_URLS.md](TEST_URLS.md) for safe test URLs.
 
-**⚠️ CORS Limitations:** Many websites block cross-origin downloads. If you see CORS errors, this is expected browser security behavior.
+**✅ Files Save Locally:** Downloaded files are automatically saved to your **Downloads folder** with Stash-compatible metadata sidecar files (`.json`). See [IMPORTING_TO_STASH.md](IMPORTING_TO_STASH.md) for how to import them into Stash.
 
-**✅ CORS Bypass Solution:** To test with sites like pornhub, onlyfans, etc.:
-```bash
-# In one terminal, start the CORS proxy:
-npm run test:proxy
+**✅ Auto-Start CORS Proxy:** The CORS proxy starts automatically when you run `npm test` - **no separate terminal needed!** Just toggle it on in the UI if you want to download from sites that block CORS (pornhub, onlyfans, etc.).
 
-# In another terminal, start the test app:
-npm test
-
-# Then in the browser, enable "CORS Proxy" in the settings panel
-```
-
-See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for full details and other solutions.
+See [CORS_LIMITATIONS.md](CORS_LIMITATIONS.md) for full details about CORS.
 
 ## What's Included
 

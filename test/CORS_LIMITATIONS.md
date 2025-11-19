@@ -34,36 +34,28 @@ See [TEST_URLS.md](TEST_URLS.md) for a list of working test URLs.
 
 ## Solutions
 
-### Option 1: Built-in CORS Proxy (Easiest for Testing)
+### Option 1: Built-in CORS Proxy (Easiest for Testing) ⭐
 
-**Use the included local CORS proxy server.** This is the recommended way to test with sites that block CORS.
+**The CORS proxy starts automatically** when you run `npm test` - no separate terminal needed!
 
 **Quick Start:**
 
-1. **Start the CORS proxy** (in a separate terminal):
-   ```bash
-   npm run test:proxy
-   ```
-
-   You should see:
-   ```
-   ╔════════════════════════════════════════════════════════════╗
-   ║  CORS Proxy Server Running                                 ║
-   ║  URL: http://localhost:8080                                ║
-   ╚════════════════════════════════════════════════════════════╝
-   ```
-
-2. **Start the test app** (in another terminal):
+1. **Start the test app:**
    ```bash
    npm test
    ```
 
-3. **Enable proxy in the UI**:
+   You'll see the CORS proxy start automatically:
+   ```
+   🔄 CORS Proxy running at http://localhost:8080
+   ```
+
+2. **Enable proxy in the UI:**
    - In the test app, look for the "CORS Proxy Settings" card at the top
    - Toggle "Enable CORS Proxy" to ON ✅
    - The proxy URL should be `http://localhost:8080` (default)
 
-4. **Test with any URL**:
+3. **Test with any URL:**
    - Paste a URL from pornhub, onlyfans, or any site
    - Click "Add to Queue"
    - Downloads are automatically routed through the proxy

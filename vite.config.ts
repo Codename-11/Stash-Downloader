@@ -1,13 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { corsProxyPlugin } from './vite-plugins/cors-proxy-plugin';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isTestMode = mode === 'test' || process.env.VITE_TEST === 'true';
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Auto-start CORS proxy in test mode
+      ...(isTestMode ? [corsProxyPlugin()] : []),
+    ],
 
     resolve: {
       alias: {

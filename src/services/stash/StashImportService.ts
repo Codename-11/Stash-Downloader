@@ -13,10 +13,21 @@ import type {
 import { ContentType } from '@/types';
 import { getStashService } from './StashGraphQLService';
 import { getDownloadService } from '@/services/download';
+import { getBrowserDownloadService } from '@/services/download/BrowserDownloadService';
 
 export class StashImportService {
   private stashService = getStashService();
   private downloadService = getDownloadService();
+  private browserDownloadService = getBrowserDownloadService();
+
+  /**
+   * Check if running in test mode
+   */
+  private isTestMode(): boolean {
+    if (typeof window === 'undefined') return false;
+    // Check if we're running on localhost:3000 (test server)
+    return window.location.port === '3000' || window.location.hostname === 'localhost';
+  }
 
   /**
    * Import a download item to Stash
@@ -55,8 +66,10 @@ export class StashImportService {
     // Create scene or image based on content type
     const contentType = item.metadata?.contentType || ContentType.Video;
 
+    let result: IStashScene | IStashImage;
+
     if (contentType === ContentType.Video) {
-      return await this.createScene(
+      result = await this.createScene(
         {
           title: item.editedMetadata.title,
           details: item.editedMetadata.description,
@@ -70,7 +83,7 @@ export class StashImportService {
         base64Data
       );
     } else {
-      return await this.createImage(
+      result = await this.createImage(
         {
           title: item.editedMetadata.title,
           rating100: item.editedMetadata.rating,
@@ -81,6 +94,15 @@ export class StashImportService {
         base64Data
       );
     }
+
+    // In test mode, save file to user's computer with metadata
+    if (this.isTestMode()) {
+      console.log('[StashImport] Test mode: Downloading file with metadata to your computer...');
+      await this.browserDownloadService.downloadWithMetadata(item, blob, result);
+      console.log('[StashImport] File saved to Downloads folder!');
+    }
+
+    return result;
   }
 
   /**
