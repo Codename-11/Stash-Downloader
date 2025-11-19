@@ -10,9 +10,10 @@ import { formatBytes } from '@/utils';
 interface QueueItemProps {
   item: IDownloadItem;
   onRemove: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit }) => {
   const getStatusBadge = () => {
     const statusConfig = {
       [DownloadStatus.Pending]: { text: 'Pending', class: 'bg-secondary' },
@@ -71,14 +72,25 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove }) => {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-danger ms-3"
-            onClick={() => onRemove(item.id)}
-            disabled={item.status === DownloadStatus.Downloading}
-          >
-            Remove
-          </button>
+          <div className="btn-group ms-3">
+            {onEdit && item.status === DownloadStatus.Pending && (
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => onEdit(item.id)}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-danger"
+              onClick={() => onRemove(item.id)}
+              disabled={item.status === DownloadStatus.Downloading}
+            >
+              Remove
+            </button>
+          </div>
         </div>
         {getProgressBar()}
       </div>

@@ -2,15 +2,19 @@
  * QueuePage - Main download queue page
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { URLInputForm } from './URLInputForm';
 import { QueueItem } from './QueueItem';
+import { BatchImport } from './BatchImport';
+import { EditWorkflowPage } from './EditWorkflowPage';
 import { useDownloadQueue } from '@/hooks';
 import { getScraperRegistry } from '@/services/metadata';
+import { DownloadStatus } from '@/types';
 
 export const QueuePage: React.FC = () => {
   const queue = useDownloadQueue();
   const scraperRegistry = getScraperRegistry();
+  const [showEditWorkflow, setShowEditWorkflow] = useState(false);
 
   const handleAddUrl = async (url: string) => {
     try {
@@ -24,6 +28,49 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  const handleBatchImport = async (urls: string[]) => {
+    for (const url of urls) {
+      await handleAddUrl(url);
+    }
+  };
+
+  const handleStartEditWorkflow = () => {
+    if (queue.stats.pending > 0) {
+      setShowEditWorkflow(true);
+    }
+  };
+
+  const handleCompleteImport = (itemId: string, stashId: string) => {
+    queue.updateItem(itemId, {
+      status: DownloadStatus.Complete,
+      stashId,
+      completedAt: new Date(),
+    });
+  };
+
+  const handleSkipItem = (itemId: string) => {
+    queue.updateItem(itemId, {
+      status: DownloadStatus.Cancelled,
+    });
+  };
+
+  // Filter pending items for edit workflow
+  const pendingItems = queue.items.filter(
+    (item) => item.status === DownloadStatus.Pending
+  );
+
+  // Show edit workflow if active
+  if (showEditWorkflow) {
+    return (
+      <EditWorkflowPage
+        items={pendingItems}
+        onComplete={handleCompleteImport}
+        onSkip={handleSkipItem}
+        onBack={() => setShowEditWorkflow(false)}
+      />
+    );
+  }
+
   return (
     <div className="container-fluid py-4">
       <div className="row">
@@ -31,6 +78,11 @@ export const QueuePage: React.FC = () => {
           <h2 className="mb-4">Download Queue</h2>
 
           <URLInputForm onSubmit={handleAddUrl} />
+
+          {/* Batch Import */}
+          <div className="mb-4">
+            <BatchImport onImport={handleBatchImport} />
+          </div>
 
           {/* Queue Statistics */}
           <div className="row mb-4">
@@ -64,6 +116,13 @@ export const QueuePage: React.FC = () => {
           {queue.items.length > 0 && (
             <div className="mb-3">
               <button
+                className="btn btn-primary me-2"
+                onClick={handleStartEditWorkflow}
+                disabled={queue.stats.pending === 0}
+              >
+                Edit & Import ({queue.stats.pending} items)
+              </button>
+              <button
                 className="btn btn-sm btn-outline-secondary me-2"
                 onClick={queue.clearCompleted}
                 disabled={queue.stats.complete === 0}
@@ -92,6 +151,13 @@ export const QueuePage: React.FC = () => {
                   key={item.id}
                   item={item}
                   onRemove={queue.removeFromQueue}
+                  onEdit={(id) => {
+                    // Find item and show edit workflow for just this item
+                    const itemToEdit = queue.items.find((i) => i.id === id);
+                    if (itemToEdit) {
+                      setShowEditWorkflow(true);
+                    }
+                  }}
                 />
               ))}
             </div>

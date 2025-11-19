@@ -5,10 +5,14 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 ## Features
 
 - **URL-based Downloads**: Download videos and images from direct URLs or supported sites
+- **Batch Import**: Import multiple URLs at once from clipboard
 - **Metadata Extraction**: Automatically extract and map metadata from sources
+- **Metadata Editor**: Edit and review all metadata before importing to Stash
+- **Smart Selectors**: Autocomplete for performers, tags, and studios with create-new option
 - **Stash Integration**: Create scenes, images, and galleries directly in Stash via GraphQL
 - **Smart Matching**: Match performers, tags, and studios against existing Stash data
 - **Queue Management**: Track multiple downloads with progress indicators
+- **Flexible Workflow**: Edit individual items or batch process entire queue
 - **Customizable Settings**: Configure download paths, quality, auto-creation rules, and more
 
 ## Installation
@@ -131,14 +135,40 @@ Settings are configurable in Stash at Settings > Plugins > Stash Downloader:
 
 ## Usage
 
+### Single URL Import
+
 1. Navigate to the Downloader page (`/downloader`)
-2. Enter a URL in the input field
-3. The plugin will:
-   - Scrape metadata from the URL
-   - Add the item to the download queue
-   - Download the file
-   - Create a Scene/Image/Gallery in Stash with metadata
-4. Monitor progress in the queue
+2. Enter a URL in the input field and click "Add to Queue"
+3. The plugin will scrape metadata from the URL automatically
+4. Click the "Edit" button on any item to review and edit metadata
+5. Click "Edit & Import" to process all pending items
+
+### Batch Import from Clipboard
+
+1. Copy multiple URLs to your clipboard (one per line)
+2. Click "Import from Clipboard" button
+3. Review the detected URLs and click "Import"
+4. All items will be added to the queue with scraped metadata
+
+### Editing & Importing Workflow
+
+1. After adding items to the queue, click "Edit & Import (X items)"
+2. For each item, you can:
+   - Edit title, description, date, and rating
+   - Add/select performers with autocomplete
+   - Add/select tags with autocomplete
+   - Add/select studio
+   - Create new performers/tags/studios on the fly
+3. Click "Save & Import to Stash" to download and create the item in Stash
+4. Click "Skip This Item" to move to the next without importing
+5. Use Previous/Next navigation to move between items
+
+### Progress Tracking
+
+- View queue statistics (total, downloading, complete, failed)
+- Monitor individual item status with badges
+- Track download progress with progress bars
+- Clear completed or failed items as needed
 
 ## Architecture
 
