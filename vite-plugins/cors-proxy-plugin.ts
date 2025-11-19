@@ -23,7 +23,7 @@ export function corsProxyPlugin(): Plugin {
         // Enable CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, User-Agent');
         res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type');
 
         // Handle preflight
