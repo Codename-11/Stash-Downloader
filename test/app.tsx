@@ -15,13 +15,10 @@ import {
 } from './fixtures/mockData';
 import { MockMetadataScraper } from './mocks/mockMetadataScraper';
 
-// Import the plugin entry point
-import '../src/index';
-
 // Import Bootstrap CSS (would normally come from Stash)
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-// Install mock PluginApi before anything else
+// Install mock PluginApi FIRST before loading plugin
 const mockApi = installMockPluginApi();
 
 // Set up mock data
@@ -33,12 +30,15 @@ setMockData({
   images: mockImages,
 });
 
+// Now import the plugin (after PluginApi is installed)
+await import('../src/index');
+
 // Register mock scraper
-import { getScraperRegistry } from '../src/services/metadata';
+const { getScraperRegistry } = await import('../src/services/metadata');
 getScraperRegistry().register(new MockMetadataScraper());
 
 // Replace download service with mock
-import { getMockDownloadService } from './mocks/mockDownloadService';
+const { getMockDownloadService } = await import('./mocks/mockDownloadService');
 // Override the download service getter
 (window as any).__MOCK_DOWNLOAD_SERVICE__ = getMockDownloadService();
 
