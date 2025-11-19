@@ -82,7 +82,7 @@ export default defineConfig(({ mode }) => {
       open: isTestMode,
     },
 
-    // Root for test mode
-    root: isTestMode ? __dirname : undefined,
+    // Root for test mode - points to test directory
+    root: isTestMode ? path.resolve(__dirname, 'test') : undefined,
   };
 });
