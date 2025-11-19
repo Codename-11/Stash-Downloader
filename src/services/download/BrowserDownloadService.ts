@@ -64,8 +64,25 @@ export class BrowserDownloadService {
    * Generate appropriate filename from URL or metadata
    */
   private generateFilename(item: IDownloadItem, blob: Blob): string {
-    // Get the proper file extension from MIME type (most reliable)
-    const ext = this.getExtensionFromMimeType(blob.type);
+    // Try to get extension from multiple sources
+    let ext = this.getExtensionFromMimeType(blob.type);
+
+    // If MIME type detection failed (.bin), try to detect from URL or content type
+    if (ext === '.bin') {
+      console.log('[BrowserDownload] MIME type detection failed, blob.type:', blob.type);
+
+      // Try to get extension from URL
+      const urlExt = this.getExtensionFromUrl(item.url);
+      if (urlExt && urlExt !== '.bin') {
+        ext = urlExt;
+        console.log('[BrowserDownload] Using extension from URL:', ext);
+      } else {
+        // Fallback based on content type metadata
+        const contentType = item.metadata?.contentType || 'video';
+        ext = contentType === 'image' ? '.jpg' : '.mp4';
+        console.log('[BrowserDownload] Using fallback extension:', ext);
+      }
+    }
 
     // Prefer title over URL-based filename
     let baseName: string;
@@ -125,22 +142,66 @@ export class BrowserDownloadService {
   }
 
   /**
+   * Try to get valid media extension from URL
+   */
+  private getExtensionFromUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname.toLowerCase();
+
+      // Valid video extensions
+      const videoExts = ['.mp4', '.webm', '.mkv', '.avi', '.mov', '.flv', '.wmv', '.m4v', '.mpg', '.mpeg'];
+      // Valid image extensions
+      const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+
+      const allValidExts = [...videoExts, ...imageExts];
+
+      // Check if URL ends with a valid media extension
+      for (const ext of allValidExts) {
+        if (pathname.endsWith(ext)) {
+          return ext;
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get file extension from MIME type
    */
   private getExtensionFromMimeType(mimeType: string): string {
+    if (!mimeType) return '.bin';
+
     const mimeToExt: Record<string, string> = {
+      // Video MIME types
       'video/mp4': '.mp4',
       'video/webm': '.webm',
       'video/quicktime': '.mov',
       'video/x-msvideo': '.avi',
       'video/x-matroska': '.mkv',
+      'video/x-flv': '.flv',
+      'video/x-ms-wmv': '.wmv',
+      'video/mpeg': '.mpg',
+
+      // Image MIME types
       'image/jpeg': '.jpg',
       'image/png': '.png',
       'image/gif': '.gif',
       'image/webp': '.webp',
+      'image/bmp': '.bmp',
+      'image/svg+xml': '.svg',
+
+      // Sometimes MIME type has charset, handle that
+      'video/mp4; codecs="avc1.42E01E, mp4a.40.2"': '.mp4',
     };
 
-    return mimeToExt[mimeType] || '.bin';
+    // Handle MIME types with parameters (e.g., "video/mp4; codecs=...")
+    const baseType = mimeType.split(';')[0].trim();
+
+    return mimeToExt[baseType] || mimeToExt[mimeType] || '.bin';
   }
 
   /**

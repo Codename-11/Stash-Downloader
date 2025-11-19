@@ -7,6 +7,7 @@ import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/
 import { PerformerSelector } from '@/components/common/PerformerSelector';
 import { TagSelector } from '@/components/common/TagSelector';
 import { StudioSelector } from '@/components/common/StudioSelector';
+import { getScraperRegistry } from '@/services/metadata';
 
 interface MetadataEditorFormProps {
   item: IDownloadItem;
@@ -26,6 +27,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [performers, setPerformers] = useState<IStashPerformer[]>([]);
   const [tags, setTags] = useState<IStashTag[]>([]);
   const [studio, setStudio] = useState<IStashStudio | null>(null);
+  const [isScraping, setIsScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   // Initialize with scraped metadata
   useEffect(() => {
@@ -43,6 +46,36 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       setRating(item.editedMetadata.rating || 0);
     }
   }, [item]);
+
+  const handleScrapeMetadata = async () => {
+    setIsScraping(true);
+    setScrapeError(null);
+
+    try {
+      console.log('[MetadataEditor] Scraping metadata from:', item.url);
+
+      const scraperRegistry = getScraperRegistry();
+      const metadata = await scraperRegistry.scrape(item.url);
+
+      console.log('[MetadataEditor] Scraped metadata:', metadata);
+
+      // Update form fields with scraped data
+      if (metadata.title) setTitle(metadata.title);
+      if (metadata.description) setDescription(metadata.description);
+      if (metadata.date) setDate(metadata.date);
+
+      // TODO: Convert performer/tag/studio names to IStashPerformer/IStashTag/IStashStudio objects
+      // For now, these would need to be matched against Stash database
+      // or created as new entries
+
+      setScrapeError(null);
+    } catch (error) {
+      console.error('[MetadataEditor] Scraping failed:', error);
+      setScrapeError(error instanceof Error ? error.message : 'Failed to scrape metadata');
+    } finally {
+      setIsScraping(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,16 +112,46 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             </div>
           )}
 
-          {/* Source URL */}
+          {/* Source URL with Scrape button */}
           <div className="mb-3">
             <label className="form-label">Source URL</label>
-            <input
-              type="text"
-              className="form-control"
-              value={item.url}
-              disabled
-              readOnly
-            />
+            <div className="input-group">
+              <input
+                type="text"
+                className="form-control"
+                value={item.url}
+                disabled
+                readOnly
+              />
+              <button
+                type="button"
+                className="btn btn-outline-primary"
+                onClick={handleScrapeMetadata}
+                disabled={isScraping}
+              >
+                {isScraping ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Scraping...
+                  </>
+                ) : (
+                  <>
+                    🔍 Scrape Metadata
+                  </>
+                )}
+              </button>
+            </div>
+            {scrapeError && (
+              <div className="text-danger small mt-1">
+                {scrapeError}
+              </div>
+            )}
+            <div className="form-text">
+              Click "Scrape Metadata" to fetch title, description, and other data from the website.
+              {!localStorage.getItem('corsProxyEnabled') && (
+                <span className="text-warning"> Enable CORS proxy for better results!</span>
+              )}
+            </div>
           </div>
 
           {/* Title */}
