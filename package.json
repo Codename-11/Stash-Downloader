@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "tsc && vite build",
+    "test": "VITE_TEST=true vite --mode test",
+    "test:build": "VITE_TEST=true vite build --mode test",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -35,7 +37,11 @@
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   },
-  "dependencies": {},
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "peerDependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0"

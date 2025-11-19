@@ -55,6 +55,32 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 
 ## Development
 
+### Testing Without Stash
+
+You can develop and test the plugin **without a running Stash instance**:
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start test environment (opens browser at http://localhost:3000)
+pnpm test
+```
+
+This runs a complete mock environment with:
+- Mock PluginApi with in-memory GraphQL
+- Pre-loaded test data (3 performers, 4 tags, 2 studios)
+- Simulated file downloads with progress tracking
+- All plugin features fully functional
+- Hot reload for rapid development
+
+**Test URLs that work:**
+- `https://example.com/video1.mp4`
+- `https://example.com/video2.mp4`
+- `https://example.com/image1.jpg`
+
+See [`test/README.md`](test/README.md) for detailed testing documentation.
+
 ### Project Structure
 
 ```
@@ -72,6 +98,16 @@ src/
 ├── utils/             # Utilities
 ├── constants/         # Constants
 └── index.tsx          # Plugin entry point
+
+test/
+├── mocks/             # Mock implementations
+│   ├── mockPluginApi.ts      # Mock Stash PluginApi
+│   ├── mockDownloadService.ts # Mock downloads
+│   └── mockMetadataScraper.ts # Mock scraper
+├── fixtures/          # Test data
+│   └── mockData.ts    # Performers, tags, studios
+├── utils/             # Test utilities
+└── app.tsx            # Standalone test app
 ```
 
 ### Available Scripts
