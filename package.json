@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "tsc && vite build",
-    "test": "VITE_TEST=true vite --mode test",
-    "test:build": "VITE_TEST=true vite build --mode test",
+    "test": "cross-env VITE_TEST=true vite --mode test",
+    "test:build": "cross-env VITE_TEST=true vite build --mode test",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -30,6 +30,7 @@
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^7.0.3",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",

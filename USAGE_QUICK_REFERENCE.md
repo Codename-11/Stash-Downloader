@@ -9,7 +9,7 @@ Quick reference card for common tasks and commands.
 cd ~/.stash/plugins  # or %USERPROFILE%\.stash\plugins on Windows
 git clone https://github.com/Codename-11/Stash-Downloader.git stash-downloader
 cd stash-downloader
-pnpm install && pnpm build
+npm install && npm run build
 
 # Then enable in Stash: Settings → Plugins → Stash Downloader
 ```
@@ -138,20 +138,20 @@ pnpm install && pnpm build
 
 ```bash
 # Test without Stash
-pnpm test               # Opens browser at localhost:3000
+npm test                # Opens browser at localhost:3000
 
 # Build for production
-pnpm build              # Creates dist/stash-downloader.js
+npm run build           # Creates dist/stash-downloader.js
 
 # Watch mode
-pnpm dev                # Auto-rebuild on changes
+npm run dev             # Auto-rebuild on changes
 
 # Type checking
-pnpm type-check         # Run TypeScript compiler
+npm run type-check      # Run TypeScript compiler
 
 # Code quality
-pnpm lint               # ESLint
-pnpm format             # Prettier
+npm run lint            # ESLint
+npm run format          # Prettier
 ```
 
 ---
@@ -220,8 +220,8 @@ mutation CreateScene($input: SceneCreateInput!) {
 ```bash
 cd ~/.stash/plugins/stash-downloader
 git pull
-pnpm install
-pnpm build
+npm install
+npm run build
 ```
 
 ---

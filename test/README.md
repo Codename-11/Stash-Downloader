@@ -6,13 +6,13 @@ This directory contains a complete test environment for developing and testing t
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Start test server (opens browser automatically)
-pnpm test
+npm test
 
 # Build test version
-pnpm test:build
+npm run test:build
 ```
 
 The test app will open at `http://localhost:3000` with the plugin fully functional using mock data.
@@ -150,7 +150,7 @@ getMockData().performers
 
 1. **Start test server:**
    ```bash
-   pnpm test
+   npm test
    ```
 
 2. **Make changes to source code** in `src/`
@@ -163,7 +163,7 @@ getMockData().performers
 
 6. **Build plugin** when ready:
    ```bash
-   pnpm build
+   npm run build
    ```
 
 ### Debugging
@@ -313,8 +313,11 @@ if (Math.random() < 0.1) {
 ### Port 3000 already in use
 
 ```bash
-# Use different port
-PORT=3001 pnpm test
+# Use different port (Linux/macOS)
+PORT=3001 npm test
+
+# Windows
+set PORT=3001 && npm test
 ```
 
 ### Changes not appearing
@@ -369,7 +372,7 @@ The test environment can be used for automated testing:
 
 ```bash
 # Build test version
-pnpm test:build
+npm run test:build
 
 # Run in headless browser (example with Playwright)
 npx playwright test
