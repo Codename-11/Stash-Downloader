@@ -26,12 +26,19 @@ export class StashImportService {
       throw new Error('Item must have edited metadata before import');
     }
 
+    console.log('[StashImport] Starting import for:', item.url);
+
     // Download the file
+    console.log('[StashImport] Downloading file...');
     const blob = await this.downloadService.download(item.url, {
       onProgress: (progress) => {
-        console.log('Download progress:', progress);
+        console.log('[StashImport] Download progress:',
+          `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
+        );
       },
     });
+
+    console.log('[StashImport] Download complete, file size:', blob.size, 'bytes');
 
     // Convert to base64 for uploading
     const base64Data = await this.blobToBase64(blob);

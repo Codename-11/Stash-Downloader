@@ -37,10 +37,9 @@ await import('../src/index');
 const { getScraperRegistry } = await import('../src/services/metadata');
 getScraperRegistry().register(new MockMetadataScraper());
 
-// Replace download service with mock
-const { getMockDownloadService } = await import('./mocks/mockDownloadService');
-// Override the download service getter
-(window as any).__MOCK_DOWNLOAD_SERVICE__ = getMockDownloadService();
+// NOTE: We DON'T override the download service - use real downloads
+// This allows testing actual file downloads from real URLs
+console.log('[Test] Using REAL download service for actual file downloads');
 
 // Get the registered routes
 const routes = (mockApi as any)._getRoutes();
@@ -72,6 +71,7 @@ const TestApp: React.FC = () => {
             <li>Mock PluginApi installed</li>
             <li>Mock data loaded: {mockPerformers.length} performers, {mockTags.length} tags, {mockStudios.length} studios</li>
             <li>Mock scraper registered</li>
+            <li><strong>Real downloads enabled</strong> - Files will actually be fetched from URLs</li>
             <li>Current route: <code>{currentRoute}</code></li>
           </ul>
         </div>
