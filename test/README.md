@@ -17,6 +17,8 @@ npm run test:build
 
 The test app will open at `http://localhost:3000` with the plugin fully functional using mock data.
 
+**⚠️ Real Downloads Enabled:** The test environment actually downloads files from the internet! See [TEST_URLS.md](TEST_URLS.md) for safe test URLs.
+
 ## What's Included
 
 ### Mock PluginApi (`mocks/mockPluginApi.ts`)
