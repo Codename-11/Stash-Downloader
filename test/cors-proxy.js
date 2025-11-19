@@ -10,11 +10,10 @@
  * Then in test app, enable "Use CORS Proxy" in settings.
  */
 
-const http = require('http');
-const https = require('https');
-const url = require('url');
+import http from 'http';
+import https from 'https';
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const HOST = 'localhost';
 
 const server = http.createServer((req, res) => {
@@ -46,13 +45,24 @@ const server = http.createServer((req, res) => {
 
   console.log(`[CORS Proxy] ${req.method} ${targetUrl}`);
 
-  const parsedUrl = url.parse(targetUrl);
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(targetUrl);
+  } catch (error) {
+    res.writeHead(400);
+    res.end(JSON.stringify({
+      error: 'Invalid URL format',
+      message: error.message
+    }));
+    return;
+  }
+
   const protocol = parsedUrl.protocol === 'https:' ? https : http;
 
   const options = {
     hostname: parsedUrl.hostname,
     port: parsedUrl.port,
-    path: parsedUrl.path,
+    path: parsedUrl.pathname + parsedUrl.search,
     method: req.method,
     headers: {
       ...req.headers,
@@ -101,7 +111,7 @@ server.listen(PORT, HOST, () => {
 ║  Status: Ready to proxy requests                           ║
 ╟────────────────────────────────────────────────────────────╢
 ║  Usage:                                                    ║
-║    http://localhost:8080/https://example.com/video.mp4    ║
+║    http://localhost:${PORT}/https://example.com/video.mp4    ║
 ║                                                            ║
 ║  In test app:                                              ║
 ║    1. Enable "Use CORS Proxy" in settings                  ║
@@ -124,7 +134,8 @@ Try:
      - Linux/Mac: lsof -ti:${PORT} | xargs kill -9
 
   2. Or run proxy on different port:
-     PORT=8081 node test/cors-proxy.js
+     - Windows: set PORT=8081 && node test/cors-proxy.js
+     - Linux/Mac: PORT=8081 node test/cors-proxy.js
     `);
   } else {
     console.error('Server error:', error);
