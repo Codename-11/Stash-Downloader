@@ -8,6 +8,8 @@
 import type { Plugin } from 'vite';
 import http from 'http';
 import https from 'https';
+import { spawn } from 'child_process';
+import { URL as URLParser } from 'url';
 
 export function corsProxyPlugin(): Plugin {
   let proxyServer: http.Server | null = null;
@@ -30,6 +32,12 @@ export function corsProxyPlugin(): Plugin {
         if (req.method === 'OPTIONS') {
           res.writeHead(200);
           res.end();
+          return;
+        }
+
+        // Check if this is a yt-dlp extraction request
+        if (req.url?.startsWith('/api/extract?')) {
+          handleYtDlpExtraction(req, res);
           return;
         }
 
@@ -100,6 +108,82 @@ export function corsProxyPlugin(): Plugin {
 
         req.pipe(proxyReq);
       });
+
+      /**
+       * Handle yt-dlp extraction requests
+       */
+      function handleYtDlpExtraction(req: http.IncomingMessage, res: http.ServerResponse) {
+        const urlParams = new URLParser(req.url || '', `http://${req.headers.host}`);
+        const videoUrl = urlParams.searchParams.get('url');
+
+        if (!videoUrl) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Missing url parameter',
+            usage: '/api/extract?url=https://example.com/video'
+          }));
+          return;
+        }
+
+        console.log(`[yt-dlp] Extracting metadata for: ${videoUrl}`);
+
+        const ytDlp = spawn('yt-dlp', [
+          '--dump-json',
+          '--no-playlist',
+          '--no-warnings',
+          videoUrl
+        ]);
+
+        let stdout = '';
+        let stderr = '';
+
+        ytDlp.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        ytDlp.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        ytDlp.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`[yt-dlp] Error (exit code ${code}):`, stderr);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: 'yt-dlp extraction failed',
+              exitCode: code,
+              stderr: stderr,
+              message: 'Make sure yt-dlp is installed: pip install yt-dlp'
+            }));
+            return;
+          }
+
+          try {
+            const data = JSON.parse(stdout);
+            console.log(`[yt-dlp] ✓ Extracted metadata for: ${data.title}`);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+          } catch (error: any) {
+            console.error(`[yt-dlp] Failed to parse JSON:`, error.message);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: 'Failed to parse yt-dlp output',
+              message: error.message
+            }));
+          }
+        });
+
+        ytDlp.on('error', (error: any) => {
+          console.error(`[yt-dlp] Failed to start:`, error.message);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Failed to start yt-dlp',
+            message: error.message,
+            hint: 'Make sure yt-dlp is installed: pip install yt-dlp'
+          }));
+        });
+      }
 
       proxyServer.listen(PORT, HOST, () => {
         console.log(`\n🔄 CORS Proxy running at http://${HOST}:${PORT}`);

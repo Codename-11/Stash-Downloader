@@ -7,6 +7,7 @@ import { GenericScraper } from './GenericScraper';
 import { HTMLScraper } from './HTMLScraper';
 import { PornhubScraper } from './PornhubScraper';
 import { YouPornScraper } from './YouPornScraper';
+import { YtDlpScraper } from './YtDlpScraper';
 import { extractDomain } from '@/utils';
 
 export class ScraperRegistry {
@@ -17,7 +18,8 @@ export class ScraperRegistry {
     this.fallbackScraper = new GenericScraper();
 
     // Register built-in scrapers
-    // Order matters: more specific scrapers first, generic ones last
+    // Order matters: yt-dlp first (if available), then specific scrapers, then generic
+    this.register(new YtDlpScraper());  // Try yt-dlp first for all URLs
     this.register(new PornhubScraper());
     this.register(new YouPornScraper());
     this.register(new HTMLScraper());
@@ -61,9 +63,44 @@ export class ScraperRegistry {
 
   /**
    * Scrape metadata from URL
+   * Tries yt-dlp first, falls back to HTML scrapers if it fails
    */
   async scrape(url: string): Promise<IScrapedMetadata> {
     const scraper = this.findScraper(url);
+
+    // If using yt-dlp, try it but fall back to other scrapers if it fails
+    if (scraper.name === 'yt-dlp') {
+      try {
+        return await scraper.scrape(url);
+      } catch (error) {
+        console.warn('[ScraperRegistry] yt-dlp failed, falling back to HTML scrapers:', error);
+
+        // Find the next best scraper (skip yt-dlp)
+        const fallbackScraper = this.scrapers.find(
+          (s) => s.name !== 'yt-dlp' && !s.supportedDomains.includes('*') && s.canHandle(url)
+        );
+
+        if (fallbackScraper) {
+          console.log(`[ScraperRegistry] Using fallback scraper: ${fallbackScraper.name}`);
+          return await fallbackScraper.scrape(url);
+        }
+
+        // Try wildcard scrapers
+        const wildcardScraper = this.scrapers.find(
+          (s) => s.name !== 'yt-dlp' && s.supportedDomains.includes('*') && s.canHandle(url)
+        );
+
+        if (wildcardScraper) {
+          console.log(`[ScraperRegistry] Using wildcard fallback: ${wildcardScraper.name}`);
+          return await wildcardScraper.scrape(url);
+        }
+
+        // Last resort: use generic scraper
+        console.log('[ScraperRegistry] Using final fallback: GenericScraper');
+        return await this.fallbackScraper.scrape(url);
+      }
+    }
+
     return await scraper.scrape(url);
   }
 
