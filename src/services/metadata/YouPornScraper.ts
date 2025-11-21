@@ -126,10 +126,53 @@ export class YouPornScraper implements IMetadataScraper {
     try {
       console.log('[YouPornScraper] Attempting to extract video URL...');
 
-      // YouPorn typically embeds video data in window.videoData or similar JavaScript variables
+      // YouPorn embeds video data in page_params.video_player_setup object
+      // This is the method used by yt-dlp (from PR #8827)
 
-      // Method 1: Look for window.videoData or similar objects
-      console.log('[YouPornScraper] Trying method 1: window.videoData...');
+      // Method 1: Look for page_params.video_player_setup (yt-dlp method)
+      console.log('[YouPornScraper] Trying method 1: page_params.video_player_setup (yt-dlp method)...');
+      const playerSetupMatch = html.match(/page_params\.video_player_setup\s*=\s*(\{[\s\S]*?\});/);
+      if (playerSetupMatch) {
+        console.log('[YouPornScraper] Found page_params.video_player_setup, parsing...');
+        try {
+          const playerSetup = JSON.parse(playerSetupMatch[1]);
+          console.log('[YouPornScraper] playerSetup keys:', Object.keys(playerSetup));
+
+          if (playerSetup.mediaDefinitions) {
+            const mediaDefs = Array.isArray(playerSetup.mediaDefinitions)
+              ? playerSetup.mediaDefinitions
+              : JSON.parse(playerSetup.mediaDefinitions);
+
+            console.log(`[YouPornScraper] Found ${mediaDefs.length} media definitions`);
+
+            // Filter for MP4 videos and sort by quality
+            const videos = mediaDefs
+              .filter((def: any) => def.format === 'mp4' && def.videoUrl)
+              .map((def: any) => ({
+                url: def.videoUrl,
+                quality: parseInt(def.quality) || 0,
+                format: def.format,
+              }))
+              .sort((a: any, b: any) => b.quality - a.quality);
+
+            console.log('[YouPornScraper] Available qualities from page_params:');
+            videos.forEach((v: any) => {
+              console.log(`  - ${v.quality}p: ${v.url.substring(0, 100)}...`);
+            });
+
+            if (videos.length > 0) {
+              console.log(`[YouPornScraper] ✓ Found ${videos.length} video URLs, selecting highest quality: ${videos[0].quality}p`);
+              console.log('[YouPornScraper] Video URL:', videos[0].url);
+              return videos[0].url;
+            }
+          }
+        } catch (e) {
+          console.error('[YouPornScraper] Failed to parse page_params.video_player_setup:', e);
+        }
+      }
+
+      // Method 2: Look for window.videoData or similar objects
+      console.log('[YouPornScraper] Trying method 2: window.videoData...');
       const videoDataMatch = html.match(/window\.videoData\s*=\s*(\{[\s\S]*?\});/);
       if (videoDataMatch) {
         console.log('[YouPornScraper] Found window.videoData, parsing...');
@@ -162,9 +205,9 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 2: Look for "video":"..." pattern with escaped JSON URLs
+      // Method 3: Look for "video":"..." pattern with escaped JSON URLs
       // Find ALL video URLs and select the highest quality
-      console.log('[YouPornScraper] Trying method 2: JSON-escaped video URLs...');
+      console.log('[YouPornScraper] Trying method 3: JSON-escaped video URLs...');
       const escapedVideoMatches = html.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/gi);
       if (escapedVideoMatches && escapedVideoMatches.length > 0) {
         console.log(`[YouPornScraper] Found ${escapedVideoMatches.length} video URLs with escaped slashes`);
@@ -205,8 +248,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 2b: Look for ALL .mp4 URLs in the page (broader search)
-      console.log('[YouPornScraper] Trying method 2b: searching for ALL .mp4 URLs in page...');
+      // Method 3b: Look for ALL .mp4 URLs in the page (broader search)
+      console.log('[YouPornScraper] Trying method 3b: searching for ALL .mp4 URLs in page...');
       const allMp4Matches = html.match(/https?:\\\/\\\/[^"']+\.mp4[^"']*/gi);
       if (allMp4Matches && allMp4Matches.length > 0) {
         console.log(`[YouPornScraper] Found ${allMp4Matches.length} total .mp4 URLs in HTML (escaped)`);
@@ -243,8 +286,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 3: Look for data-video-urls or similar data attributes
-      console.log('[YouPornScraper] Trying method 3: data-video-urls attribute...');
+      // Method 4: Look for data-video-urls or similar data attributes
+      console.log('[YouPornScraper] Trying method 4: data-video-urls attribute...');
       const videoElement = doc.querySelector('[data-video-urls]');
       if (videoElement) {
         const videoUrlsAttr = videoElement.getAttribute('data-video-urls');
@@ -271,8 +314,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 4: Look for JSON-LD structured data
-      console.log('[YouPornScraper] Trying method 4: JSON-LD structured data...');
+      // Method 5: Look for JSON-LD structured data
+      console.log('[YouPornScraper] Trying method 5: JSON-LD structured data...');
       const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
       for (const script of Array.from(jsonLdScripts)) {
         try {
@@ -286,8 +329,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 5: Look for media definitions in various JavaScript patterns
-      console.log('[YouPornScraper] Trying method 5: various JavaScript patterns...');
+      // Method 6: Look for media definitions in various JavaScript patterns
+      console.log('[YouPornScraper] Trying method 6: various JavaScript patterns...');
 
       // Pattern: mediaDefinitions = [...]
       const mediaDefMatch = html.match(/mediaDefinitions\s*=\s*(\[[\s\S]*?\]);/);
@@ -313,8 +356,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 6: Look for <video> element with source (backup)
-      console.log('[YouPornScraper] Trying method 6: <video> element...');
+      // Method 7: Look for <video> element with source (backup)
+      console.log('[YouPornScraper] Trying method 7: <video> element...');
       const videoTag = doc.querySelector('video source');
       if (videoTag) {
         const src = videoTag.getAttribute('src');
@@ -324,8 +367,8 @@ export class YouPornScraper implements IMetadataScraper {
         }
       }
 
-      // Method 7: Look for any large JSON object in scripts that might contain video data
-      console.log('[YouPornScraper] Trying method 7: searching all script tags for video URLs...');
+      // Method 8: Look for any large JSON object in scripts that might contain video data
+      console.log('[YouPornScraper] Trying method 8: searching all script tags for video URLs...');
       const allScripts = doc.querySelectorAll('script:not([src])');
       for (const script of Array.from(allScripts)) {
         const scriptContent = script.textContent || '';
