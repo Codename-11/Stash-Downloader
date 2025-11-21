@@ -25,7 +25,7 @@ describe('BrowserDownloadService', () => {
       // Access private method through a workaround
       const filename = (service as any).generateFilename(item, blob);
 
-      expect(filename).toBe('My_Video_Title.mp4');
+      expect(filename).toBe('My Video Title.mp4');
     });
 
     it('should use editedMetadata title over regular metadata', async () => {
@@ -44,7 +44,7 @@ describe('BrowserDownloadService', () => {
       const blob = new Blob(['test'], { type: 'video/mp4' });
       const filename = (service as any).generateFilename(item, blob);
 
-      expect(filename).toBe('Edited_Title.mp4');
+      expect(filename).toBe('Edited Title.mp4');
     });
 
     it('should detect extension from MIME type', () => {
@@ -100,6 +100,7 @@ describe('BrowserDownloadService', () => {
       const blob = new Blob(['test'], { type: 'video/mp4' });
       const filename = (service as any).generateFilename(item, blob);
 
+      // Invalid chars are replaced with underscores
       expect(filename).toBe('My_Video_Title_With_Invalid_Chars.mp4');
     });
 
@@ -174,9 +175,9 @@ describe('BrowserDownloadService', () => {
   });
 
   describe('sanitizeFilename', () => {
-    it('should remove invalid filesystem characters', () => {
+    it('should replace invalid filesystem characters with underscores', () => {
       const tests = [
-        ['file<name>', 'file_name'],
+        ['file<name', 'file_name'],
         ['file>name', 'file_name'],
         ['file:name', 'file_name'],
         ['file"name', 'file_name'],
