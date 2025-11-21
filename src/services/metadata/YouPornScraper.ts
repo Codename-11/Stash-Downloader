@@ -163,14 +163,40 @@ export class YouPornScraper implements IMetadataScraper {
       }
 
       // Method 2: Look for "video":"..." pattern with escaped JSON URLs
+      // Find ALL video URLs and select the highest quality
       console.log('[YouPornScraper] Trying method 2: JSON-escaped video URLs...');
-      const escapedVideoMatch = html.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/i);
-      if (escapedVideoMatch) {
-        console.log('[YouPornScraper] Found escaped video URL, unescaping...');
-        // Unescape the JSON string (replace \/ with /)
-        const unescapedUrl = escapedVideoMatch[1].replace(/\\\//g, '/');
-        console.log('[YouPornScraper] ✓ Found and unescaped video URL:', unescapedUrl);
-        return unescapedUrl;
+      const escapedVideoMatches = html.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/gi);
+      if (escapedVideoMatches && escapedVideoMatches.length > 0) {
+        console.log(`[YouPornScraper] Found ${escapedVideoMatches.length} video URLs with escaped slashes`);
+
+        // Extract and parse all URLs with their quality info
+        const videos = escapedVideoMatches.map(match => {
+          const urlMatch = match.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/i);
+          if (!urlMatch) return null;
+
+          const escapedUrl = urlMatch[1];
+          const unescapedUrl = escapedUrl.replace(/\\\//g, '/');
+
+          // Extract quality from URL (e.g., "360P_360K" or "1080P_2000K")
+          const qualityMatch = unescapedUrl.match(/\/(\d+)P_(\d+)K_/);
+          const quality = qualityMatch ? parseInt(qualityMatch[1]) : 0;
+          const bitrate = qualityMatch ? parseInt(qualityMatch[2]) : 0;
+
+          return { url: unescapedUrl, quality, bitrate };
+        }).filter(v => v !== null) as Array<{url: string, quality: number, bitrate: number}>;
+
+        if (videos.length > 0) {
+          // Sort by quality (highest first), then by bitrate
+          videos.sort((a, b) => {
+            if (b.quality !== a.quality) return b.quality - a.quality;
+            return b.bitrate - a.bitrate;
+          });
+
+          const bestVideo = videos[0];
+          console.log(`[YouPornScraper] ✓ Found ${videos.length} video URLs, selecting highest quality: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
+          console.log('[YouPornScraper] Video URL:', bestVideo.url);
+          return bestVideo.url;
+        }
       }
 
       // Method 3: Look for data-video-urls or similar data attributes

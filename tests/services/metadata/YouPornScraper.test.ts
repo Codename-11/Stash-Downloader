@@ -176,6 +176,22 @@ describe('YouPornScraper', () => {
       expect(videoUrl).toBe('https://ev-ph.ypncdn.com/videos/202205/11/407902931/360P_360K_407902931_fb.mp4?validfrom=123');
     });
 
+    it('should select highest quality when multiple escaped video URLs exist', () => {
+      const html = `
+        <script>
+          var data = {
+            "360p": {"video":"https:\\/\\/example.com\\/videos\\/360P_400K_video.mp4"},
+            "720p": {"video":"https:\\/\\/example.com\\/videos\\/720P_1500K_video.mp4"},
+            "1080p": {"video":"https:\\/\\/example.com\\/videos\\/1080P_3000K_video.mp4"},
+            "480p": {"video":"https:\\/\\/example.com\\/videos\\/480P_800K_video.mp4"}
+          };
+        </script>
+      `;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const videoUrl = (scraper as any).extractVideoUrl(html, doc);
+      expect(videoUrl).toBe('https://example.com/videos/1080P_3000K_video.mp4');
+    });
+
     it('should extract video URL from JSON-LD', () => {
       const html = `
         <script type="application/ld+json">
