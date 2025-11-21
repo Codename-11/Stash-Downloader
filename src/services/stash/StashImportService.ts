@@ -39,9 +39,19 @@ export class StashImportService {
 
     console.log('[StashImport] Starting import for:', item.url);
 
+    // Determine which URL to download from
+    // If scraper found a direct video URL, use that instead of the page URL
+    const downloadUrl = item.metadata?.videoUrl || item.url;
+
+    if (item.metadata?.videoUrl) {
+      console.log('[StashImport] Using direct video URL:', downloadUrl);
+    } else {
+      console.log('[StashImport] Using page URL (no direct video URL found):', downloadUrl);
+    }
+
     // Download the file
     console.log('[StashImport] Downloading file...');
-    const blob = await this.downloadService.download(item.url, {
+    const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
         console.log('[StashImport] Download progress:',
           `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`

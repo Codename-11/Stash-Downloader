@@ -30,6 +30,7 @@ export interface IScrapedMetadata {
   description?: string;
   date?: string;
   url: string;
+  videoUrl?: string; // Actual video file URL (if different from page URL)
   performers?: string[];
   tags?: string[];
   studio?: string;

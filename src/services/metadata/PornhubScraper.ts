@@ -111,7 +111,81 @@ export class PornhubScraper implements IMetadataScraper {
     // Upload date
     metadata.date = this.extractDate(doc);
 
+    // Video URL (actual video file)
+    metadata.videoUrl = this.extractVideoUrl(html, doc);
+
     return metadata;
+  }
+
+  /**
+   * Extract actual video URL from page
+   */
+  private extractVideoUrl(html: string, doc: Document): string | undefined {
+    try {
+      // Pornhub embeds video URLs in JavaScript variables
+      // Look for mediaDefinitions or flashvars
+
+      // Method 1: Look for mediaDefinitions in script tags
+      const scriptMatch = html.match(/var\s+mediaDefinitions\s*=\s*(\[.*?\]);/s);
+      if (scriptMatch) {
+        const mediaDefinitions = JSON.parse(scriptMatch[1]);
+
+        // Find highest quality video
+        const videos = mediaDefinitions
+          .filter((def: any) => def.format === 'mp4')
+          .sort((a: any, b: any) => {
+            const qualityA = parseInt(a.quality) || 0;
+            const qualityB = parseInt(b.quality) || 0;
+            return qualityB - qualityA;
+          });
+
+        if (videos.length > 0 && videos[0].videoUrl) {
+          console.log('[PornhubScraper] Found video URL:', videos[0].videoUrl);
+          return videos[0].videoUrl;
+        }
+      }
+
+      // Method 2: Look for flashvars
+      const flashvarsMatch = html.match(/var\s+flashvars[^=]*=\s*(\{.*?\});/s);
+      if (flashvarsMatch) {
+        const flashvars = JSON.parse(flashvarsMatch[1]);
+
+        if (flashvars.mediaDefinitions) {
+          const defs = typeof flashvars.mediaDefinitions === 'string'
+            ? JSON.parse(flashvars.mediaDefinitions)
+            : flashvars.mediaDefinitions;
+
+          const videos = defs
+            .filter((def: any) => def.format === 'mp4')
+            .sort((a: any, b: any) => {
+              const qualityA = parseInt(a.quality) || 0;
+              const qualityB = parseInt(b.quality) || 0;
+              return qualityB - qualityA;
+            });
+
+          if (videos.length > 0 && videos[0].videoUrl) {
+            console.log('[PornhubScraper] Found video URL from flashvars:', videos[0].videoUrl);
+            return videos[0].videoUrl;
+          }
+        }
+      }
+
+      // Method 3: Look for video tags (backup)
+      const videoElement = doc.querySelector('video source');
+      if (videoElement) {
+        const src = videoElement.getAttribute('src');
+        if (src) {
+          console.log('[PornhubScraper] Found video URL from video element:', src);
+          return src;
+        }
+      }
+
+      console.warn('[PornhubScraper] Could not find video URL in page');
+      return undefined;
+    } catch (error) {
+      console.error('[PornhubScraper] Error extracting video URL:', error);
+      return undefined;
+    }
   }
 
   /**
