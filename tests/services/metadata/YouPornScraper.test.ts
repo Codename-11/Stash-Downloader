@@ -165,6 +165,17 @@ describe('YouPornScraper', () => {
       expect(videoUrl).toBe('https://example.com/video-1080.mp4');
     });
 
+    it('should extract and unescape JSON-escaped video URLs', () => {
+      const html = `
+        <script>
+          var settings = {"video":"https:\\/\\/ev-ph.ypncdn.com\\/videos\\/202205\\/11\\/407902931\\/360P_360K_407902931_fb.mp4?validfrom=123"};
+        </script>
+      `;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const videoUrl = (scraper as any).extractVideoUrl(html, doc);
+      expect(videoUrl).toBe('https://ev-ph.ypncdn.com/videos/202205/11/407902931/360P_360K_407902931_fb.mp4?validfrom=123');
+    });
+
     it('should extract video URL from JSON-LD', () => {
       const html = `
         <script type="application/ld+json">
