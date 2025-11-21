@@ -185,6 +185,12 @@ export class YouPornScraper implements IMetadataScraper {
           return { url: unescapedUrl, quality, bitrate };
         }).filter(v => v !== null) as Array<{url: string, quality: number, bitrate: number}>;
 
+        // DEBUG: Log all found URLs with their qualities
+        console.log('[YouPornScraper] All video URLs found:');
+        videos.forEach(v => {
+          console.log(`  - ${v.quality}p @ ${v.bitrate}k: ${v.url}`);
+        });
+
         if (videos.length > 0) {
           // Sort by quality (highest first), then by bitrate
           videos.sort((a, b) => {
@@ -193,7 +199,45 @@ export class YouPornScraper implements IMetadataScraper {
           });
 
           const bestVideo = videos[0];
-          console.log(`[YouPornScraper] ✓ Found ${videos.length} video URLs, selecting highest quality: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
+          console.log(`[YouPornScraper] ✓ Selecting highest quality: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
+          console.log('[YouPornScraper] Video URL:', bestVideo.url);
+          return bestVideo.url;
+        }
+      }
+
+      // Method 2b: Look for ALL .mp4 URLs in the page (broader search)
+      console.log('[YouPornScraper] Trying method 2b: searching for ALL .mp4 URLs in page...');
+      const allMp4Matches = html.match(/https?:\\\/\\\/[^"']+\.mp4[^"']*/gi);
+      if (allMp4Matches && allMp4Matches.length > 0) {
+        console.log(`[YouPornScraper] Found ${allMp4Matches.length} total .mp4 URLs in HTML (escaped)`);
+
+        const allVideos = allMp4Matches.map(escapedUrl => {
+          const unescapedUrl = escapedUrl.replace(/\\\//g, '/');
+          const qualityMatch = unescapedUrl.match(/\/(\d+)P_(\d+)K_/);
+          const quality = qualityMatch ? parseInt(qualityMatch[1]) : 0;
+          const bitrate = qualityMatch ? parseInt(qualityMatch[2]) : 0;
+          return { url: unescapedUrl, quality, bitrate };
+        }).filter(v => v.quality > 0); // Only keep URLs with identifiable quality
+
+        // Remove duplicates
+        const uniqueVideos = allVideos.filter((v, i, arr) =>
+          arr.findIndex(x => x.url === v.url) === i
+        );
+
+        if (uniqueVideos.length > 0) {
+          console.log('[YouPornScraper] All unique .mp4 URLs with quality info:');
+          uniqueVideos.forEach(v => {
+            console.log(`  - ${v.quality}p @ ${v.bitrate}k`);
+          });
+
+          // Sort and select highest
+          uniqueVideos.sort((a, b) => {
+            if (b.quality !== a.quality) return b.quality - a.quality;
+            return b.bitrate - a.bitrate;
+          });
+
+          const bestVideo = uniqueVideos[0];
+          console.log(`[YouPornScraper] ✓ Selecting highest quality from all .mp4 URLs: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
           console.log('[YouPornScraper] Video URL:', bestVideo.url);
           return bestVideo.url;
         }
