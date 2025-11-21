@@ -6,6 +6,7 @@ import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { GenericScraper } from './GenericScraper';
 import { HTMLScraper } from './HTMLScraper';
 import { PornhubScraper } from './PornhubScraper';
+import { YouPornScraper } from './YouPornScraper';
 import { extractDomain } from '@/utils';
 
 export class ScraperRegistry {
@@ -18,6 +19,7 @@ export class ScraperRegistry {
     // Register built-in scrapers
     // Order matters: more specific scrapers first, generic ones last
     this.register(new PornhubScraper());
+    this.register(new YouPornScraper());
     this.register(new HTMLScraper());
   }
 
