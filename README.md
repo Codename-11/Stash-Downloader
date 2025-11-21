@@ -3,7 +3,7 @@
 A React-based web-UI plugin for Stash that enables downloading images and videos from external sources with automatic metadata extraction, tagging, and organization.
 
 📖 **[Quick Reference Guide](USAGE_QUICK_REFERENCE.md)** - Common tasks and commands
-🧪 **[Test Environment Guide](test/README.md)** - Develop without Stash
+🧪 **[Test Environment Guide](test-app/README.md)** - Develop without Stash
 
 ## Features
 
@@ -110,7 +110,7 @@ This runs a complete mock environment with:
 - `https://example.com/video2.mp4`
 - `https://example.com/image1.jpg`
 
-See [`test/README.md`](test/README.md) for detailed testing documentation.
+See [`test-app/README.md`](test-app/README.md) for detailed testing documentation.
 
 ### Project Structure
 
@@ -432,7 +432,7 @@ That's it! The content is now in your Stash library with all metadata.
 1. Check URL is direct link to file
 2. Verify internet connection
 3. Some sites block automated downloads
-4. **CORS errors in test mode**: Expected behavior - many sites block cross-origin requests. This works in production with Stash. See `test/CORS_LIMITATIONS.md` for details
+4. **CORS errors in test mode**: Expected behavior - many sites block cross-origin requests. This works in production with Stash. See `test-app/CORS_LIMITATIONS.md` for details
 5. Authentication required - some sites need login/cookies
 6. Try different URL or download manually first
 
@@ -467,7 +467,7 @@ That's it! The content is now in your Stash library with all metadata.
 **Where to get help:**
 - GitHub Issues: [Report bugs](../../issues)
 - Stash Discord: Community support
-- Documentation: Check this README and `test/README.md`
+- Documentation: Check this README and `test-app/README.md`
 
 **When reporting issues, include:**
 - Stash version

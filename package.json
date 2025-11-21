@@ -7,8 +7,11 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "tsc && vite build",
-    "test": "cross-env VITE_TEST=true vite --mode test",
-    "test:build": "cross-env VITE_TEST=true vite build --mode test",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "test-app": "cross-env VITE_TEST=true vite --mode test",
+    "test-app:build": "cross-env VITE_TEST=true vite build --mode test",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directs --max-warnings 0",
@@ -30,13 +33,17 @@
     "@typescript-eslint/eslint-plugin": "^8.18.2",
     "@typescript-eslint/parser": "^8.18.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^1.0.4",
+    "@vitest/ui": "^1.0.4",
     "cross-env": "^7.0.3",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
+    "happy-dom": "^12.10.3",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vitest": "^1.0.4"
   },
   "dependencies": {
     "bootstrap": "^5.3.3",
