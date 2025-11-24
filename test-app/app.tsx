@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
+import { ROUTES } from '../src/constants';
 import { installMockPluginApi, setMockData } from './mocks/mockPluginApi';
 import {
   mockPerformers,
@@ -74,7 +75,7 @@ initializePlugin();
 
 // Create test app wrapper
 const TestApp: React.FC = () => {
-  const [currentRoute, setCurrentRoute] = React.useState('/downloader');
+  const [currentRoute, setCurrentRoute] = React.useState(ROUTES.MAIN);
   // Default to enabled in test mode if not explicitly set
   const [corsProxyEnabled, setCorsProxyEnabled] = React.useState(() => {
     const stored = localStorage.getItem('corsProxyEnabled');
