@@ -27,6 +27,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
@@ -47,26 +48,18 @@
     "vitest": "^1.0.4"
   },
   "dependencies": {
-    "@emotion/react": "^11.13.0",
-    "@emotion/styled": "^11.13.0",
-    "@mui/icons-material": "^7.3.5",
-    "@mui/material": "^7.3.5",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
   "peerDependencies": {
     "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "react-intl": "^6.0.0"
+    "react-dom": "^18.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": false
     },
     "react-dom": {
-      "optional": false
-    },
-    "react-intl": {
       "optional": false
     }
   }
