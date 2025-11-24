@@ -31,14 +31,12 @@ cat > index.yml << EOF
   name: Stash Downloader
   version: ${VERSION}
   date: ${DATETIME}
+  path: plugins/stash-downloader
   files:
     - stash-downloader.yml
     - dist/stash-downloader.js
-  requires:
-    - stash: ">=0.20.0"
   description: Download images and videos from URLs with automatic metadata extraction and organization
   url: https://github.com/Codename-11/Stash-Downloader
-  path: plugins/stash-downloader
 EOF
 
 echo "✅ Build complete!"

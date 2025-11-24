@@ -50,14 +50,12 @@ jobs:
             name: Stash Downloader
             version: 0.1.0
             date: ${CURRENT_DATETIME}
+            path: plugins/stash-downloader
             files:
               - stash-downloader.yml
               - dist/stash-downloader.js
-            requires:
-              - stash: ">=0.20.0"
             description: Download images and videos from URLs with automatic metadata extraction and organization
             url: ${{ github.server_url }}/${{ github.repository }}
-            path: plugins/stash-downloader
           EOF
 
       - name: Setup Pages
