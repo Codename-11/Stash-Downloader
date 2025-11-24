@@ -39,7 +39,7 @@ settings:
     default: best
   filenameTemplate:
     displayName: Filename Template
-    description: Template for downloaded filenames. Variables: {title}, {date}, {performers}, {studio}
+    description: "Template for downloaded filenames. Variables: {title}, {date}, {performers}, {studio}"
     type: STRING
     default: "{title}"
   enableNotifications:
