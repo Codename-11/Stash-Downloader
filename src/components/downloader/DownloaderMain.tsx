@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { IntlProvider } from 'react-intl';
 import { Box } from '@mui/material';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { LogProvider } from '@/contexts/LogContext';
@@ -16,13 +17,15 @@ interface DownloaderMainProps {
 
 export const DownloaderMain: React.FC<DownloaderMainProps> = ({ isTestMode, testSettingsPanel }) => {
   return (
-    <ToastProvider>
-      <LogProvider>
-        <Box className="stash-downloader-plugin" sx={{ minHeight: '100vh' }}>
-          <ToastContainer />
-          <QueuePage isTestMode={isTestMode} testSettingsPanel={testSettingsPanel} />
-        </Box>
-      </LogProvider>
-    </ToastProvider>
+    <IntlProvider locale="en" defaultLocale="en">
+      <ToastProvider>
+        <LogProvider>
+          <Box className="stash-downloader-plugin" sx={{ minHeight: '100vh' }}>
+            <ToastContainer />
+            <QueuePage isTestMode={isTestMode} testSettingsPanel={testSettingsPanel} />
+          </Box>
+        </LogProvider>
+      </ToastProvider>
+    </IntlProvider>
   );
 };
