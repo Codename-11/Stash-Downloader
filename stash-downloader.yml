@@ -11,42 +11,31 @@ settings:
     displayName: Concurrent Downloads
     description: Maximum number of simultaneous downloads
     type: NUMBER
-    default: 3
   autoCreatePerformers:
     displayName: Auto-Create Performers
     description: Automatically create new performers if they don't exist in Stash
     type: BOOLEAN
-    default: true
   autoCreateTags:
     displayName: Auto-Create Tags
     description: Automatically create new tags if they don't exist in Stash
     type: BOOLEAN
-    default: true
   autoCreateStudios:
     displayName: Auto-Create Studios
     description: Automatically create new studios if they don't exist in Stash
     type: BOOLEAN
-    default: false
   downloadQuality:
     displayName: Download Quality
-    description: Preferred quality for video downloads
+    description: "Preferred quality for video downloads (best, 1080p, 720p, 480p)"
     type: STRING
-    enum:
-      - best
-      - 1080p
-      - 720p
-      - 480p
-    default: best
   filenameTemplate:
     displayName: Filename Template
     description: "Template for downloaded filenames. Variables: {title}, {date}, {performers}, {studio}"
     type: STRING
-    default: "{title}"
   enableNotifications:
     displayName: Enable Notifications
     description: Show browser notifications for download completion
     type: BOOLEAN
-    default: true
-js:
-  - dist/stash-downloader.js
-interface: stash-downloader
+ui:
+  javascript:
+    - dist/stash-downloader.js
+interface: js
