@@ -7,10 +7,10 @@ export const PLUGIN_NAME = 'Stash Downloader';
 export const PLUGIN_VERSION = '0.1.0';
 
 export const ROUTES = {
-  MAIN: '/downloader',
-  QUEUE: '/downloader/queue',
-  METADATA: '/downloader/metadata',
-  SETTINGS: '/downloader/settings',
+  MAIN: '/plugin/stash-downloader',
+  QUEUE: '/plugin/stash-downloader/queue',
+  METADATA: '/plugin/stash-downloader/metadata',
+  SETTINGS: '/plugin/stash-downloader/settings',
 } as const;
 
 export const DEFAULT_SETTINGS = {
