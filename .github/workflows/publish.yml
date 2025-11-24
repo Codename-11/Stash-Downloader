@@ -44,12 +44,12 @@ jobs:
 
       - name: Generate plugin index
         run: |
-          CURRENT_DATE=$(date +%Y-%m-%d)
+          CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
           cat > index.yml << EOF
           - id: stash-downloader
             name: Stash Downloader
             version: 0.1.0
-            date: ${CURRENT_DATE}
+            date: ${CURRENT_DATETIME}
             files:
               - stash-downloader.yml
               - dist/stash-downloader.js

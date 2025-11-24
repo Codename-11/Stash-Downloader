@@ -22,7 +22,7 @@ cp LICENSE plugins/stash-downloader/
 
 # Get version from package.json
 VERSION=$(node -p "require('./package.json').version")
-DATE=$(date +%Y-%m-%d)
+DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
 
 # Generate index.yml
 echo "Generating plugin index..."
@@ -30,7 +30,7 @@ cat > index.yml << EOF
 - id: stash-downloader
   name: Stash Downloader
   version: ${VERSION}
-  date: ${DATE}
+  date: ${DATETIME}
   files:
     - stash-downloader.yml
     - dist/stash-downloader.js
