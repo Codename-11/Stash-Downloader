@@ -359,6 +359,98 @@ stash-downloader-plugin/
 - Monitor GraphQL query times
 - Log slow component renders (with profiler in dev)
 
+## Plugin Deployment & Updates
+
+### GitHub Pages Publishing
+**Decision**: Use GitHub Actions to build and publish plugin as ZIP package
+
+**Workflow**:
+1. Push to main branch triggers GitHub Actions
+2. Build plugin with `npm run build`
+3. Package plugin directory into ZIP file
+4. Calculate SHA256 checksum for integrity verification
+5. Generate `index.yml` with version from package.json
+6. Deploy to GitHub Pages via `actions/upload-pages-artifact`
+
+**Key Files**:
+- `.github/workflows/publish.yml` - Automated build and deploy
+- `build_site.sh` - Local testing script (matches workflow)
+- `_site/` directory - Output containing `index.yml` and `.zip`
+
+### Plugin Manifest Format
+**Decision**: Use minimal manifest structure matching Stash's Config struct
+
+**Required fields** (from `pkg/plugin/config.go`):
+```yaml
+name: Plugin Name
+description: ...
+version: 0.1.0  # Must match package.json
+url: https://github.com/user/repo
+settings:
+  settingKey:
+    displayName: Display Name
+    description: Setting description
+    type: STRING | NUMBER | BOOLEAN  # Only these types supported
+ui:
+  javascript:
+    - dist/stash-downloader.js
+interface: js  # Must be "js" for JavaScript plugins
+```
+
+**Not supported** (will cause parse errors):
+- `default` field in settings (no default values)
+- `enum` field in settings (put options in description instead)
+- Root-level `js` field (must be `ui.javascript`)
+
+### Version Management
+**Decision**: Single source of truth in package.json
+
+**Process**:
+1. Update version in `package.json` (semantic versioning)
+2. Commit and push to main
+3. GitHub Actions reads version and publishes
+4. Stash detects update by comparing versions
+5. Users see "Update" button in Settings → Plugins
+
+**Version format**: `MAJOR.MINOR.PATCH` (e.g., `0.1.0` → `0.1.1`)
+
+### Plugin Repository Index
+**Decision**: Flat YAML array format (not nested structure)
+
+**Structure**:
+```yaml
+- id: stash-downloader
+  name: Stash Downloader
+  version: 0.1.0  # From package.json
+  date: 2025-11-24 14:30:45  # MUST include time component
+  path: stash-downloader.zip  # ZIP file, not directory
+  sha256: [64-char hash]  # For integrity verification
+  description: ...
+  url: https://github.com/user/repo
+```
+
+**Critical requirements**:
+- Date must include time: `YYYY-MM-DD HH:MM:SS` (Go time.Parse format)
+- Path must be ZIP file with SHA256 checksum
+- Both index.yml and ZIP must be in same directory
+- Array at root level (not nested under `sources:` or `plugins:`)
+
+### Navigation Integration
+**Decision**: Patch Navbar component to add "Downloader" link
+
+**Implementation**:
+```typescript
+window.PluginApi.patch.after('Navbar', (_props: any, output: any) => {
+  // Add NavLink component to navbar children
+  // Users can access plugin from any page
+});
+```
+
+**Rationale**:
+- Provides persistent access from top navigation
+- More discoverable than buried in settings
+- Consistent with Stash's navigation patterns
+
 ## Future Architecture Considerations
 
 ### Scalability

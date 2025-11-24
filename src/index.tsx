@@ -31,7 +31,7 @@ function initializePlugin() {
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
     // Add navigation link to Stash's navbar
-    window.PluginApi.patch.after('Navbar', (props, output) => {
+    window.PluginApi.patch.after('Navbar', (_props: any, output: any) => {
       const { React } = window.PluginApi;
       const { NavLink } = window.PluginApi.libraries.ReactRouterDOM;
 
