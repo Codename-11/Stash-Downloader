@@ -34,26 +34,38 @@ jobs:
       - name: Build plugin
         run: npm run build
 
-      - name: Create plugins directory structure
+      - name: Create plugin package
         run: |
+          mkdir -p _site
           mkdir -p plugins/stash-downloader
           cp -r dist plugins/stash-downloader/
           cp stash-downloader.yml plugins/stash-downloader/
           cp README.md plugins/stash-downloader/
           cp LICENSE plugins/stash-downloader/
 
+          # Create ZIP file
+          cd plugins
+          zip -r ../stash-downloader.zip stash-downloader
+          cd ..
+
+          # Calculate SHA256
+          SHA256=$(sha256sum stash-downloader.zip | awk '{print $1}')
+
+          # Move ZIP to _site directory
+          mv stash-downloader.zip _site/
+
       - name: Generate plugin index
         run: |
           CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
-          cat > index.yml << EOF
+          SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
+
+          cat > _site/index.yml << EOF
           - id: stash-downloader
             name: Stash Downloader
             version: 0.1.0
             date: ${CURRENT_DATETIME}
-            path: plugins/stash-downloader
-            files:
-              - stash-downloader.yml
-              - dist/stash-downloader.js
+            path: stash-downloader.zip
+            sha256: ${SHA256}
             description: Download images and videos from URLs with automatic metadata extraction and organization
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
@@ -64,7 +76,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

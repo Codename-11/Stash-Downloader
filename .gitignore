@@ -14,6 +14,8 @@ build/
 # Generated plugin repository files
 plugins/
 index.yml
+_site/
+*.zip
 
 # Development
 .vite/

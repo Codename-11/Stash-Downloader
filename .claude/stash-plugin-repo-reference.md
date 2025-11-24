@@ -16,13 +16,16 @@ There are two known formats:
   name: Plugin Name
   version: 0.1.0
   date: 2025-11-24 14:30:45
-  path: plugins/plugin-name
-  files:
-    - plugin.yml
-    - dist/plugin.js
+  path: plugin-name.zip
+  sha256: abc123...def456
   description: Plugin description
   url: https://github.com/user/repo
 ```
+
+**Key points:**
+- `path` must point to a **ZIP file**, not a directory
+- `sha256` is the hash of the ZIP file for integrity verification
+- ZIP should contain all plugin files in a subdirectory
 
 #### Format 2: CommunityScripts Format (With Metadata Wrapper)
 ```yaml
@@ -245,6 +248,18 @@ requires:
 ### Issue: GitHub Pages shows 404
 **Cause:** Pages not configured for GitHub Actions
 **Fix:** Settings → Pages → Source → Select "GitHub Actions"
+
+### Issue: "failed to get package file: 404 Not Found"
+**Cause:** Plugin is not packaged as ZIP file, or path in index.yml is wrong
+**Fix:**
+1. Package plugin directory into ZIP: `zip -r plugin-name.zip plugin-name/`
+2. Calculate SHA256: `sha256sum plugin-name.zip`
+3. Update index.yml:
+   ```yaml
+   path: plugin-name.zip       # Must be ZIP file
+   sha256: [calculated hash]   # Must match ZIP
+   ```
+4. Both `plugin-name.zip` and `index.yml` must be in same directory on GitHub Pages
 
 ## Testing Locally
 
