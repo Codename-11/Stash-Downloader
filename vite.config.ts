@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => {
               'react-dom/client',
               'react-router-dom',
               '@apollo/client',
+              'react-intl',
             ],
             output: {
               // Global variable names for externalized deps
@@ -66,6 +67,7 @@ export default defineConfig(({ mode }) => {
                 'react-dom/client': 'PluginApi.ReactDOM',
                 'react-router-dom': 'PluginApi.libraries.ReactRouterDOM',
                 '@apollo/client': 'PluginApi.libraries.Apollo',
+                'react-intl': 'PluginApi.libraries.Intl',
               },
               // Ensure consistent output
               inlineDynamicImports: true,

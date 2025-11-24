@@ -13,6 +13,10 @@ export interface IPluginApi {
   libraries: {
     ReactRouterDOM: any;
     Apollo: any;
+    Intl: any; // react-intl library
+    Bootstrap?: any; // React Bootstrap components
+    Mousetrap?: any; // Keyboard shortcuts (v0.25.0+)
+    MousetrapPause?: any; // Mousetrap pause helper (v0.25.0+)
   };
 
   GQL: {
