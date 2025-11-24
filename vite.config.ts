@@ -14,6 +14,12 @@ export default defineConfig(({ mode }) => {
       ...(isTestMode ? [corsProxyPlugin()] : []),
     ],
 
+    // Define global constants for browser builds
+    define: {
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'process.env': JSON.stringify({}),
+    },
+
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
