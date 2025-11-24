@@ -27,34 +27,18 @@ DATE=$(date +%Y-%m-%d)
 # Generate index.yml
 echo "Generating plugin index..."
 cat > index.yml << EOF
----
-version: "1"
-sources:
-  - id: stash-downloader
-    name: Stash Downloader
-    metadata:
-      Name: Stash Downloader
-      Author: Codename-11
-      Description: Download images and videos from URLs with automatic metadata extraction and organization
-      URL: https://github.com/Codename-11/Stash-Downloader
-      Tags:
-        - download
-        - metadata
-        - scraper
-        - react
-    plugins:
-      - id: stash-downloader
-        name: Stash Downloader
-        version: ${VERSION}
-        date: ${DATE}
-        files:
-          - stash-downloader.yml
-          - dist/stash-downloader.js
-        requires:
-          - stash: ">=0.20.0"
-        description: Download images and videos from URLs with automatic metadata extraction and organization
-        url: https://github.com/Codename-11/Stash-Downloader
-        path: plugins/stash-downloader
+- id: stash-downloader
+  name: Stash Downloader
+  version: ${VERSION}
+  date: ${DATE}
+  files:
+    - stash-downloader.yml
+    - dist/stash-downloader.js
+  requires:
+    - stash: ">=0.20.0"
+  description: Download images and videos from URLs with automatic metadata extraction and organization
+  url: https://github.com/Codename-11/Stash-Downloader
+  path: plugins/stash-downloader
 EOF
 
 echo "✅ Build complete!"
