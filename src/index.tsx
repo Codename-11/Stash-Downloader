@@ -30,8 +30,8 @@ function initializePlugin() {
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
-    // Add navigation link to Stash's navbar
-    window.PluginApi.patch.after('Navbar', (_props: any, output: any) => {
+    // Add navigation link to Stash's main navbar
+    window.PluginApi.patch.after('MainNavBar.MenuItems', (_props: any, output: any) => {
       const { React } = window.PluginApi;
       const { NavLink } = window.PluginApi.libraries.ReactRouterDOM;
 
@@ -45,23 +45,15 @@ function initializePlugin() {
         'Downloader'
       );
 
-      // Add link to navigation
-      if (output?.props?.children) {
-        const navItems = Array.isArray(output.props.children)
-          ? output.props.children
-          : [output.props.children];
-
-        navItems.push(downloaderLink);
-
-        return React.cloneElement(output, {
-          children: navItems,
-        });
+      // Add link to menu items
+      if (Array.isArray(output)) {
+        return [...output, downloaderLink];
       }
 
       return output;
     });
 
-    console.log(`[${PLUGIN_ID}] Navigation link added to navbar`);
+    console.log(`[${PLUGIN_ID}] Navigation link added to MainNavBar`);
 
   } catch (error) {
     console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);
