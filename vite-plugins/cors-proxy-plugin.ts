@@ -25,7 +25,8 @@ export function corsProxyPlugin(): Plugin {
         // Enable CORS
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, User-Agent');
+        // Allow all common browser headers including upgrade-insecure-requests
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, User-Agent, Accept, Accept-Language, Accept-Encoding, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests, Origin');
         res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Content-Type');
 
         // Handle preflight
@@ -41,17 +42,57 @@ export function corsProxyPlugin(): Plugin {
           return;
         }
 
-        // Extract target URL from path
-        const targetUrl = req.url?.substring(1); // Remove leading slash
+        // Check if this is a yt-dlp download request
+        if (req.url?.startsWith('/api/download?')) {
+          handleYtDlpDownload(req, res);
+          return;
+        }
+
+        // Extract target URL from query parameter or path
+        // New format: http://localhost:8080/?url=https://example.com/video.mp4
+        // Legacy format: http://localhost:8080/https://example.com/video.mp4
+        let targetUrl: string | null = null;
+
+        // Try query parameter first (new format)
+        const urlParams = new URLParser(req.url || '', `http://${req.headers.host}`);
+        if (urlParams.searchParams.has('url')) {
+          targetUrl = urlParams.searchParams.get('url');
+          console.log(`[CORS Proxy] Using URL from query parameter: ${targetUrl}`);
+        } else {
+          // Fallback to path format (legacy)
+          targetUrl = req.url?.substring(1) || null; // Remove leading slash
+          console.log(`[CORS Proxy] Using URL from path: ${targetUrl}`);
+
+          // Try decoding if needed
+          if (targetUrl && !targetUrl.startsWith('http')) {
+            try {
+              const decoded = decodeURIComponent(targetUrl);
+              if (decoded.startsWith('http')) {
+                targetUrl = decoded;
+                console.log(`[CORS Proxy] Decoded URL: ${targetUrl}`);
+              }
+            } catch (e: any) {
+              console.log(`[CORS Proxy] Decode failed: ${e.message}`);
+            }
+          }
+        }
 
         if (!targetUrl || !targetUrl.startsWith('http')) {
-          res.writeHead(400);
+          console.error(`[CORS Proxy] ❌ Invalid URL format`);
+          console.error(`[CORS Proxy]   - Raw req.url: ${req.url}`);
+          console.error(`[CORS Proxy]   - Extracted: ${targetUrl}`);
+          res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
             error: 'Invalid URL',
-            usage: `http://localhost:${PORT}/https://example.com/file.mp4`
+            received: targetUrl,
+            rawPath: req.url,
+            message: 'URL must start with http:// or https://',
+            usage: 'http://localhost:8080/?url=https://example.com/file.mp4'
           }));
           return;
         }
+
+        console.log(`[CORS Proxy] ✓ Valid URL: ${targetUrl}`);
 
         console.log(`[CORS Proxy] ${req.method} ${targetUrl}`);
 
@@ -125,17 +166,36 @@ export function corsProxyPlugin(): Plugin {
           return;
         }
 
-        console.log(`[yt-dlp] Extracting metadata for: ${videoUrl}`);
+        // Validate URL before passing to yt-dlp
+        let validatedUrl: string;
+        try {
+          const urlObj = new URL(videoUrl);
+          validatedUrl = urlObj.href;
+        } catch (error) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Invalid URL format',
+            message: `URL must be a valid absolute URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            received: videoUrl
+          }));
+          return;
+        }
+
+        console.log(`[yt-dlp] Extracting metadata for: ${validatedUrl}`);
 
         const ytDlp = spawn('yt-dlp', [
           '--dump-json',
           '--no-playlist',
+          '--quiet',
           '--no-warnings',
-          videoUrl
+          '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          '--referer', 'https://www.pornhub.com/',
+          validatedUrl
         ]);
 
         let stdout = '';
         let stderr = '';
+        let responseHandled = false;
 
         ytDlp.stdout.on('data', (data) => {
           stdout += data.toString();
@@ -146,6 +206,8 @@ export function corsProxyPlugin(): Plugin {
         });
 
         ytDlp.on('close', (code) => {
+          if (responseHandled) return; // Already handled by error event
+
           if (code !== 0) {
             console.error(`[yt-dlp] Error (exit code ${code}):`, stderr);
             res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -175,6 +237,7 @@ export function corsProxyPlugin(): Plugin {
         });
 
         ytDlp.on('error', (error: any) => {
+          responseHandled = true; // Prevent close event from also sending response
           console.error(`[yt-dlp] Failed to start:`, error.message);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
@@ -182,6 +245,112 @@ export function corsProxyPlugin(): Plugin {
             message: error.message,
             hint: 'Make sure yt-dlp is installed: pip install yt-dlp'
           }));
+        });
+      }
+
+      /**
+       * Handle yt-dlp download requests
+       */
+      function handleYtDlpDownload(req: http.IncomingMessage, res: http.ServerResponse) {
+        const urlParams = new URLParser(req.url || '', `http://${req.headers.host}`);
+        const videoUrl = urlParams.searchParams.get('url');
+        const format = urlParams.searchParams.get('format') || 'best';
+
+        if (!videoUrl) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Missing url parameter',
+            usage: '/api/download?url=https://example.com/video&format=best'
+          }));
+          return;
+        }
+
+        console.log(`[yt-dlp] Downloading video from: ${videoUrl} (format: ${format})`);
+
+        // Set headers for streaming
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+
+        // Decode URL parameter
+        const decodedUrl = decodeURIComponent(videoUrl);
+
+        // Validate URL before passing to yt-dlp
+        let validatedUrl: string;
+        try {
+          const urlObj = new URL(decodedUrl);
+          validatedUrl = urlObj.href;
+        } catch (error) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Invalid URL format',
+            message: `URL must be a valid absolute URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            received: videoUrl,
+            decoded: decodedUrl
+          }));
+          return;
+        }
+
+        const ytDlp = spawn('yt-dlp', [
+          '-f', format,
+          '-o', '-',
+          '--no-playlist',
+          '--no-progress',
+          '--quiet',
+          '--no-warnings',
+          '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          '--referer', 'https://www.pornhub.com/',
+          validatedUrl
+        ]);
+
+        let stderr = '';
+
+        ytDlp.stdout.on('data', (data) => {
+          res.write(data);
+        });
+
+        ytDlp.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        ytDlp.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`[yt-dlp] Download error (exit code ${code}):`, stderr);
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'yt-dlp download failed',
+                exitCode: code,
+                stderr: stderr.substring(0, 500),
+                message: 'Make sure yt-dlp is installed: pip install yt-dlp'
+              }));
+            } else {
+              res.end();
+            }
+            return;
+          }
+
+          console.log(`[yt-dlp] ✓ Download complete for: ${validatedUrl}`);
+          res.end();
+        });
+
+        ytDlp.on('error', (error: any) => {
+          console.error(`[yt-dlp] Failed to start download:`, error.message);
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              error: 'Failed to start yt-dlp',
+              message: error.message,
+              hint: 'Make sure yt-dlp is installed: pip install yt-dlp'
+            }));
+          }
+        });
+
+        req.on('close', () => {
+          if (!ytDlp.killed) {
+            console.log('[yt-dlp] Client disconnected, killing yt-dlp process');
+            ytDlp.kill();
+          }
         });
       }
 

@@ -13,9 +13,6 @@ export interface IPluginApi {
   libraries: {
     ReactRouterDOM: any;
     Apollo: any;
-    Bootstrap: any;
-    FontAwesomeSolid: any;
-    FontAwesomeRegular: any;
   };
 
   GQL: {

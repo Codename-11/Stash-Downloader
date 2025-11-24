@@ -3,10 +3,28 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  TextField,
+  Button,
+  Box,
+  Stack,
+  Typography,
+  InputAdornment,
+  Rating,
+  CircularProgress,
+} from '@mui/material';
+import { Search as SearchIcon, Star as StarIcon, PlayCircle as PlayIcon } from '@mui/icons-material';
 import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/types';
+import { ContentType } from '@/types';
 import { PerformerSelector } from '@/components/common/PerformerSelector';
 import { TagSelector } from '@/components/common/TagSelector';
 import { StudioSelector } from '@/components/common/StudioSelector';
+import { MediaPreviewModal } from '@/components/common';
+import { useToast } from '@/contexts/ToastContext';
+import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
 
 interface MetadataEditorFormProps {
@@ -20,6 +38,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   onSave,
   onCancel,
 }) => {
+  const toast = useToast();
+  const log = useLog();
   const [title, setTitle] = useState(item.metadata?.title || '');
   const [description, setDescription] = useState(item.metadata?.description || '');
   const [date, setDate] = useState(item.metadata?.date || '');
@@ -29,6 +49,15 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [studio, setStudio] = useState<IStashStudio | null>(null);
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  const handlePreview = (url: string, type: 'image' | 'video') => {
+    setPreviewUrl(url);
+    setPreviewType(type);
+    setPreviewOpen(true);
+  };
 
   // Initialize with scraped metadata
   useEffect(() => {
@@ -52,12 +81,12 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     setScrapeError(null);
 
     try {
-      console.log('[MetadataEditor] Scraping metadata from:', item.url);
+      log.addLog('info', 'scrape', `Scraping metadata from: ${item.url}`);
 
       const scraperRegistry = getScraperRegistry();
       const metadata = await scraperRegistry.scrape(item.url);
 
-      console.log('[MetadataEditor] Scraped metadata:', metadata);
+      log.addLog('success', 'scrape', `Successfully scraped metadata: ${metadata.title || item.url}`);
 
       // Update form fields with scraped data
       if (metadata.title) setTitle(metadata.title);
@@ -68,10 +97,15 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       // For now, these would need to be matched against Stash database
       // or created as new entries
 
+      toast.showToast('success', 'Metadata Scraped', `Successfully scraped: ${metadata.title || item.url}`);
       setScrapeError(null);
     } catch (error) {
-      console.error('[MetadataEditor] Scraping failed:', error);
-      setScrapeError(error instanceof Error ? error.message : 'Failed to scrape metadata');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to scrape metadata';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      log.addLog('error', 'scrape', `Scraping failed: ${errorMessage}`, errorStack);
+      toast.showToast('error', 'Scrape Failed', errorMessage);
+      setScrapeError(errorMessage);
     } finally {
       setIsScraping(false);
     }
@@ -94,172 +128,198 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   };
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h5 className="mb-0">Edit Metadata</h5>
-      </div>
-      <div className="card-body">
-        <form onSubmit={handleSubmit}>
-          {/* Preview thumbnail if available */}
-          {item.metadata?.thumbnailUrl && (
-            <div className="mb-3 text-center">
-              <img
-                src={item.metadata.thumbnailUrl}
-                alt="Preview"
-                className="img-thumbnail"
-                style={{ maxHeight: '200px', maxWidth: '100%' }}
-              />
-            </div>
-          )}
+    <Card>
+      <CardHeader title="Edit Metadata" />
+      <CardContent>
+        <Box component="form" onSubmit={handleSubmit}>
+          <Stack spacing={3}>
+            {/* Preview thumbnail if available */}
+            {item.metadata?.thumbnailUrl && (
+              <Box sx={{ textAlign: 'center' }}>
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="center">
+                  <Box
+                    component="img"
+                    src={item.metadata.thumbnailUrl}
+                    alt="Preview"
+                    sx={{
+                      maxHeight: 200,
+                      maxWidth: '100%',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor: 'divider',
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      '&:hover': {
+                        transform: 'scale(1.02)',
+                        boxShadow: 4,
+                      },
+                    }}
+                    onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
+                    onError={(e) => {
+                      // Try to use CORS proxy if image fails to load
+                      const img = e.target as HTMLImageElement;
+                      const originalSrc = item.metadata?.thumbnailUrl;
+                      if (originalSrc && !originalSrc.includes('localhost:8080')) {
+                        const corsProxyEnabled = localStorage.getItem('corsProxyEnabled') === 'true';
+                        const corsProxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
+                        if (corsProxyEnabled) {
+                          const proxiedUrl = `${corsProxyUrl}/${originalSrc}`;
+                          console.log('[MetadataEditor] Thumbnail failed, trying CORS proxy:', proxiedUrl);
+                          img.src = proxiedUrl;
+                        }
+                      }
+                    }}
+                    title="Click to view full size"
+                  />
+                  {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<PlayIcon />}
+                      onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
+                      title="Preview video"
+                    >
+                      Preview Video
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            )}
 
-          {/* Source URL with Scrape button */}
-          <div className="mb-3">
-            <label className="form-label">Source URL</label>
-            <div className="input-group">
-              <input
-                type="text"
-                className="form-control"
+            {/* Source URL with Scrape button */}
+            <Box>
+              <TextField
+                label="Source URL"
                 value={item.url}
                 disabled
-                readOnly
+                fullWidth
+                variant="outlined"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Button
+                        variant="outlined"
+                        startIcon={isScraping ? <CircularProgress size={16} /> : <SearchIcon />}
+                        onClick={handleScrapeMetadata}
+                        disabled={isScraping}
+                      >
+                        {isScraping ? 'Scraping...' : 'Scrape Metadata'}
+                      </Button>
+                    </InputAdornment>
+                  ),
+                }}
               />
-              <button
-                type="button"
-                className="btn btn-outline-primary"
-                onClick={handleScrapeMetadata}
-                disabled={isScraping}
-              >
-                {isScraping ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Scraping...
-                  </>
-                ) : (
-                  <>
-                    🔍 Scrape Metadata
-                  </>
-                )}
-              </button>
-            </div>
-            {scrapeError && (
-              <div className="text-danger small mt-1">
-                {scrapeError}
-              </div>
-            )}
-            <div className="form-text">
-              Click "Scrape Metadata" to fetch title, description, and other data from the website.
-              {!localStorage.getItem('corsProxyEnabled') && (
-                <span className="text-warning"> Enable CORS proxy for better results!</span>
+              {scrapeError && (
+                <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                  {scrapeError}
+                </Typography>
               )}
-            </div>
-          </div>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Click "Scrape Metadata" to fetch title, description, and other data from the website.
+                {!localStorage.getItem('corsProxyEnabled') && (
+                  <Typography component="span" color="warning.main">
+                    {' '}Enable CORS proxy for better results!
+                  </Typography>
+                )}
+              </Typography>
+            </Box>
 
-          {/* Title */}
-          <div className="mb-3">
-            <label htmlFor="title" className="form-label">
-              Title *
-            </label>
-            <input
+            {/* Title */}
+            <TextField
               id="title"
+              label="Title"
               type="text"
-              className="form-control"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
+              fullWidth
+              variant="outlined"
             />
-          </div>
 
-          {/* Description */}
-          <div className="mb-3">
-            <label htmlFor="description" className="form-label">
-              Description
-            </label>
-            <textarea
+            {/* Description */}
+            <TextField
               id="description"
-              className="form-control"
+              label="Description"
+              multiline
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              fullWidth
+              variant="outlined"
             />
-          </div>
 
-          {/* Date */}
-          <div className="mb-3">
-            <label htmlFor="date" className="form-label">
-              Date
-            </label>
-            <input
+            {/* Date */}
+            <TextField
               id="date"
+              label="Date"
               type="date"
-              className="form-control"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              fullWidth
+              variant="outlined"
+              InputLabelProps={{
+                shrink: true,
+              }}
             />
-          </div>
 
-          {/* Rating */}
-          <div className="mb-3">
-            <label className="form-label">Rating</label>
-            <div className="d-flex gap-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  className="btn btn-sm btn-outline-warning"
-                  onClick={() => setRating(star * 20)}
-                  style={{
-                    backgroundColor: rating >= star * 20 ? '#ffc107' : 'transparent',
+            {/* Rating */}
+            <Box>
+              <Typography variant="body2" gutterBottom>
+                Rating
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Rating
+                  value={rating / 20}
+                  max={5}
+                  onChange={(_, newValue) => {
+                    setRating(newValue ? newValue * 20 : 0);
                   }}
-                >
-                  ★
-                </button>
-              ))}
-              {rating > 0 && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary ms-2"
-                  onClick={() => setRating(0)}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <small className="text-muted">Rating: {rating}/100</small>
-          </div>
+                  emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
+                />
+                {rating > 0 && (
+                  <Button size="small" variant="outlined" onClick={() => setRating(0)}>
+                    Clear
+                  </Button>
+                )}
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                Rating: {rating}/100
+              </Typography>
+            </Box>
 
-          {/* Performers */}
-          <div className="mb-3">
+            {/* Performers */}
             <PerformerSelector
               selectedPerformers={performers}
               onChange={setPerformers}
             />
-          </div>
 
-          {/* Tags */}
-          <div className="mb-3">
+            {/* Tags */}
             <TagSelector selectedTags={tags} onChange={setTags} />
-          </div>
 
-          {/* Studio */}
-          <div className="mb-3">
+            {/* Studio */}
             <StudioSelector selectedStudio={studio} onChange={setStudio} />
-          </div>
 
-          {/* Actions */}
-          <div className="d-flex gap-2">
-            <button type="submit" className="btn btn-primary">
-              Save & Import to Stash
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            {/* Actions */}
+            <Stack direction="row" spacing={2}>
+              <Button type="submit" variant="contained">
+                Save & Import to Stash
+              </Button>
+              <Button variant="outlined" onClick={onCancel}>
+                Cancel
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
+      </CardContent>
+
+      {/* Media Preview Modal */}
+      <MediaPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        mediaUrl={previewUrl}
+        mediaType={previewType}
+        alt={title || item.metadata?.title || 'Preview'}
+      />
+    </Card>
   );
 };

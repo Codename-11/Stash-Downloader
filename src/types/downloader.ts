@@ -31,12 +31,21 @@ export interface IScrapedMetadata {
   date?: string;
   url: string;
   videoUrl?: string; // Actual video file URL (if different from page URL)
+  imageUrl?: string; // Actual image file URL (if different from page URL)
   performers?: string[];
   tags?: string[];
   studio?: string;
   thumbnailUrl?: string;
   duration?: number; // seconds
+  quality?: string; // Video quality (e.g., "1080p", "720p", "4K")
   contentType: ContentType;
+}
+
+export interface IItemLogEntry {
+  timestamp: Date;
+  level: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  details?: string;
 }
 
 export interface IDownloadItem {
@@ -66,6 +75,9 @@ export interface IDownloadItem {
 
   // Stash integration
   stashId?: string; // Scene/Image/Gallery ID after creation
+
+  // Logs for this specific item
+  logs?: IItemLogEntry[];
 
   // Timestamps
   addedAt: Date;

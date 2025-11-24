@@ -2,7 +2,6 @@
 node_modules/
 .pnpm-store/
 .yarn/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -11,6 +10,10 @@ dist/
 dist-test/
 build/
 *.tsbuildinfo
+
+# Generated plugin repository files
+plugins/
+index.yml
 
 # Development
 .vite/

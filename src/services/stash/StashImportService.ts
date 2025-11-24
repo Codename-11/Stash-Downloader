@@ -9,6 +9,8 @@ import type {
   IStashPerformer,
   IStashTag,
   IStashStudio,
+  IDownloadProgress,
+  IItemLogEntry,
 } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from './StashGraphQLService';
@@ -32,39 +34,94 @@ export class StashImportService {
   /**
    * Import a download item to Stash
    */
-  async importToStash(item: IDownloadItem): Promise<IStashScene | IStashImage> {
+  async importToStash(
+    item: IDownloadItem,
+    callbacks?: {
+      onProgress?: (progress: IDownloadProgress) => void;
+      onStatusChange?: (status: string) => void;
+      onLog?: (level: IItemLogEntry['level'], message: string, details?: string) => void;
+    }
+  ): Promise<IStashScene | IStashImage> {
+    const { onProgress, onStatusChange, onLog } = callbacks || {};
     if (!item.editedMetadata) {
       throw new Error('Item must have edited metadata before import');
     }
 
-    console.log('[StashImport] Starting import for:', item.url);
+    const itemTitle = item.editedMetadata?.title || item.metadata?.title || item.url;
+    console.log('[StashImport] Starting import for:', {
+      url: item.url,
+      title: itemTitle,
+      hasMetadata: !!item.metadata,
+      hasVideoUrl: !!item.metadata?.videoUrl,
+      videoUrl: item.metadata?.videoUrl,
+    });
+
+    if (onLog) onLog('info', `Starting import for: ${itemTitle}`);
 
     // Determine which URL to download from
-    // If scraper found a direct video URL, use that instead of the page URL
-    const downloadUrl = item.metadata?.videoUrl || item.url;
+    // For yt-dlp sites, always use the original page URL (yt-dlp handles finding the video)
+    // For other sites, use direct video URL if available
+    let downloadUrl = item.url;
 
+    // Only use videoUrl if it's a valid absolute URL and we're not using yt-dlp
     if (item.metadata?.videoUrl) {
-      console.log('[StashImport] Using direct video URL:', downloadUrl);
+      try {
+        const videoUrlObj = new URL(item.metadata.videoUrl);
+        // If it's a valid absolute URL and not from a yt-dlp site, use it
+        const isYtDlpSite = ['youporn.com', 'pornhub.com', 'www.pornhub.com', 'www.youporn.com'].some(domain =>
+          item.url.toLowerCase().includes(domain)
+        );
+        if (!isYtDlpSite) {
+          downloadUrl = videoUrlObj.href;
+          console.log('[StashImport] Using direct video URL:', downloadUrl);
+          if (onLog) onLog('info', 'Using direct video URL for download');
+        } else {
+          console.log('[StashImport] Using page URL (yt-dlp will find video):', {
+            pageUrl: downloadUrl,
+            videoUrl: item.metadata.videoUrl,
+            reason: 'yt-dlp site detected',
+          });
+          if (onLog) onLog('info', 'Using page URL (yt-dlp will extract video)');
+        }
+      } catch (error) {
+        // videoUrl is not a valid absolute URL, use page URL
+        console.log('[StashImport] videoUrl is invalid, using page URL:', {
+          pageUrl: downloadUrl,
+          videoUrl: item.metadata.videoUrl,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        if (onLog) onLog('warning', 'Invalid video URL, falling back to page URL', error instanceof Error ? error.message : undefined);
+      }
     } else {
       console.log('[StashImport] Using page URL (no direct video URL found):', downloadUrl);
+      if (onLog) onLog('info', 'No direct video URL found, using page URL');
     }
 
     // Download the file
-    console.log('[StashImport] Downloading file...');
+    if (onStatusChange) onStatusChange('Downloading file...');
+    if (onLog) onLog('info', 'Starting file download...');
+    console.log('[StashImport] Downloading file from URL:', downloadUrl);
     const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
         console.log('[StashImport] Download progress:',
           `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
         );
+        if (onProgress) onProgress(progress);
       },
     });
 
     console.log('[StashImport] Download complete, file size:', blob.size, 'bytes');
+    if (onLog) onLog('success', `Download complete (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
     // Convert to base64 for uploading
+    if (onStatusChange) onStatusChange('Processing file...');
+    if (onLog) onLog('info', 'Processing file for upload...');
     const base64Data = await this.blobToBase64(blob);
+    if (onLog) onLog('info', 'File encoded successfully');
 
     // Get or create performers, tags, studio
+    if (onStatusChange) onStatusChange('Resolving metadata...');
+    if (onLog) onLog('info', 'Resolving performers, tags, and studio...');
     const performerIds = await this.resolvePerformers(
       item.editedMetadata.performerIds || []
     );
@@ -73,11 +130,15 @@ export class StashImportService {
       ? await this.resolveStudio(item.editedMetadata.studioId)
       : undefined;
 
+    if (onLog) onLog('info', `Resolved ${performerIds.length} performers, ${tagIds.length} tags, ${studioId ? '1 studio' : '0 studios'}`);
+
     // Create scene or image based on content type
     const contentType = item.metadata?.contentType || ContentType.Video;
 
     let result: IStashScene | IStashImage;
 
+    if (onStatusChange) onStatusChange('Creating entry in Stash...');
+    if (onLog) onLog('info', `Creating ${contentType === ContentType.Video ? 'scene' : 'image'} entry in Stash...`);
     if (contentType === ContentType.Video) {
       result = await this.createScene(
         {
@@ -105,13 +166,18 @@ export class StashImportService {
       );
     }
 
+    if (onLog) onLog('success', `${contentType === ContentType.Video ? 'Scene' : 'Image'} created successfully in Stash`, `ID: ${result.id}`);
+
     // In test mode, save file to user's computer with metadata
     if (this.isTestMode()) {
       console.log('[StashImport] Test mode: Downloading file with metadata to your computer...');
+      if (onLog) onLog('info', 'Test mode: Saving file to Downloads folder...');
       await this.browserDownloadService.downloadWithMetadata(item, blob, result);
       console.log('[StashImport] File saved to Downloads folder!');
+      if (onLog) onLog('success', 'File saved to Downloads folder');
     }
 
+    if (onLog) onLog('success', 'Import completed successfully');
     return result;
   }
 
@@ -165,7 +231,7 @@ export class StashImportService {
    */
   private async createScene(
     input: any,
-    fileData?: string
+    _fileData?: string
   ): Promise<IStashScene> {
     // Note: Actual file upload may require different approach
     // This is a simplified implementation
@@ -175,7 +241,7 @@ export class StashImportService {
   /**
    * Create image in Stash
    */
-  private async createImage(input: any, fileData?: string): Promise<IStashImage> {
+  private async createImage(input: any, _fileData?: string): Promise<IStashImage> {
     return await this.stashService.createImage(input);
   }
 
@@ -199,7 +265,7 @@ export class StashImportService {
   /**
    * Resolve all temporary IDs before import
    */
-  async resolveTemporaryEntities(item: IDownloadItem): Promise<{
+  async resolveTemporaryEntities(_item: IDownloadItem): Promise<{
     performers: IStashPerformer[];
     tags: IStashTag[];
     studio: IStashStudio | null;

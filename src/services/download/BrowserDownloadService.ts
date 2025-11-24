@@ -35,7 +35,7 @@ export class BrowserDownloadService {
   async downloadWithMetadata(
     item: IDownloadItem,
     blob: Blob,
-    result: IStashScene | IStashImage
+    _result: IStashScene | IStashImage
   ): Promise<void> {
     // Generate filename from URL or title
     const filename = this.generateFilename(item, blob);
@@ -90,14 +90,25 @@ export class BrowserDownloadService {
     if (item.editedMetadata?.title || item.metadata?.title) {
       // Use title if available
       baseName = item.editedMetadata?.title || item.metadata?.title || 'download';
+
+      // Remove quality prefix like "[1080p] " from title if present
+      // (we'll add it as a suffix instead)
+      baseName = baseName.replace(/^\[(\d+p)\]\s*/, '');
     } else {
       // Try to extract meaningful name from URL
       baseName = this.getBaseNameFromUrl(item.url);
     }
 
-    // Sanitize and combine
+    // Extract quality suffix
+    let qualitySuffix = '';
+    if (item.metadata?.quality) {
+      qualitySuffix = `_${item.metadata.quality}`;
+      console.log('[BrowserDownload] Adding quality suffix:', qualitySuffix);
+    }
+
+    // Sanitize and combine: basename_quality.ext
     const sanitizedName = this.sanitizeFilename(baseName);
-    return sanitizedName + ext;
+    return sanitizedName + qualitySuffix + ext;
   }
 
   /**
@@ -111,7 +122,10 @@ export class BrowserDownloadService {
 
       if (segments.length === 0) return 'download';
 
-      let lastSegment = decodeURIComponent(segments[segments.length - 1]);
+      const lastSegmentRaw = segments[segments.length - 1];
+      if (!lastSegmentRaw) return 'download';
+
+      let lastSegment = decodeURIComponent(lastSegmentRaw);
 
       // Remove extension if it's not a valid media extension
       const invalidExtensions = ['.php', '.asp', '.aspx', '.jsp', '.cgi', '.html', '.htm'];
@@ -199,9 +213,9 @@ export class BrowserDownloadService {
     };
 
     // Handle MIME types with parameters (e.g., "video/mp4; codecs=...")
-    const baseType = mimeType.split(';')[0].trim();
+    const baseType = mimeType.split(';')[0]?.trim();
 
-    return mimeToExt[baseType] || mimeToExt[mimeType] || '.bin';
+    return (baseType && mimeToExt[baseType]) || mimeToExt[mimeType] || '.bin';
   }
 
   /**
@@ -260,7 +274,7 @@ export class BrowserDownloadService {
    * Download entire queue as ZIP (future enhancement)
    * This would require a zip library like JSZip
    */
-  async downloadQueueAsZip(items: IDownloadItem[]): Promise<void> {
+  async downloadQueueAsZip(_items: IDownloadItem[]): Promise<void> {
     // TODO: Implement batch download as ZIP
     throw new Error('Batch ZIP download not yet implemented');
   }

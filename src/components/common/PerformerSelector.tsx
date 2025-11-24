@@ -3,9 +3,11 @@
  */
 
 import React, { useState } from 'react';
+import { Autocomplete, TextField, Chip, Stack, Button, Box, Typography } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import type { IStashPerformer } from '@/types';
 import { useStashData } from '@/hooks';
-import { AutocompleteInput } from './AutocompleteInput';
+import { debounce } from '@/utils';
 
 interface PerformerSelectorProps {
   selectedPerformers: IStashPerformer[];
@@ -19,14 +21,42 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
   disabled = false,
 }) => {
   const [inputValue, setInputValue] = useState('');
+  const [options, setOptions] = useState<IStashPerformer[]>([]);
+  const [loading, setLoading] = useState(false);
   const { searchPerformers } = useStashData();
 
-  const handleSelect = (performer: IStashPerformer) => {
-    // Don't add duplicates
-    if (!selectedPerformers.some((p) => p.id === performer.id)) {
-      onChange([...selectedPerformers, performer]);
+  const debouncedSearch = React.useRef(
+    debounce(async (query: string) => {
+      if (query.length < 2) {
+        setOptions([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const results = await searchPerformers(query);
+        setOptions(results);
+      } catch (error) {
+        console.error('Search error:', error);
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300)
+  ).current;
+
+  React.useEffect(() => {
+    if (inputValue) {
+      debouncedSearch(inputValue);
+    } else {
+      setOptions([]);
     }
-    setInputValue('');
+  }, [inputValue, debouncedSearch]);
+
+  const handleSelect = (performer: IStashPerformer | null) => {
+    if (performer && !selectedPerformers.some((p) => p.id === performer.id)) {
+      onChange([...selectedPerformers, performer]);
+      setInputValue('');
+    }
   };
 
   const handleRemove = (performerId: string) => {
@@ -36,7 +66,6 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
   const handleCreateNew = () => {
     if (!inputValue.trim()) return;
 
-    // Create a temporary performer (ID will be assigned when created in Stash)
     const newPerformer: IStashPerformer = {
       id: `temp-${Date.now()}`,
       name: inputValue.trim(),
@@ -47,61 +76,81 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
   };
 
   return (
-    <div>
-      <label className="form-label">Performers</label>
+    <Box>
+      <Typography variant="body2" gutterBottom>
+        Performers
+      </Typography>
 
       {/* Selected performers */}
       {selectedPerformers.length > 0 && (
-        <div className="mb-2">
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
           {selectedPerformers.map((performer) => (
-            <span key={performer.id} className="badge bg-primary me-2 mb-2">
-              {performer.name}
-              {!disabled && (
-                <button
-                  type="button"
-                  className="btn-close btn-close-white ms-2"
-                  style={{ fontSize: '0.6rem' }}
-                  onClick={() => handleRemove(performer.id)}
-                  aria-label="Remove"
-                />
-              )}
-            </span>
+            <Chip
+              key={performer.id}
+              label={performer.name}
+              onDelete={disabled ? undefined : () => handleRemove(performer.id)}
+              color="primary"
+              size="small"
+            />
           ))}
-        </div>
+        </Stack>
       )}
 
       {/* Autocomplete input */}
       {!disabled && (
-        <div className="input-group">
-          <AutocompleteInput<IStashPerformer>
-            value={inputValue}
-            onChange={setInputValue}
-            onSelect={handleSelect}
-            onSearch={searchPerformers}
-            renderItem={(performer) => (
-              <div>
-                <strong>{performer.name}</strong>
-                {performer.disambiguation && (
-                  <small className="text-muted"> ({performer.disambiguation})</small>
-                )}
-              </div>
+        <Stack direction="row" spacing={1}>
+          <Autocomplete<IStashPerformer, false, false, true>
+            freeSolo
+            options={options}
+            loading={loading}
+            inputValue={inputValue}
+            onInputChange={(_, newValue) => setInputValue(newValue)}
+            onChange={(_, newValue) => {
+              if (newValue && typeof newValue !== 'string') {
+                handleSelect(newValue);
+              }
+            }}
+            getOptionLabel={(option) => {
+              if (typeof option === 'string') return option;
+              return option.name;
+            }}
+            renderOption={(props, option) => (
+              <li {...props} key={option.id}>
+                <Box>
+                  <Typography variant="body2" component="strong">
+                    {option.name}
+                  </Typography>
+                  {option.disambiguation && (
+                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                      ({option.disambiguation})
+                    </Typography>
+                  )}
+                </Box>
+              </li>
             )}
-            placeholder="Search or add performer..."
-            disabled={disabled}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search or add performer..."
+                variant="outlined"
+                size="small"
+              />
+            )}
+            sx={{ flexGrow: 1 }}
           />
-          <button
-            type="button"
-            className="btn btn-outline-secondary"
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
             onClick={handleCreateNew}
             disabled={!inputValue.trim()}
           >
             Create New
-          </button>
-        </div>
+          </Button>
+        </Stack>
       )}
-      <small className="text-muted">
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
         Search existing performers or type a name and click "Create New"
-      </small>
-    </div>
+      </Typography>
+    </Box>
   );
 };

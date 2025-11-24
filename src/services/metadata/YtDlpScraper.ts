@@ -10,10 +10,12 @@
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import { fetchWithTimeout } from '@/utils';
 
 export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
   supportedDomains = ['*']; // Supports all domains
+  private readonly timeoutMs = 60000; // 60 seconds for yt-dlp (can be slow)
 
   canHandle(url: string): boolean {
     // Can handle any URL if yt-dlp is available
@@ -34,10 +36,14 @@ export class YtDlpScraper implements IMetadataScraper {
 
       console.log('[YtDlpScraper] Calling yt-dlp API:', extractUrl);
 
-      const response = await fetch(extractUrl);
+      const response = await fetchWithTimeout(
+        extractUrl,
+        {},
+        this.timeoutMs
+      );
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: response.statusText }));
         console.warn('[YtDlpScraper] yt-dlp failed:', error);
         throw new Error(`yt-dlp extraction failed: ${error.error || response.statusText}`);
       }
@@ -76,10 +82,11 @@ export class YtDlpScraper implements IMetadataScraper {
    * Convert yt-dlp JSON output to our metadata format
    */
   private convertYtDlpToMetadata(ytdlp: any, originalUrl: string): IScrapedMetadata {
-    // Find the best video format
-    const videoUrl = this.selectBestVideoFormat(ytdlp);
+    // Find the best video format and quality
+    const { videoUrl, quality } = this.selectBestVideoFormat(ytdlp);
 
-    return {
+    // Build base metadata
+    const metadata: IScrapedMetadata = {
       url: originalUrl,
       videoUrl: videoUrl,
       title: ytdlp.title || undefined,
@@ -90,18 +97,29 @@ export class YtDlpScraper implements IMetadataScraper {
       performers: ytdlp.artist ? [ytdlp.artist] : ytdlp.uploader ? [ytdlp.uploader] : [],
       tags: ytdlp.tags || ytdlp.categories || [],
       studio: ytdlp.uploader || ytdlp.channel || undefined,
+      quality: quality,
       contentType: 'video' as ContentType,
     };
+
+    // Add quality to title if available
+    if (quality && metadata.title) {
+      metadata.title = `[${quality}] ${metadata.title}`;
+    }
+
+    return metadata;
   }
 
   /**
    * Select the best video format from yt-dlp formats list
+   * Returns both the video URL and quality
    */
-  private selectBestVideoFormat(ytdlp: any): string | undefined {
+  private selectBestVideoFormat(ytdlp: any): { videoUrl: string | undefined; quality: string | undefined } {
     // If there's a direct URL field, use it
     if (ytdlp.url) {
       console.log('[YtDlpScraper] Using direct URL from yt-dlp');
-      return ytdlp.url;
+      // Try to extract quality from ytdlp data
+      const quality = ytdlp.height ? `${ytdlp.height}p` : undefined;
+      return { videoUrl: ytdlp.url, quality };
     }
 
     // Otherwise, look through formats for best video
@@ -115,7 +133,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
       if (videoFormats.length === 0) {
         console.warn('[YtDlpScraper] No video formats found');
-        return ytdlp.webpage_url || ytdlp.original_url;
+        return { videoUrl: ytdlp.webpage_url || ytdlp.original_url, quality: undefined };
       }
 
       // Sort by quality (height * width, or just height if width not available)
@@ -126,15 +144,16 @@ export class YtDlpScraper implements IMetadataScraper {
       });
 
       const best = videoFormats[0];
-      console.log(`[YtDlpScraper] Selected format: ${best.height}p (${best.format_id})`);
+      const quality = best.height ? `${best.height}p` : undefined;
+      console.log(`[YtDlpScraper] Selected format: ${quality || 'unknown'} (${best.format_id})`);
       console.log(`[YtDlpScraper] Video URL: ${best.url.substring(0, 100)}...`);
 
-      return best.url;
+      return { videoUrl: best.url, quality };
     }
 
     // Fallback to page URL
     console.warn('[YtDlpScraper] No formats available, using page URL');
-    return ytdlp.webpage_url || ytdlp.original_url;
+    return { videoUrl: ytdlp.webpage_url || ytdlp.original_url, quality: undefined };
   }
 
   /**

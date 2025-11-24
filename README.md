@@ -1,4 +1,7 @@
-# Stash Downloader Plugin
+<div align="center">
+  <img src="src/assets/logo.svg" alt="Stash Downloader Logo" width="128" height="128" />
+  <h1>Stash Downloader Plugin</h1>
+</div>
 
 A React-based web-UI plugin for Stash that enables downloading images and videos from external sources with automatic metadata extraction, tagging, and organization.
 
@@ -26,6 +29,34 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 - Stash v0.20 or later
 - Internet connection for downloading content
 
+### ⭐ Recommended: Install from Custom Plugin Source
+
+The easiest way to install and keep the plugin updated:
+
+1. **Add Custom Plugin Source**
+   - Open Stash web interface
+   - Go to **Settings** → **Plugins** → **Available Plugins**
+   - Click **"Add Source"**
+   - Enter this URL: `https://codename-11.github.io/Stash-Downloader/index.yml`
+   - Click **"Add"**
+
+2. **Install the Plugin**
+   - Find "Stash Downloader" in the Available Plugins list
+   - Click **"Install"**
+   - Wait for installation to complete
+   - Click **"Reload Plugins"** if needed
+
+3. **Configure Settings** (optional)
+   - In Settings → Plugins → Stash Downloader
+   - Set your preferred download path, quality, etc.
+   - Click "Save"
+
+4. **Access the Plugin**
+   - Navigate to `http://localhost:9999/downloader` (or your Stash URL + `/downloader`)
+   - Start downloading and organizing your content!
+
+### Alternative: Manual Installation
+
 **Installation Steps:**
 
 1. **Download the Plugin**
@@ -35,13 +66,13 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 2. **Build the Plugin** (if building from source)
    ```bash
    cd Stash-Downloader
-   pnpm install
-   pnpm build
+   npm install
+   npm run build
    ```
 
 3. **Install in Stash**
 
-   **Option A: Manual Installation**
+   **Option A: Manual Copy**
    - Copy the entire `Stash-Downloader` folder to your Stash plugins directory:
      - **Linux/macOS**: `~/.stash/plugins/stash-downloader/`
      - **Windows**: `%USERPROFILE%\.stash\plugins\stash-downloader\`
@@ -53,13 +84,13 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
    cd ~/.stash/plugins
    git clone https://github.com/Codename-11/Stash-Downloader.git stash-downloader
    cd stash-downloader
-   pnpm install && pnpm build
+   npm install && npm run build
 
    # Windows (PowerShell)
    cd $env:USERPROFILE\.stash\plugins
    git clone https://github.com/Codename-11/Stash-Downloader.git stash-downloader
    cd stash-downloader
-   pnpm install; pnpm build
+   npm install; npm run build
    ```
 
 4. **Enable the Plugin**
@@ -71,13 +102,19 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 
 5. **Configure Settings** (optional)
    - In Settings → Plugins → Stash Downloader
-   - Set your preferred download path
-   - Configure concurrent downloads, quality, etc.
+   - Set your preferred download path, quality, etc.
    - Click "Save"
 
 6. **Access the Plugin**
    - Navigate to `http://localhost:9999/downloader` (or your Stash URL + `/downloader`)
    - Or look for "Downloader" in Stash navigation (if patched)
+
+### Automated Build & Export
+
+- **Linux/macOS**: `./scripts/export-plugin.sh`
+- **Windows (PowerShell 7+)**: `pwsh ./scripts/export-plugin.ps1`
+
+These scripts clean previous artifacts, run `pnpm install && pnpm build`, and place ready-to-import assets in `build/export/stash-downloader/` along with a `stash-downloader.zip` archive for distribution.
 
 **Verification:**
 - You should see the download queue page

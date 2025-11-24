@@ -1,8 +1,11 @@
 /**
  * AutocompleteInput - Generic autocomplete component
+ * Note: This component is being replaced by MUI Autocomplete in selector components
+ * Keeping for backward compatibility but will be deprecated
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Autocomplete, TextField, CircularProgress } from '@mui/material';
 import { debounce } from '@/utils';
 
 interface AutocompleteInputProps<T> {
@@ -28,15 +31,13 @@ export function AutocompleteInput<T>({
 }: AutocompleteInputProps<T>) {
   const [suggestions, setSuggestions] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState(value);
 
   // Debounced search
   const debouncedSearch = useRef(
     debounce(async (query: string) => {
       if (query.length < minChars) {
         setSuggestions([]);
-        setShowDropdown(false);
         return;
       }
 
@@ -44,7 +45,6 @@ export function AutocompleteInput<T>({
       try {
         const results = await onSearch(query);
         setSuggestions(results);
-        setShowDropdown(results.length > 0);
       } catch (error) {
         console.error('Search error:', error);
         setSuggestions([]);
@@ -55,56 +55,59 @@ export function AutocompleteInput<T>({
   ).current;
 
   useEffect(() => {
-    debouncedSearch(value);
-  }, [value, debouncedSearch]);
+    setInputValue(value);
+  }, [value]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSelect = (item: T) => {
-    onSelect(item);
-    setShowDropdown(false);
-    setSuggestions([]);
-  };
+    if (inputValue.length >= minChars) {
+      debouncedSearch(inputValue);
+    } else {
+      setSuggestions([]);
+    }
+  }, [inputValue, debouncedSearch, minChars]);
 
   return (
-    <div ref={wrapperRef} className="position-relative">
-      <input
-        type="text"
-        className="form-control"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-      />
-      {isLoading && (
-        <span className="position-absolute top-50 end-0 translate-middle-y me-2">
-          <span className="spinner-border spinner-border-sm" />
-        </span>
+    <Autocomplete<T, false, false, true>
+      freeSolo
+      options={suggestions}
+      loading={isLoading}
+      inputValue={inputValue}
+      onInputChange={(_, newValue) => {
+        setInputValue(newValue);
+        onChange(newValue);
+      }}
+      onChange={(_, newValue) => {
+        if (newValue && typeof newValue !== 'string') {
+          onSelect(newValue);
+        }
+      }}
+      disabled={disabled}
+      getOptionLabel={(option) => {
+        if (typeof option === 'string') return option;
+        // For custom objects, try to get a display name
+        return (option as any).name || String(option);
+      }}
+      renderOption={(props, option) => (
+        <li {...props} key={(option as any).id || String(option)}>
+          {renderItem(option)}
+        </li>
       )}
-      {showDropdown && suggestions.length > 0 && (
-        <ul className="list-group position-absolute w-100 mt-1" style={{ zIndex: 1000 }}>
-          {suggestions.map((item, index) => (
-            <li
-              key={index}
-              className="list-group-item list-group-item-action"
-              style={{ cursor: 'pointer' }}
-              onClick={() => handleSelect(item)}
-            >
-              {renderItem(item)}
-            </li>
-          ))}
-        </ul>
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          placeholder={placeholder}
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {isLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
       )}
-    </div>
+      sx={{ flexGrow: 1 }}
+    />
   );
 }

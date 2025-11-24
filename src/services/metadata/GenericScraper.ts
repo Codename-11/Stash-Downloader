@@ -5,13 +5,12 @@
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
-import { extractDomain } from '@/utils';
 
 export class GenericScraper implements IMetadataScraper {
   name = 'Generic';
   supportedDomains = ['*']; // Fallback for all domains
 
-  canHandle(url: string): boolean {
+  canHandle(_url: string): boolean {
     return true; // Generic scraper handles everything as fallback
   }
 

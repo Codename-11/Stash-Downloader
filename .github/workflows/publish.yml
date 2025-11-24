@@ -1,0 +1,88 @@
+name: Build and Publish Plugin
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Create plugins directory structure
+        run: |
+          mkdir -p plugins/stash-downloader
+          cp -r dist plugins/stash-downloader/
+          cp stash-downloader.yml plugins/stash-downloader/
+          cp README.md plugins/stash-downloader/
+          cp LICENSE plugins/stash-downloader/
+
+      - name: Generate plugin index
+        run: |
+          cat > index.yml << 'EOF'
+          ---
+          version: "1"
+          sources:
+            - id: stash-downloader
+              name: Stash Downloader
+              metadata:
+                Name: Stash Downloader
+                Author: Codename-11
+                Description: Download images and videos from URLs with automatic metadata extraction and organization
+                URL: https://github.com/Codename-11/Stash-Downloader
+                Tags:
+                  - download
+                  - metadata
+                  - scraper
+                  - react
+              plugins:
+                - id: stash-downloader
+                  name: Stash Downloader
+                  version: 0.1.0
+                  date: $(date +%Y-%m-%d)
+                  files:
+                    - stash-downloader.yml
+                    - dist/stash-downloader.js
+                  requires:
+                    - stash: ">=0.20.0"
+                  description: Download images and videos from URLs with automatic metadata extraction and organization
+                  url: ${{ github.server_url }}/${{ github.repository }}
+                  path: plugins/stash-downloader
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

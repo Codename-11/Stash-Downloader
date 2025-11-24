@@ -3,11 +3,16 @@
  */
 
 import React, { useState } from 'react';
+import { Container, Box, Typography, LinearProgress, Chip, Stack, Button, Alert, AppBar, Toolbar } from '@mui/material';
+import { ArrowBack as ArrowBackIcon, SkipNext as SkipNextIcon } from '@mui/icons-material';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus } from '@/types';
 import { MetadataEditorForm } from './MetadataEditorForm';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { useToast } from '@/contexts/ToastContext';
+import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
 
 interface EditWorkflowPageProps {
@@ -23,6 +28,8 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
   onSkip,
   onBack,
 }) => {
+  const toast = useToast();
+  const log = useLog();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +42,11 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
     setIsImporting(true);
     setError(null);
 
+    const itemTitle = currentItem.editedMetadata?.title || currentItem.metadata?.title || currentItem.url;
+    
     try {
+      log.addLog('info', 'download', `Starting import to Stash: ${itemTitle}`);
+      
       const importService = getStashImportService();
 
       // Update item with edited metadata
@@ -48,6 +59,9 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
       // Import to Stash
       const result = await importService.importToStash(itemWithMetadata);
 
+      log.addLog('success', 'download', `Successfully imported to Stash: ${itemTitle}`, `Stash ID: ${result.id}`);
+      toast.showToast('success', 'Import Successful', `Successfully imported: ${itemTitle}`);
+
       // Mark as complete
       onComplete(currentItem.id, result.id);
 
@@ -56,10 +70,44 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
         setCurrentIndex(currentIndex + 1);
       } else {
         // All done
+        log.addLog('success', 'download', 'All items imported successfully');
+        toast.showToast('success', 'All Done', 'All items have been imported successfully');
         onBack();
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to import to Stash';
+      let errorMsg = err instanceof Error ? err.message : 'Failed to import to Stash';
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      
+      // Log detailed error information
+      console.error('[EditWorkflowPage] Import error details:', {
+        error: err,
+        message: errorMsg,
+        stack: errorStack,
+        itemUrl: currentItem.url,
+        itemTitle: itemTitle,
+        hasMetadata: !!currentItem.metadata,
+        videoUrl: currentItem.metadata?.videoUrl,
+      });
+      
+      // Provide helpful error messages for common issues
+      if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch') || errorMsg.includes('CORS')) {
+        const corsEnabled = typeof window !== 'undefined' && localStorage.getItem('corsProxyEnabled') === 'true';
+        if (!corsEnabled) {
+          errorMsg = 'CORS Error: Enable CORS proxy in settings to download from this site. The site blocks direct browser requests.';
+        } else {
+          errorMsg = 'Network Error: Check if CORS proxy is running and accessible. Some sites may block downloads even with proxy.';
+        }
+      }
+      
+      // Add more context to error message
+      if (errorMsg.includes('Invalid URL')) {
+        errorMsg += ` (URL: ${currentItem.url})`;
+      }
+      
+      log.addLog('error', 'download', `Failed to import to Stash: ${errorMsg}`, 
+        `URL: ${currentItem.url}\nVideo URL: ${currentItem.metadata?.videoUrl || 'none'}\n${errorStack || ''}`
+      );
+      toast.showToast('error', 'Import Failed', errorMsg);
       setError(errorMsg);
     } finally {
       setIsImporting(false);
@@ -87,71 +135,113 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
 
   if (!currentItem) {
     return (
-      <div className="container-fluid py-4">
-        <div className="alert alert-info">No items to edit</div>
-        <button className="btn btn-secondary" onClick={onBack}>
-          Back to Queue
-        </button>
-      </div>
+      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
+        <AppBar position="static" color="default" elevation={1}>
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Edit & Import
+            </Typography>
+            <ThemeToggle />
+          </Toolbar>
+        </AppBar>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            No items to edit
+          </Alert>
+          <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+            Back to Queue
+          </Button>
+        </Container>
+      </Box>
     );
   }
 
   if (isImporting) {
     return (
-      <div className="container-fluid py-4">
-        <LoadingSpinner size="lg" text="Importing to Stash..." />
-      </div>
+      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
+        <AppBar position="static" color="default" elevation={1}>
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Edit & Import
+            </Typography>
+            <ThemeToggle />
+          </Toolbar>
+        </AppBar>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <LoadingSpinner size="lg" text="Importing to Stash..." />
+        </Container>
+      </Box>
     );
   }
 
+  const progressPercentage = ((currentIndex + 1) / items.length) * 100;
+
   return (
-    <div className="container-fluid py-4">
-      <div className="row">
-        <div className="col-lg-8 offset-lg-2">
+    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar position="static" color="default" elevation={1}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Edit & Import
+          </Typography>
+          <ThemeToggle />
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth={false} sx={{ py: 4, px: 3 }}>
+        <Stack spacing={3}>
           {/* Progress indicator */}
-          <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h4>Edit & Import</h4>
-              <span className="badge bg-primary">
-                {currentIndex + 1} / {items.length}
-              </span>
-            </div>
-            <div className="progress" style={{ height: '8px' }}>
-              <div
-                className="progress-bar"
-                role="progressbar"
-                style={{ width: `${((currentIndex + 1) / items.length) * 100}%` }}
-              />
-            </div>
-          </div>
+          <Box sx={{ mb: 4 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Typography variant="h5" component="h4">
+                Edit & Import
+              </Typography>
+              <Chip label={`${currentIndex + 1} / ${items.length}`} color="primary" />
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={progressPercentage}
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+          </Box>
 
           {/* Navigation */}
-          <div className="mb-3">
-            <button
-              className="btn btn-sm btn-outline-secondary me-2"
+          <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ArrowBackIcon />}
               onClick={onBack}
             >
-              ← Back to Queue
-            </button>
-            <button
-              className="btn btn-sm btn-outline-secondary me-2"
+              Back to Queue
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ArrowBackIcon />}
               onClick={handlePrevious}
               disabled={currentIndex === 0}
             >
-              ← Previous
-            </button>
-            <button className="btn btn-sm btn-outline-warning" onClick={handleSkip}>
-              Skip This Item →
-            </button>
-          </div>
+              Previous
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              color="warning"
+              endIcon={<SkipNextIcon />}
+              onClick={handleSkip}
+            >
+              Skip This Item
+            </Button>
+          </Stack>
 
           {/* Error display */}
           {error && (
-            <ErrorMessage
-              error={error}
-              onRetry={() => setError(null)}
-              onDismiss={() => setError(null)}
-            />
+            <Box sx={{ mb: 3 }}>
+              <ErrorMessage
+                error={error}
+                onRetry={() => setError(null)}
+                onDismiss={() => setError(null)}
+              />
+            </Box>
           )}
 
           {/* Metadata editor */}
@@ -160,8 +250,8 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
             onSave={handleSave}
             onCancel={handleSkip}
           />
-        </div>
-      </div>
-    </div>
+        </Stack>
+      </Container>
+    </Box>
   );
 };

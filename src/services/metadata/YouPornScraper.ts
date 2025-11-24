@@ -13,10 +13,12 @@
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import { fetchWithTimeout } from '@/utils';
 
 export class YouPornScraper implements IMetadataScraper {
   name = 'YouPorn';
   supportedDomains = ['youporn.com', 'www.youporn.com'];
+  private readonly timeoutMs = 30000; // 30 seconds for HTML fetch
 
   canHandle(url: string): boolean {
     try {
@@ -32,18 +34,29 @@ export class YouPornScraper implements IMetadataScraper {
 
     try {
       const html = await this.fetchHTML(url);
+      console.log('[YouPornScraper] HTML fetched, length:', html.length);
+      
       const metadata = this.parseHTML(html, url);
 
-      console.log('[YouPornScraper] Extracted metadata:', metadata);
+      console.log('[YouPornScraper] Extracted metadata:', {
+        title: metadata.title,
+        hasDescription: !!metadata.description,
+        hasThumbnail: !!metadata.thumbnailUrl,
+        hasVideoUrl: !!metadata.videoUrl,
+        performersCount: metadata.performers?.length || 0,
+        tagsCount: metadata.tags?.length || 0,
+      });
       return metadata;
     } catch (error) {
-      console.error('[YouPornScraper] Failed to scrape:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('[YouPornScraper] Failed to scrape:', errorMsg);
+      console.error('[YouPornScraper] Error stack:', errorStack);
+      console.error('[YouPornScraper] Full error object:', error);
 
-      return {
-        url,
-        title: 'YouPorn Video',
-        contentType: 'video' as ContentType,
-      };
+      // Re-throw the error instead of returning minimal metadata
+      // This allows the ScraperRegistry to try fallback scrapers
+      throw new Error(`YouPorn scraper failed: ${errorMsg}`);
     }
   }
 
@@ -52,12 +65,27 @@ export class YouPornScraper implements IMetadataScraper {
    */
   private async fetchHTML(url: string): Promise<string> {
     const fetchUrl = this.wrapWithProxyIfEnabled(url);
+    console.log('[YouPornScraper] Fetching from URL:', fetchUrl);
 
-    const response = await fetch(fetchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    const response = await fetchWithTimeout(
+      fetchUrl,
+      {
+        method: 'GET',
+        mode: 'cors', // Explicitly set CORS mode
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Referer': 'https://www.youporn.com/',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'same-origin',
+          // Removed 'Upgrade-Insecure-Requests' - not needed and causes CORS issues
+        },
       },
-    });
+      this.timeoutMs
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -70,13 +98,29 @@ export class YouPornScraper implements IMetadataScraper {
    * Wrap URL with CORS proxy if enabled
    */
   private wrapWithProxyIfEnabled(url: string): string {
-    if (typeof window === 'undefined') return url;
+    if (typeof window === 'undefined') {
+      console.log('[YouPornScraper] window is undefined, skipping proxy');
+      return url;
+    }
 
     const corsEnabled = localStorage.getItem('corsProxyEnabled') === 'true';
-    if (!corsEnabled) return url;
+    const corsProxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
+    
+    console.log('[YouPornScraper] CORS proxy check:', {
+      corsEnabled,
+      corsProxyUrl,
+      originalUrl: url,
+    });
 
-    const proxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
-    return `${proxyUrl}/${url}`;
+    if (!corsEnabled) {
+      console.warn('[YouPornScraper] ⚠️ CORS proxy is NOT enabled! Enable it in test app settings.');
+      return url;
+    }
+
+    // Use query parameter instead of path to avoid URL encoding issues
+    const proxiedUrl = `${corsProxyUrl}/?url=${encodeURIComponent(url)}`;
+    console.log('[YouPornScraper] ✓ Using CORS proxy:', proxiedUrl);
+    return proxiedUrl;
   }
 
   /**
@@ -86,9 +130,12 @@ export class YouPornScraper implements IMetadataScraper {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
+    // Detect content type (video or image)
+    const contentType = this.detectContentType(doc, url);
+
     const metadata: IScrapedMetadata = {
       url,
-      contentType: 'video' as ContentType,
+      contentType,
     };
 
     // Title
@@ -103,8 +150,10 @@ export class YouPornScraper implements IMetadataScraper {
     // Description
     metadata.description = this.extractDescription(doc);
 
-    // Duration
-    metadata.duration = this.extractDuration(doc);
+    // Duration (only for videos)
+    if (contentType === 'video') {
+      metadata.duration = this.extractDuration(doc);
+    }
 
     // Thumbnail
     metadata.thumbnailUrl = this.extractThumbnail(doc);
@@ -112,10 +161,92 @@ export class YouPornScraper implements IMetadataScraper {
     // Upload date
     metadata.date = this.extractDate(doc);
 
-    // Video URL (actual video file) - THIS IS CRITICAL
-    metadata.videoUrl = this.extractVideoUrl(html, doc);
+    // Video URL (actual video file) - only for videos
+    if (contentType === 'video') {
+      metadata.videoUrl = this.extractVideoUrl(html, doc);
+
+      // Extract quality from video URL if available
+      if (metadata.videoUrl) {
+        metadata.quality = this.extractQualityFromUrl(metadata.videoUrl);
+
+        // Add quality to title if available
+        if (metadata.quality && metadata.title) {
+          metadata.title = `[${metadata.quality}] ${metadata.title}`;
+        }
+      }
+    } else if (contentType === 'image') {
+      // Image URL (actual image file) - for images
+      metadata.imageUrl = this.extractImageUrl(html, doc);
+    }
 
     return metadata;
+  }
+
+  /**
+   * Detect content type from page
+   */
+  private detectContentType(doc: Document, url: string): ContentType {
+    // Check og:type meta tag
+    const ogType = doc.querySelector('meta[property="og:type"]')?.getAttribute('content')?.toLowerCase();
+    if (ogType?.includes('image')) return 'image' as ContentType;
+    if (ogType?.includes('video')) return 'video' as ContentType;
+
+    // Check URL path for image indicators
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('/photo/') || urlLower.includes('/image/') || urlLower.includes('/picture/')) {
+      return 'image' as ContentType;
+    }
+
+    // Check for image extensions in URL
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    if (imageExtensions.some(ext => urlLower.includes(ext))) {
+      return 'image' as ContentType;
+    }
+
+    // Default to video for YouPorn
+    return 'video' as ContentType;
+  }
+
+  /**
+   * Extract actual image URL from page
+   */
+  private extractImageUrl(html: string, doc: Document): string | undefined {
+    try {
+      console.log('[YouPornScraper] Attempting to extract image URL...');
+
+      // Method 1: Look for og:image meta tag
+      const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+      if (ogImage && (ogImage.includes('.jpg') || ogImage.includes('.png') || ogImage.includes('.webp'))) {
+        console.log('[YouPornScraper] ✓ Found image URL from og:image:', ogImage);
+        return ogImage;
+      }
+
+      // Method 2: Look for large image elements
+      const largeImage = doc.querySelector('img[src*="youporn"], img[data-src*="youporn"]');
+      if (largeImage) {
+        const src = largeImage.getAttribute('src') || largeImage.getAttribute('data-src');
+        if (src && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp'))) {
+          console.log('[YouPornScraper] ✓ Found image URL from img element:', src);
+          return src.startsWith('http') ? src : new URL(src, 'https://www.youporn.com').href;
+        }
+      }
+
+      // Method 3: Look for image URLs in JavaScript variables
+      const imageUrlMatch = html.match(/"imageUrl"\s*:\s*"([^"]+)"/i) || 
+                           html.match(/"image_url"\s*:\s*"([^"]+)"/i) ||
+                           html.match(/var\s+imageUrl\s*=\s*"([^"]+)"/i);
+      if (imageUrlMatch && imageUrlMatch[1]) {
+        const imageUrl = imageUrlMatch[1].replace(/\\\//g, '/');
+        console.log('[YouPornScraper] ✓ Found image URL from JavaScript:', imageUrl);
+        return imageUrl.startsWith('http') ? imageUrl : new URL(imageUrl, 'https://www.youporn.com').href;
+      }
+
+      console.warn('[YouPornScraper] ⚠️ Could not find image URL in page');
+      return undefined;
+    } catch (error) {
+      console.error('[YouPornScraper] Error extracting image URL:', error);
+      return undefined;
+    }
   }
 
   /**
@@ -132,7 +263,7 @@ export class YouPornScraper implements IMetadataScraper {
       // Method 1: Look for page_params.video_player_setup (yt-dlp method)
       console.log('[YouPornScraper] Trying method 1: page_params.video_player_setup (yt-dlp method)...');
       const playerSetupMatch = html.match(/page_params\.video_player_setup\s*=\s*(\{[\s\S]*?\});/);
-      if (playerSetupMatch) {
+      if (playerSetupMatch && playerSetupMatch[1]) {
         console.log('[YouPornScraper] Found page_params.video_player_setup, parsing...');
         try {
           const playerSetup = JSON.parse(playerSetupMatch[1]);
@@ -160,7 +291,7 @@ export class YouPornScraper implements IMetadataScraper {
               console.log(`  - ${v.quality}p: ${v.url.substring(0, 100)}...`);
             });
 
-            if (videos.length > 0) {
+            if (videos.length > 0 && videos[0]) {
               console.log(`[YouPornScraper] ✓ Found ${videos.length} video URLs, selecting highest quality: ${videos[0].quality}p`);
               console.log('[YouPornScraper] Video URL:', videos[0].url);
               return videos[0].url;
@@ -174,7 +305,7 @@ export class YouPornScraper implements IMetadataScraper {
       // Method 2: Look for window.videoData or similar objects
       console.log('[YouPornScraper] Trying method 2: window.videoData...');
       const videoDataMatch = html.match(/window\.videoData\s*=\s*(\{[\s\S]*?\});/);
-      if (videoDataMatch) {
+      if (videoDataMatch && videoDataMatch[1]) {
         console.log('[YouPornScraper] Found window.videoData, parsing...');
         try {
           const videoData = JSON.parse(videoDataMatch[1]);
@@ -206,7 +337,7 @@ export class YouPornScraper implements IMetadataScraper {
       }
 
       // Method 3: Look for "video":"..." pattern with escaped JSON URLs
-      // Find ALL video URLs and select the highest quality
+      // Find ALL video URLs and select the highest quality DIRECT MP4
       console.log('[YouPornScraper] Trying method 3: JSON-escaped video URLs...');
       const escapedVideoMatches = html.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/gi);
       if (escapedVideoMatches && escapedVideoMatches.length > 0) {
@@ -215,21 +346,27 @@ export class YouPornScraper implements IMetadataScraper {
         // Extract and parse all URLs with their quality info
         const videos = escapedVideoMatches.map(match => {
           const urlMatch = match.match(/"video"\s*:\s*"(https?:\\\/\\\/[^"]+\.mp4[^"]*)"/i);
-          if (!urlMatch) return null;
+          if (!urlMatch || !urlMatch[1]) return null;
 
           const escapedUrl = urlMatch[1];
           const unescapedUrl = escapedUrl.replace(/\\\//g, '/');
 
+          // Filter out HLS/DASH URLs
+          if (!this.isDirectMp4Url(unescapedUrl)) {
+            console.log(`[YouPornScraper] Skipping non-direct MP4: ${unescapedUrl.substring(0, 100)}...`);
+            return null;
+          }
+
           // Extract quality from URL (e.g., "360P_360K" or "1080P_2000K")
           const qualityMatch = unescapedUrl.match(/\/(\d+)P_(\d+)K_/);
-          const quality = qualityMatch ? parseInt(qualityMatch[1]) : 0;
-          const bitrate = qualityMatch ? parseInt(qualityMatch[2]) : 0;
+          const quality = qualityMatch && qualityMatch[1] ? parseInt(qualityMatch[1]) : 0;
+          const bitrate = qualityMatch && qualityMatch[2] ? parseInt(qualityMatch[2]) : 0;
 
           return { url: unescapedUrl, quality, bitrate };
         }).filter(v => v !== null) as Array<{url: string, quality: number, bitrate: number}>;
 
         // DEBUG: Log all found URLs with their qualities
-        console.log('[YouPornScraper] All video URLs found:');
+        console.log('[YouPornScraper] Direct MP4 URLs found:');
         videos.forEach(v => {
           console.log(`  - ${v.quality}p @ ${v.bitrate}k: ${v.url}`);
         });
@@ -242,9 +379,11 @@ export class YouPornScraper implements IMetadataScraper {
           });
 
           const bestVideo = videos[0];
-          console.log(`[YouPornScraper] ✓ Selecting highest quality: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
-          console.log('[YouPornScraper] Video URL:', bestVideo.url);
-          return bestVideo.url;
+          if (bestVideo) {
+            console.log(`[YouPornScraper] ✓ Selecting highest quality direct MP4: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
+            console.log('[YouPornScraper] Video URL:', bestVideo.url);
+            return bestVideo.url;
+          }
         }
       }
 
@@ -256,16 +395,22 @@ export class YouPornScraper implements IMetadataScraper {
 
         const allVideos = allMp4Matches.map(escapedUrl => {
           const unescapedUrl = escapedUrl.replace(/\\\//g, '/');
+
+          // Filter out HLS/DASH URLs
+          if (!this.isDirectMp4Url(unescapedUrl)) {
+            return null;
+          }
+
           const qualityMatch = unescapedUrl.match(/\/(\d+)P_(\d+)K_/);
-          const quality = qualityMatch ? parseInt(qualityMatch[1]) : 0;
-          const bitrate = qualityMatch ? parseInt(qualityMatch[2]) : 0;
+          const quality = qualityMatch && qualityMatch[1] ? parseInt(qualityMatch[1]) : 0;
+          const bitrate = qualityMatch && qualityMatch[2] ? parseInt(qualityMatch[2]) : 0;
           return { url: unescapedUrl, quality, bitrate };
-        }).filter(v => v.quality > 0); // Only keep URLs with identifiable quality
+        }).filter(v => v !== null && v.quality > 0); // Only keep direct MP4 URLs with identifiable quality
 
         // Remove duplicates
         const uniqueVideos = allVideos.filter((v, i, arr) =>
-          arr.findIndex(x => x.url === v.url) === i
-        );
+          arr.findIndex(x => x!.url === v!.url) === i
+        ) as Array<{url: string, quality: number, bitrate: number}>;
 
         if (uniqueVideos.length > 0) {
           console.log('[YouPornScraper] All unique .mp4 URLs with quality info:');
@@ -280,9 +425,11 @@ export class YouPornScraper implements IMetadataScraper {
           });
 
           const bestVideo = uniqueVideos[0];
-          console.log(`[YouPornScraper] ✓ Selecting highest quality from all .mp4 URLs: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
-          console.log('[YouPornScraper] Video URL:', bestVideo.url);
-          return bestVideo.url;
+          if (bestVideo) {
+            console.log(`[YouPornScraper] ✓ Selecting highest quality from all .mp4 URLs: ${bestVideo.quality}p @ ${bestVideo.bitrate}k`);
+            console.log('[YouPornScraper] Video URL:', bestVideo.url);
+            return bestVideo.url;
+          }
         }
       }
 
@@ -302,11 +449,13 @@ export class YouPornScraper implements IMetadataScraper {
               return parseInt(b) - parseInt(a);
             });
 
-            if (qualities.length > 0) {
+            if (qualities.length > 0 && qualities[0]) {
               const bestQuality = qualities[0];
-              console.log(`[YouPornScraper] ✓ Found video URL with quality ${bestQuality}`);
-              console.log('[YouPornScraper] Video URL:', videoUrls[bestQuality]);
-              return videoUrls[bestQuality];
+              if (videoUrls[bestQuality]) {
+                console.log(`[YouPornScraper] ✓ Found video URL with quality ${bestQuality}`);
+                console.log('[YouPornScraper] Video URL:', videoUrls[bestQuality]);
+                return videoUrls[bestQuality];
+              }
             }
           } catch (e) {
             console.error('[YouPornScraper] Failed to parse data-video-urls:', e);
@@ -334,7 +483,7 @@ export class YouPornScraper implements IMetadataScraper {
 
       // Pattern: mediaDefinitions = [...]
       const mediaDefMatch = html.match(/mediaDefinitions\s*=\s*(\[[\s\S]*?\]);/);
-      if (mediaDefMatch) {
+      if (mediaDefMatch && mediaDefMatch[1]) {
         console.log('[YouPornScraper] Found mediaDefinitions, parsing...');
         try {
           const mediaDef = JSON.parse(mediaDefMatch[1]);
@@ -519,9 +668,9 @@ export class YouPornScraper implements IMetadataScraper {
       const durationText = doc.querySelector(selector)?.textContent?.trim();
       if (durationText) {
         const parts = durationText.split(':').map(p => parseInt(p, 10));
-        if (parts.length === 2 && !parts.some(isNaN)) {
+        if (parts.length === 2 && !parts.some(isNaN) && parts[0] !== undefined && parts[1] !== undefined) {
           return parts[0] * 60 + parts[1]; // MM:SS
-        } else if (parts.length === 3 && !parts.some(isNaN)) {
+        } else if (parts.length === 3 && !parts.some(isNaN) && parts[0] !== undefined && parts[1] !== undefined && parts[2] !== undefined) {
           return parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
         }
       }
@@ -590,5 +739,65 @@ export class YouPornScraper implements IMetadataScraper {
     }
 
     return undefined;
+  }
+
+  /**
+   * Extract quality from video URL
+   * YouPorn URLs contain quality info like "360P_360K" or "1080P_2000K"
+   */
+  private extractQualityFromUrl(url: string): string | undefined {
+    try {
+      // Match pattern like "360P_360K" or "1080P_2000K"
+      const qualityMatch = url.match(/\/(\d+)P_\d+K_/i);
+      if (qualityMatch && qualityMatch[1]) {
+        const qualityNum = parseInt(qualityMatch[1]);
+        // Format as "1080p", "720p", etc.
+        return `${qualityNum}p`;
+      }
+
+      // Fallback: try to find any quality indicator
+      const altMatch = url.match(/(\d{3,4})p/i);
+      if (altMatch && altMatch[1]) {
+        return altMatch[1] + 'p';
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error('[YouPornScraper] Error extracting quality from URL:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Check if URL is a direct MP4 download (not HLS/DASH streaming)
+   */
+  private isDirectMp4Url(url: string): boolean {
+    try {
+      const urlLower = url.toLowerCase();
+
+      // Exclude HLS playlists
+      if (urlLower.includes('.m3u8') || urlLower.includes('/hls/')) {
+        return false;
+      }
+
+      // Exclude DASH manifests
+      if (urlLower.includes('.mpd') || urlLower.includes('/dash/')) {
+        return false;
+      }
+
+      // Must end with .mp4 (not .mp4/ or .mp4?)
+      if (urlLower.endsWith('.mp4')) {
+        return true;
+      }
+
+      // Allow .mp4 with query parameters
+      if (urlLower.match(/\.mp4(\?[^/]*)?$/)) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      return false;
+    }
   }
 }

@@ -73,7 +73,7 @@ Component Re-render
 
 4. **Persistent State** (localStorage)
    - User preferences (download paths, auto-tag rules)
-   - UI preferences (theme, layout)
+   - UI preferences (Material UI theme mode, layout)
    - Fallback to defaults if unavailable
 
 ### Context Structure
@@ -89,6 +89,65 @@ SettingsContext
 ├── updateSettings: (partial) => void
 └── resetToDefaults: () => void
 ```
+
+## Material UI Integration
+
+### Theme Provider Structure
+The application uses Material UI v7 with a custom theme provider:
+
+```
+ThemeProvider (src/theme/ThemeProvider.tsx)
+├── MuiThemeProvider (from @mui/material)
+│   ├── CssBaseline (normalizes browser styles)
+│   └── App Components
+└── ThemeContext (provides mode toggle)
+```
+
+### Theme Configuration
+- **Location**: `src/theme/theme.ts`
+- **Features**:
+  - Custom color palette matching Stash aesthetic
+  - Dark/light mode support
+  - Typography configuration
+  - Component style overrides
+- **Mode Persistence**: Theme mode stored in localStorage (`stash-downloader-theme-mode`)
+
+### Component Patterns
+
+**Layout Components**:
+- Use `Container` for page-level containers
+- Use `Grid` for responsive layouts
+- Use `Box` for spacing and flex containers
+- Use `Stack` for simple flex layouts
+
+**Form Components**:
+- Use `TextField` for text inputs
+- Use `Autocomplete` for searchable selects
+- Use `Button` with variants (contained, outlined, text)
+- Use `Dialog` for modals
+
+**Feedback Components**:
+- Use `Alert` for error/success messages
+- Use `Snackbar` for toast notifications
+- Use `CircularProgress` for loading spinners
+- Use `LinearProgress` for progress bars
+
+**Data Display**:
+- Use `Card` and `CardContent` for content sections
+- Use `Chip` for tags/badges
+- Use `Table` for tabular data
+- Use `Typography` for text
+
+### Styling Approach
+- **Theme-based**: Use theme colors, spacing, and typography
+- **SX Prop**: Prefer `sx` prop for component-level styling
+- **Styled Components**: Use `styled()` for reusable styled components when needed
+- **No CSS Classes**: Avoid Bootstrap-style className usage
+
+### Icon Usage
+- Import icons from `@mui/icons-material`
+- Use with `startIcon`/`endIcon` props on buttons
+- Use `IconButton` for icon-only buttons
 
 ## Component Architecture
 

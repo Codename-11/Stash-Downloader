@@ -2,7 +2,7 @@
  * useStashData - Hook for fetching Stash data (performers, tags, studios)
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { getStashService } from '@/services/stash';
 
@@ -15,7 +15,7 @@ interface IStashDataState {
 }
 
 export function useStashData() {
-  const [state, setState] = useState<IStashDataState>({
+  const [state] = useState<IStashDataState>({
     performers: [],
     tags: [],
     studios: [],

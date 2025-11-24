@@ -23,9 +23,9 @@ function initializePlugin() {
   try {
     console.log(`[${PLUGIN_ID}] Initializing plugin...`);
 
-    // Register main route
-    window.PluginApi.register.route(ROUTES.MAIN, () => {
-      return React.createElement(DownloaderMain);
+    // Register main route - accept props for test mode
+    window.PluginApi.register.route(ROUTES.MAIN, (props?: any) => {
+      return React.createElement(DownloaderMain, props);
     });
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);

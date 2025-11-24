@@ -32,6 +32,8 @@ export default defineConfig(({ mode }) => {
           // Standard app build for testing
           outDir: 'dist-test',
           sourcemap: true,
+          // Ensure console logs are preserved in test builds
+          minify: false, // Don't minify in test mode to preserve all logs
         }
       : {
           // Library build for Stash plugin
@@ -49,10 +51,6 @@ export default defineConfig(({ mode }) => {
               'react-dom/client',
               'react-router-dom',
               '@apollo/client',
-              'react-bootstrap',
-              '@fortawesome/react-fontawesome',
-              '@fortawesome/free-solid-svg-icons',
-              '@fortawesome/free-regular-svg-icons',
             ],
             output: {
               // Global variable names for externalized deps
@@ -62,13 +60,6 @@ export default defineConfig(({ mode }) => {
                 'react-dom/client': 'PluginApi.ReactDOM',
                 'react-router-dom': 'PluginApi.libraries.ReactRouterDOM',
                 '@apollo/client': 'PluginApi.libraries.Apollo',
-                'react-bootstrap': 'PluginApi.libraries.Bootstrap',
-                '@fortawesome/react-fontawesome':
-                  'PluginApi.libraries.FontAwesomeSolid',
-                '@fortawesome/free-solid-svg-icons':
-                  'PluginApi.libraries.FontAwesomeSolid',
-                '@fortawesome/free-regular-svg-icons':
-                  'PluginApi.libraries.FontAwesomeRegular',
               },
               // Ensure consistent output
               inlineDynamicImports: true,
@@ -78,6 +69,12 @@ export default defineConfig(({ mode }) => {
           emptyOutDir: true,
           sourcemap: false, // Disable in production
           minify: 'terser',
+          terserOptions: {
+            compress: {
+              drop_console: false, // Keep console logs even in production
+              drop_debugger: true,
+            },
+          },
           target: 'es2020',
         },
 

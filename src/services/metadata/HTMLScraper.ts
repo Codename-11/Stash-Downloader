@@ -9,10 +9,12 @@
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import { fetchWithTimeout } from '@/utils';
 
 export class HTMLScraper implements IMetadataScraper {
   name = 'HTML Meta Tags';
   supportedDomains = ['*']; // Works for any site with meta tags
+  private readonly timeoutMs = 30000; // 30 seconds for HTML fetch
 
   canHandle(url: string): boolean {
     // This scraper can try any HTTP/HTTPS URL
@@ -49,11 +51,15 @@ export class HTMLScraper implements IMetadataScraper {
   private async fetchHTML(url: string): Promise<string> {
     const fetchUrl = this.wrapWithProxyIfEnabled(url);
 
-    const response = await fetch(fetchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    const response = await fetchWithTimeout(
+      fetchUrl,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
       },
-    });
+      this.timeoutMs
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
@@ -66,13 +72,29 @@ export class HTMLScraper implements IMetadataScraper {
    * Wrap URL with CORS proxy if enabled
    */
   private wrapWithProxyIfEnabled(url: string): string {
-    if (typeof window === 'undefined') return url;
+    if (typeof window === 'undefined') {
+      console.log('[HTMLScraper] window is undefined, skipping proxy');
+      return url;
+    }
 
     const corsEnabled = localStorage.getItem('corsProxyEnabled') === 'true';
-    if (!corsEnabled) return url;
+    const corsProxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
+    
+    console.log('[HTMLScraper] CORS proxy check:', {
+      corsEnabled,
+      corsProxyUrl,
+      originalUrl: url,
+    });
 
-    const proxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
-    return `${proxyUrl}/${url}`;
+    if (!corsEnabled) {
+      console.warn('[HTMLScraper] ⚠️ CORS proxy is NOT enabled! Enable it in test app settings.');
+      return url;
+    }
+
+    // Use query parameter instead of path to avoid URL encoding issues
+    const proxiedUrl = `${corsProxyUrl}/?url=${encodeURIComponent(url)}`;
+    console.log('[HTMLScraper] ✓ Using CORS proxy:', proxiedUrl);
+    return proxiedUrl;
   }
 
   /**
@@ -110,6 +132,53 @@ export class HTMLScraper implements IMetadataScraper {
       this.getMetaProperty(doc, 'twitter:image') ||
       this.getMetaName(doc, 'thumbnail') ||
       undefined;
+
+    // Image URL (for image content type - use og:image or direct image URLs)
+    if (metadata.contentType === 'image') {
+      // Try to find the actual image URL
+      metadata.imageUrl =
+        this.getMetaProperty(doc, 'og:image') ||
+        this.getMetaProperty(doc, 'twitter:image') ||
+        doc.querySelector('img[src]')?.getAttribute('src') ||
+        undefined;
+      
+      // If imageUrl is relative, make it absolute
+      if (metadata.imageUrl && !metadata.imageUrl.startsWith('http')) {
+        try {
+          metadata.imageUrl = new URL(metadata.imageUrl, url).href;
+        } catch {
+          // Keep relative URL if URL construction fails
+        }
+      }
+    }
+
+    // Video URL (for video content type)
+    if (metadata.contentType === 'video') {
+      metadata.videoUrl =
+        this.getMetaProperty(doc, 'og:video') ||
+        this.getMetaProperty(doc, 'og:video:url') ||
+        doc.querySelector('video source')?.getAttribute('src') ||
+        undefined;
+
+      // If videoUrl is relative, make it absolute
+      if (metadata.videoUrl && !metadata.videoUrl.startsWith('http')) {
+        try {
+          metadata.videoUrl = new URL(metadata.videoUrl, url).href;
+        } catch {
+          // Keep relative URL if URL construction fails
+        }
+      }
+
+      // Try to extract quality from video URL
+      if (metadata.videoUrl) {
+        metadata.quality = this.extractQualityFromUrl(metadata.videoUrl);
+
+        // Add quality to title if available
+        if (metadata.quality && metadata.title) {
+          metadata.title = `[${metadata.quality}] ${metadata.title}`;
+        }
+      }
+    }
 
     // Duration (for videos)
     const duration = this.getMetaProperty(doc, 'video:duration') ||
@@ -208,6 +277,44 @@ export class HTMLScraper implements IMetadataScraper {
       return decodeURIComponent(titleWithoutExt).replace(/[-_]/g, ' ');
     } catch {
       return 'Downloaded Content';
+    }
+  }
+
+  /**
+   * Extract quality from video URL
+   * Tries to find common quality patterns like "1080p", "720p", etc.
+   */
+  private extractQualityFromUrl(url: string): string | undefined {
+    try {
+      // Match common quality patterns
+      // Pattern 1: "_1080p" or "-720p"
+      const qualityMatch = url.match(/[_\-](\d{3,4})p/i);
+      if (qualityMatch) {
+        return `${qualityMatch[1]}p`;
+      }
+
+      // Pattern 2: "/1080p/" or "/720p/"
+      const pathMatch = url.match(/\/(\d{3,4})p\//i);
+      if (pathMatch) {
+        return `${pathMatch[1]}p`;
+      }
+
+      // Pattern 3: In query parameters like "?quality=1080p"
+      const urlObj = new URL(url);
+      const qualityParam = urlObj.searchParams.get('quality') ||
+                           urlObj.searchParams.get('res') ||
+                           urlObj.searchParams.get('resolution');
+      if (qualityParam) {
+        const qualityNum = qualityParam.match(/(\d{3,4})/);
+        if (qualityNum) {
+          return `${qualityNum[1]}p`;
+        }
+      }
+
+      return undefined;
+    } catch (error) {
+      console.error('[HTMLScraper] Error extracting quality from URL:', error);
+      return undefined;
     }
   }
 }

@@ -1,0 +1,284 @@
+/**
+ * EditMetadataModal - Modal for editing item metadata
+ */
+
+import React, { useState } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Stack,
+  Typography,
+  Box,
+  Alert,
+  LinearProgress,
+} from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
+import { MetadataEditorForm } from './MetadataEditorForm';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorMessage } from '@/components/common/ErrorMessage';
+import type { IDownloadItem } from '@/types';
+import { DownloadStatus } from '@/types';
+import { useToast } from '@/contexts/ToastContext';
+import { useLog } from '@/contexts/LogContext';
+import { getStashImportService } from '@/services/stash';
+import { formatBytes } from '@/utils';
+
+interface EditMetadataModalProps {
+  item: IDownloadItem | null;
+  open: boolean;
+  onClose: () => void;
+  onComplete: (itemId: string, stashId: string) => void;
+  onUpdateItem?: (id: string, updates: Partial<IDownloadItem>) => void;
+}
+
+export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
+  item,
+  open,
+  onClose,
+  onComplete,
+  onUpdateItem,
+}) => {
+  const toast = useToast();
+  const log = useLog();
+  const [error, setError] = useState<string | null>(null);
+
+  // Get current state from item (persisted across modal open/close)
+  const isImporting = item?.status === DownloadStatus.Processing || item?.status === DownloadStatus.Downloading;
+  const downloadProgress = item?.progress || null;
+  const importStatus = item?.status === DownloadStatus.Downloading ? 'Downloading file...' :
+                       item?.status === DownloadStatus.Processing ? 'Processing...' : 'Preparing...';
+
+  const handleSave = async (editedMetadata: IDownloadItem['editedMetadata']) => {
+    if (!item || !onUpdateItem) return;
+
+    // Update item status to processing
+    onUpdateItem(item.id, {
+      editedMetadata,
+      status: DownloadStatus.Processing,
+    });
+
+    setError(null);
+
+    const itemTitle = item.editedMetadata?.title || item.metadata?.title || item.url;
+
+    try {
+      log.addLog('info', 'download', `Starting import to Stash: ${itemTitle}`);
+
+      const importService = getStashImportService();
+
+      // Update item with edited metadata
+      const itemWithMetadata = {
+        ...item,
+        editedMetadata,
+        status: DownloadStatus.Processing,
+      };
+
+      // Initialize logs array if it doesn't exist
+      onUpdateItem(item.id, {
+        logs: [],
+      });
+
+      // Close modal immediately so import happens in background
+      onClose();
+
+      // Import to Stash with progress callbacks that update the queue item
+      const result = await importService.importToStash(itemWithMetadata, {
+        onProgress: (progress) => {
+          // Update item progress in queue
+          onUpdateItem(item.id, {
+            progress,
+            status: DownloadStatus.Downloading,
+          });
+        },
+        onStatusChange: (status) => {
+          // Update item status in queue
+          const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
+          onUpdateItem(item.id, {
+            status: newStatus,
+          });
+        },
+        onLog: (level, message, details) => {
+          // Add log entry to item's logs array
+          const currentItem = item;
+          const newLog = {
+            timestamp: new Date(),
+            level,
+            message,
+            details,
+          };
+          const existingLogs = currentItem.logs || [];
+          onUpdateItem(item.id, {
+            logs: [...existingLogs, newLog],
+          });
+        },
+      });
+
+      log.addLog('success', 'download', `Successfully imported to Stash: ${itemTitle}`, `Stash ID: ${result.id}`);
+      toast.showToast('success', 'Import Successful', `Successfully imported: ${itemTitle}`);
+
+      // Mark as complete
+      onComplete(item.id, result.id);
+    } catch (err) {
+      let errorMsg = err instanceof Error ? err.message : 'Failed to import to Stash';
+      const errorStack = err instanceof Error ? err.stack : undefined;
+
+      // Log detailed error information
+      console.error('[EditMetadataModal] Import error details:', {
+        error: err,
+        message: errorMsg,
+        stack: errorStack,
+        itemUrl: item.url,
+        itemTitle: itemTitle,
+        hasMetadata: !!item.metadata,
+        videoUrl: item.metadata?.videoUrl,
+      });
+
+      // Provide helpful error messages for common issues
+      if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch') || errorMsg.includes('CORS')) {
+        const corsEnabled = typeof window !== 'undefined' && localStorage.getItem('corsProxyEnabled') === 'true';
+        if (!corsEnabled) {
+          errorMsg = 'CORS Error: Enable CORS proxy in settings to download from this site. The site blocks direct browser requests.';
+        } else {
+          errorMsg = 'Network Error: Check if CORS proxy is running and accessible. Some sites may block downloads even with proxy.';
+        }
+      }
+
+      // Add more context to error message
+      if (errorMsg.includes('Invalid URL')) {
+        errorMsg += ` (URL: ${item.url})`;
+      }
+
+      log.addLog('error', 'download', `Failed to import to Stash: ${errorMsg}`,
+        `URL: ${item.url}\nVideo URL: ${item.metadata?.videoUrl || 'none'}\n${errorStack || ''}`
+      );
+      toast.showToast('error', 'Import Failed', errorMsg);
+      setError(errorMsg);
+
+      // Update item status to failed and add error log
+      if (onUpdateItem) {
+        const errorLog = {
+          timestamp: new Date(),
+          level: 'error' as const,
+          message: `Import failed: ${errorMsg}`,
+          details: `URL: ${item.url}\nVideo URL: ${item.metadata?.videoUrl || 'none'}\n${errorStack || ''}`,
+        };
+        const existingLogs = item.logs || [];
+        onUpdateItem(item.id, {
+          status: DownloadStatus.Failed,
+          error: errorMsg,
+          logs: [...existingLogs, errorLog],
+        });
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    setError(null);
+    onClose();
+  };
+
+  const handleClose = (_event: {}, _reason: string) => {
+    // Allow closing during import (progress will continue in background and show in queue)
+    handleCancel();
+  };
+
+  if (!item) {
+    return null;
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="lg"
+      fullWidth
+      disableEscapeKeyDown={isImporting}
+    >
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Typography variant="h6">
+            {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
+          </Typography>
+          <IconButton
+            edge="end"
+            onClick={handleCancel}
+            aria-label="close"
+          >
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+
+      <DialogContent dividers>
+        {isImporting ? (
+          <Box sx={{ py: 6 }}>
+            <Stack spacing={3} alignItems="center">
+              <LoadingSpinner size="lg" text={importStatus} />
+
+              {downloadProgress && (
+                <Box sx={{ width: '100%', maxWidth: 600 }}>
+                  <Stack spacing={1}>
+                    <Typography variant="body2" align="center" color="text.secondary">
+                      {downloadProgress.totalBytes > 0
+                        ? `${downloadProgress.percentage.toFixed(1)}% - ${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(downloadProgress.totalBytes)}`
+                        : `Downloaded: ${formatBytes(downloadProgress.bytesDownloaded)}`}
+                    </Typography>
+
+                    <LinearProgress
+                      variant={downloadProgress.totalBytes > 0 ? 'determinate' : 'indeterminate'}
+                      value={downloadProgress.percentage}
+                      sx={{ height: 8, borderRadius: 1 }}
+                    />
+
+                    {downloadProgress.speed > 0 && (
+                      <Typography variant="caption" align="center" color="text.secondary">
+                        Speed: {formatBytes(downloadProgress.speed)}/s
+                        {downloadProgress.timeRemaining && downloadProgress.timeRemaining < 3600 && (
+                          <> • ETA: {Math.ceil(downloadProgress.timeRemaining)}s</>
+                        )}
+                      </Typography>
+                    )}
+                  </Stack>
+                </Box>
+              )}
+            </Stack>
+          </Box>
+        ) : (
+          <Stack spacing={3}>
+            {/* Error display */}
+            {error && (
+              <ErrorMessage
+                error={error}
+                onRetry={() => setError(null)}
+                onDismiss={() => setError(null)}
+              />
+            )}
+
+            {/* URL display */}
+            <Alert severity="info">
+              <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+                <strong>URL:</strong> {item.url}
+              </Typography>
+            </Alert>
+
+            {/* Metadata editor */}
+            <MetadataEditorForm
+              item={item}
+              onSave={handleSave}
+              onCancel={handleCancel}
+            />
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
+          {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
+        </Typography>
+      </DialogActions>
+    </Dialog>
+  );
+};

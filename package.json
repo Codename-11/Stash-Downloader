@@ -41,12 +41,16 @@
     "eslint-plugin-react-refresh": "^0.4.16",
     "happy-dom": "^12.10.3",
     "prettier": "^3.4.2",
+    "terser": "^5.44.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^1.0.4"
   },
   "dependencies": {
-    "bootstrap": "^5.3.3",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@mui/icons-material": "^7.3.5",
+    "@mui/material": "^7.3.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

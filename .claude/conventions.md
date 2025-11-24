@@ -17,7 +17,7 @@
 - **Custom Hooks**: Extract reusable logic into custom hooks (prefix with `use`)
 - **Props**: Define explicit prop interfaces for all components
 - **File Structure**: One component per file (except small related sub-components)
-- **Imports**: Group and order: React → Third-party → Services → Components → Types → Styles
+- **Imports**: Group and order: React → Material UI → Third-party → Services → Components → Types → Styles
 
 ### File Organization
 ```
@@ -34,6 +34,9 @@ src/
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
 ├── constants/         # Application constants
+├── theme/             # Material UI theme configuration
+│   ├── theme.ts       # Theme definition
+│   └── ThemeProvider.tsx  # Theme provider component
 └── index.tsx          # Plugin entry point
 ```
 
@@ -41,6 +44,8 @@ src/
 ```typescript
 // 1. Imports
 import React, { useState, useEffect } from 'react';
+import { Button, TextField, Card, CardContent, Stack } from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { useStashData } from '@/hooks/useStashData';
 import type { IDownloadItem } from '@/types';
 
@@ -70,12 +75,101 @@ export const DownloadQueue: React.FC<DownloadQueueProps> = ({ items, onRemove })
 
   // 7. JSX
   return (
-    <div className="download-queue">
-      {/* Component markup */}
-    </div>
+    <Card>
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Component markup using MUI components */}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 };
 ```
+
+## Material UI Conventions
+
+### Import Ordering
+```typescript
+// 1. React
+import React, { useState } from 'react';
+
+// 2. Material UI components (grouped)
+import { Button, TextField, Card, CardContent } from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+
+// 3. Third-party libraries
+import { useQuery } from '@apollo/client';
+
+// 4. Internal services
+import { getDownloadService } from '@/services/download';
+
+// 5. Internal components
+import { LoadingSpinner } from '@/components/common';
+
+// 6. Internal hooks
+import { useDownloadQueue } from '@/hooks';
+
+// 7. Types
+import type { IDownloadItem } from '@/types';
+
+// 8. Utils
+import { formatBytes } from '@/utils';
+```
+
+### Component Usage
+
+**Layout**:
+- Use `Container` with `maxWidth` prop for page containers
+- Use `Grid` for responsive layouts (prefer over custom flexbox)
+- Use `Stack` for simple vertical/horizontal layouts
+- Use `Box` for spacing, borders, and custom styling
+
+**Styling**:
+- Prefer `sx` prop for component-level styling
+- Use theme values: `sx={{ color: 'primary.main', spacing: 2 }}`
+- Use `styled()` for reusable styled components
+- Avoid inline styles when theme values are available
+
+**Icons**:
+- Import with descriptive names: `import { Add as AddIcon } from '@mui/icons-material'`
+- Use `startIcon`/`endIcon` props on buttons
+- Use `IconButton` for icon-only interactive elements
+
+**Forms**:
+- Use `TextField` with appropriate `variant` (outlined is default)
+- Use `Autocomplete` for searchable selects
+- Use `Select` for simple dropdowns
+- Always provide `label` prop for accessibility
+
+**Feedback**:
+- Use `Alert` for inline messages
+- Use `Snackbar` for toast notifications
+- Use `CircularProgress` for loading states
+- Use `LinearProgress` for progress bars
+
+### Theme Customization
+
+**Accessing Theme**:
+```typescript
+import { useTheme } from '@mui/material/styles';
+import { useThemeMode } from '@/theme/ThemeProvider';
+
+const theme = useTheme();
+const { mode, toggleMode } = useThemeMode();
+```
+
+**Customizing Theme**:
+- Edit `src/theme/theme.ts` for global theme changes
+- Use component `styleOverrides` in theme for component-level changes
+- Use `sx` prop for component-specific styling
+
+### Best Practices
+- Always wrap app with `ThemeProvider` from `@/theme/ThemeProvider`
+- Use theme spacing units: `sx={{ p: 2, m: 1 }}` (multiplies by 8px)
+- Use theme breakpoints: `sx={{ display: { xs: 'none', md: 'block' } }}`
+- Prefer semantic color props: `color="primary"` over `color="#1976d2"`
+- Use `Typography` component for text instead of raw HTML tags
+- Ensure all interactive elements are keyboard accessible
 
 ## Error Handling
 - **Service Layer**: Return `Result<T, Error>` pattern or throw specific error types
