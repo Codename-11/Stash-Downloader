@@ -30,10 +30,7 @@ function initializePlugin() {
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
-    // Optional: Add navigation link patch (example)
-    // This would add a link to the plugin in Stash's navigation
-    // Uncomment if you want to patch the navigation
-    /*
+    // Add navigation link to Stash's navbar
     window.PluginApi.patch.after('Navbar', (props, output) => {
       const { React } = window.PluginApi;
       const { NavLink } = window.PluginApi.libraries.ReactRouterDOM;
@@ -43,6 +40,7 @@ function initializePlugin() {
         {
           to: ROUTES.MAIN,
           className: 'nav-link',
+          key: 'stash-downloader-nav-link',
         },
         'Downloader'
       );
@@ -62,7 +60,8 @@ function initializePlugin() {
 
       return output;
     });
-    */
+
+    console.log(`[${PLUGIN_ID}] Navigation link added to navbar`);
 
   } catch (error) {
     console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);
