@@ -58,11 +58,12 @@ jobs:
         run: |
           CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
           SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
+          VERSION=$(node -p "require('./package.json').version")
 
           cat > _site/index.yml << EOF
           - id: stash-downloader
             name: Stash Downloader
-            version: 0.1.0
+            version: ${VERSION}
             date: ${CURRENT_DATETIME}
             path: stash-downloader.zip
             sha256: ${SHA256}
