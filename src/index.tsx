@@ -75,14 +75,14 @@ function initializePlugin() {
           return [...output, downloaderLink];
         }
 
-        // If output is null/undefined, return just our link in an array
-        if (output == null) {
+        // If output is null/undefined or empty object, return just our link in an array
+        if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
           return [downloaderLink];
         }
 
-        // For other cases, try to append
+        // For other cases, try to append (but log for debugging)
         console.warn(`[${PLUGIN_ID}] Unexpected output type:`, typeof output, output);
-        return output;
+        return [downloaderLink];
       } catch (patchError) {
         console.error(`[${PLUGIN_ID}] Error in MainNavBar patch:`, patchError);
         return output;
