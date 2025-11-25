@@ -3,19 +3,25 @@
  */
 
 import React from 'react';
-import { IconButton, Tooltip } from '@mui/material';
-import { LightMode as LightModeIcon, DarkMode as DarkModeIcon } from '@mui/icons-material';
 import { useThemeMode } from '@/theme/ThemeProvider';
 
 export const ThemeToggle: React.FC = () => {
   const { mode, toggleMode } = useThemeMode();
 
   return (
-    <Tooltip title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}>
-      <IconButton onClick={toggleMode} color="inherit" size="small">
-        {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
-      </IconButton>
-    </Tooltip>
+    <button
+      type="button"
+      className="btn btn-sm btn-link p-1"
+      onClick={toggleMode}
+      title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+      aria-label={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}
+    >
+      {mode === 'light' ? (
+        <span style={{ fontSize: '1.2rem' }}>🌙</span>
+      ) : (
+        <span style={{ fontSize: '1.2rem' }}>☀️</span>
+      )}
+    </button>
   );
 };
 

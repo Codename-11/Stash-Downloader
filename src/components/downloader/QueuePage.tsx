@@ -3,7 +3,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Container, Box, Typography, Card, CardContent, Button, Stack, AppBar, Toolbar, Link, Alert, Chip } from '@mui/material';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
@@ -281,146 +280,105 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   };
 
   return (
-    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              flexGrow: 1,
-            }}
-          >
-            <Box
-              component="img"
+    <div className="d-flex flex-column min-vh-100">
+      <nav className="navbar navbar-light bg-light border-bottom">
+        <div className="container-fluid">
+          <div className="d-flex align-items-center gap-3 flex-grow-1">
+            <img
               src={logoSvg}
               alt="Stash Downloader Logo"
-              sx={{
-                width: 40,
-                height: 40,
-              }}
+              style={{ width: '40px', height: '40px' }}
             />
-            <Typography variant="h6" component="div">
-              Stash Downloader
-            </Typography>
-          </Box>
+            <h6 className="mb-0">Stash Downloader</h6>
+          </div>
           {isTestMode && (
-            <Chip
-              label="DEVELOPMENT MODE"
-              color="warning"
-              size="small"
-              sx={{ mr: 1 }}
-            />
+            <span className="badge bg-warning me-2">DEVELOPMENT MODE</span>
           )}
           <ThemeToggle />
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Stack spacing={3}>
+        </div>
+      </nav>
+      <div className="container-lg py-4">
+        <div className="d-flex flex-column gap-3">
           {/* Test settings panel in test mode */}
           {isTestMode && testSettingsPanel}
 
-          <URLInputForm 
-            onSubmit={handleAddUrl} 
+          <URLInputForm
+            onSubmit={handleAddUrl}
             initialValue={urlFieldValue}
             onValueChange={setUrlFieldValue}
           />
 
           {/* Batch Import */}
-          <Box sx={{ mb: 3 }}>
-            <BatchImport 
+          <div className="mb-3">
+            <BatchImport
               onImport={handleBatchImport}
               onSingleUrl={(url) => {
                 setUrlFieldValue(url);
               }}
             />
-          </Box>
+          </div>
 
           {/* Queue Statistics */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Stack direction="row" justifyContent="space-around" alignItems="center">
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" component="div">
-                    {queue.stats.total}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" component="div" color="primary">
-                    {queue.stats.downloading}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Downloading
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" component="div" color="success.main">
-                    {queue.stats.complete}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Complete
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5" component="div" color="error.main">
-                    {queue.stats.failed}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Failed
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+          <div className="card mb-3">
+            <div className="card-body">
+              <div className="d-flex justify-content-around align-items-center">
+                <div className="text-center">
+                  <h5 className="mb-0">{queue.stats.total}</h5>
+                  <small className="text-muted">Total</small>
+                </div>
+                <div className="text-center">
+                  <h5 className="mb-0 text-primary">{queue.stats.downloading}</h5>
+                  <small className="text-muted">Downloading</small>
+                </div>
+                <div className="text-center">
+                  <h5 className="mb-0 text-success">{queue.stats.complete}</h5>
+                  <small className="text-muted">Complete</small>
+                </div>
+                <div className="text-center">
+                  <h5 className="mb-0 text-danger">{queue.stats.failed}</h5>
+                  <small className="text-muted">Failed</small>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Bulk Actions */}
           {queue.items.length > 0 && (
-            <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-              <Button
-                variant="contained"
+            <div className="d-flex gap-2 mb-3">
+              <button
+                className="btn btn-primary"
                 onClick={() => {
                   const firstPending = queue.items.find(item => item.status === DownloadStatus.Pending);
                   if (firstPending) setEditingItem(firstPending);
                 }}
                 disabled={queue.stats.pending === 0}
               >
-                Edit & Import ({queue.stats.pending} items)
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
+                📝 Edit & Import ({queue.stats.pending} items)
+              </button>
+              <button
+                className="btn btn-outline-secondary btn-sm"
                 onClick={queue.clearCompleted}
                 disabled={queue.stats.complete === 0}
               >
                 Clear Completed
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                color="error"
+              </button>
+              <button
+                className="btn btn-outline-danger btn-sm"
                 onClick={queue.clearAll}
               >
                 Clear All
-              </Button>
-            </Stack>
+              </button>
+            </div>
           )}
 
           {/* Queue Items */}
           {queue.items.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 5 }}>
-              <Typography variant="h5" color="text.secondary" gutterBottom>
-                No downloads in queue
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Enter a URL above to get started
-              </Typography>
-            </Box>
+            <div className="text-center py-5">
+              <h5 className="text-muted mb-2">No downloads in queue</h5>
+              <small className="text-muted">Enter a URL above to get started</small>
+            </div>
           ) : (
-            <Stack spacing={2}>
+            <div className="d-flex flex-column gap-2">
               {queue.items.map((item) => (
                 <QueueItem
                   key={item.id}
@@ -443,13 +401,13 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                   }}
                 />
               ))}
-            </Stack>
+            </div>
           )}
 
           {/* Activity Log */}
           <LogViewer />
-        </Stack>
-      </Container>
+        </div>
+      </div>
 
       {/* Edit Metadata Modal */}
       <EditMetadataModal
@@ -468,25 +426,25 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         severity="warning"
         maxWidth="md"
       >
-        <Stack spacing={2}>
-          <Alert severity="info">
+        <div className="d-flex flex-column gap-3">
+          <div className="alert alert-info">
             <strong>yt-dlp</strong> is a powerful video extraction tool that provides the highest quality downloads from hundreds of sites.
-          </Alert>
+          </div>
 
-          <Typography variant="body1">
+          <p className="mb-0">
             <strong>What's happening:</strong>
-          </Typography>
-          <Typography variant="body2" component="div">
+          </p>
+          <div>
             • yt-dlp is not detected on your system<br />
             • The app will fall back to built-in scrapers (YouPornScraper, PornhubScraper)<br />
             • Built-in scrapers may only extract <strong>lower quality videos</strong> (360p-480p)<br />
             • Some sites may not work at all without yt-dlp
-          </Typography>
+          </div>
 
-          <Typography variant="body1" sx={{ mt: 2 }}>
+          <p className="mb-0 mt-2">
             <strong>To install yt-dlp:</strong>
-          </Typography>
-          <Box component="pre" sx={{ bgcolor: 'grey.900', color: 'grey.100', p: 2, borderRadius: 1, overflow: 'auto' }}>
+          </p>
+          <pre className="bg-dark text-light p-3 rounded" style={{ overflow: 'auto' }}>
             <code>
               # Using pip (recommended){'\n'}
               pip install yt-dlp{'\n\n'}
@@ -495,22 +453,22 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
               # Verify installation{'\n'}
               yt-dlp --version
             </code>
-          </Box>
+          </pre>
 
-          <Typography variant="body2" color="text.secondary">
+          <small className="text-muted">
             <strong>Note:</strong> You may need to restart the dev server after installing yt-dlp for changes to take effect.
-          </Typography>
+          </small>
 
-          <Alert severity="success">
-            <Typography variant="body2">
+          <div className="alert alert-success">
+            <small>
               <strong>Alternative:</strong> Download the standalone executable from{' '}
-              <Link href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">
                 github.com/yt-dlp/yt-dlp/releases
-              </Link>
+              </a>
               {' '}and add it to your system PATH.
-            </Typography>
-          </Alert>
-        </Stack>
+            </small>
+          </div>
+        </div>
       </InfoModal>
 
       {/* Item Log Modal */}
@@ -520,6 +478,6 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         title={viewingLogsForItem?.metadata?.title || viewingLogsForItem?.url || ''}
         logs={viewingLogsForItem?.logs || []}
       />
-    </Box>
+    </div>
   );
 };

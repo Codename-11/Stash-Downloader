@@ -3,8 +3,6 @@
  */
 
 import React from 'react';
-import { Card, CardContent, Box, Typography, Chip, LinearProgress, Stack, Button, IconButton, CircularProgress, Badge, Skeleton } from '@mui/material';
-import { Download as DownloadIcon, Edit as EditIcon, Delete as DeleteIcon, VideoLibrary as VideoIcon, Image as ImageIcon, Article as LogsIcon, PlayCircle as PlayIcon } from '@mui/icons-material';
 import { MediaPreviewModal } from '@/components/common';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus, ContentType } from '@/types';
@@ -31,16 +29,16 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
 
   const getStatusChip = () => {
     const statusConfig = {
-      [DownloadStatus.Pending]: { label: 'Pending', color: 'default' as const },
-      [DownloadStatus.Downloading]: { label: 'Downloading', color: 'primary' as const },
-      [DownloadStatus.Processing]: { label: 'Processing', color: 'info' as const },
-      [DownloadStatus.Complete]: { label: 'Complete', color: 'success' as const },
-      [DownloadStatus.Failed]: { label: 'Failed', color: 'error' as const },
-      [DownloadStatus.Cancelled]: { label: 'Cancelled', color: 'warning' as const },
+      [DownloadStatus.Pending]: { label: 'Pending', color: 'bg-secondary' },
+      [DownloadStatus.Downloading]: { label: 'Downloading', color: 'bg-primary' },
+      [DownloadStatus.Processing]: { label: 'Processing', color: 'bg-info' },
+      [DownloadStatus.Complete]: { label: 'Complete', color: 'bg-success' },
+      [DownloadStatus.Failed]: { label: 'Failed', color: 'bg-danger' },
+      [DownloadStatus.Cancelled]: { label: 'Cancelled', color: 'bg-warning' },
     };
 
     const config = statusConfig[item.status];
-    return <Chip label={config.label} color={config.color} size="small" />;
+    return <span className={`badge ${config.color}`}>{config.label}</span>;
   };
 
   const getProgressBar = () => {
@@ -57,66 +55,67 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
       const { percentage, bytesDownloaded, totalBytes, speed } = item.progress;
 
       return (
-        <Box sx={{ mt: 2 }}>
-          <LinearProgress
-            variant={totalBytes > 0 ? "determinate" : "indeterminate"}
-            value={percentage}
-            sx={{ height: 8, borderRadius: 1 }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+        <div className="mt-2">
+          <div className="progress" style={{ height: '8px' }}>
+            <div
+              className={`progress-bar ${totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''}`}
+              role="progressbar"
+              style={{ width: `${totalBytes > 0 ? percentage : 100}%` }}
+              aria-valuenow={percentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            ></div>
+          </div>
+          <small className="text-muted d-block mt-1">
             {totalBytes > 0
               ? `${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)`
               : `Downloaded: ${formatBytes(bytesDownloaded)} (${formatBytes(speed)}/s)`
             }
-          </Typography>
-        </Box>
+          </small>
+        </div>
       );
     }
 
     // No progress data but status is downloading/processing - show indeterminate
     return (
-      <Box sx={{ mt: 2 }}>
-        <LinearProgress variant="indeterminate" sx={{ height: 8, borderRadius: 1 }} />
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+      <div className="mt-2">
+        <div className="progress" style={{ height: '8px' }}>
+          <div className="progress-bar progress-bar-striped progress-bar-animated w-100" role="progressbar"></div>
+        </div>
+        <small className="text-muted d-block mt-1">
           {item.status === DownloadStatus.Downloading ? 'Downloading...' : 'Processing...'}
-        </Typography>
-      </Box>
+        </small>
+      </div>
     );
   };
 
   const isScrapingMetadata = !item.metadata && !item.error && item.status === DownloadStatus.Pending;
 
   return (
-    <Card sx={{ mb: 2 }}>
-      <CardContent>
-        <Stack direction="row" spacing={2} alignItems="flex-start">
+    <div className="card mb-3">
+      <div className="card-body">
+        <div className="d-flex gap-3 align-items-start">
           {/* Thumbnail preview or skeleton */}
           {isScrapingMetadata ? (
-            <Skeleton
-              variant="rectangular"
-              width={120}
-              height={80}
-              sx={{ borderRadius: 1, flexShrink: 0 }}
-              animation="wave"
-            />
+            <div
+              className="placeholder-glow"
+              style={{ width: '120px', height: '80px', flexShrink: 0 }}
+            >
+              <div className="placeholder w-100 h-100 rounded"></div>
+            </div>
           ) : item.metadata?.thumbnailUrl ? (
-            <Box
-              component="img"
+            <img
               src={item.metadata.thumbnailUrl}
               alt="Preview"
-              sx={{
-                maxHeight: 80,
-                maxWidth: 120,
+              style={{
+                maxHeight: '80px',
+                maxWidth: '120px',
                 objectFit: 'cover',
                 cursor: 'pointer',
-                borderRadius: 1,
-                border: 1,
-                borderColor: 'divider',
+                borderRadius: '4px',
+                border: '1px solid #dee2e6',
                 flexShrink: 0,
                 transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'scale(1.05)',
-                },
               }}
               onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
               onError={(e) => {
@@ -138,129 +137,121 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                   img.style.display = 'none';
                 }
               }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               title="Click to view full size"
             />
           ) : null}
-          <Box sx={{ flexGrow: 1 }}>
+          <div className="flex-grow-1">
             {/* Title section */}
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <div className="d-flex gap-2 align-items-center mb-2">
               {isScrapingMetadata ? (
-                <Stack spacing={0.5} sx={{ width: '100%' }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CircularProgress size={16} />
-                    <Typography variant="body2" color="text.secondary">
-                      Scraping metadata...
-                    </Typography>
-                  </Stack>
-                  <Skeleton width="60%" height={32} animation="wave" />
-                </Stack>
+                <div className="w-100">
+                  <div className="d-flex gap-2 align-items-center">
+                    <div className="spinner-border spinner-border-sm" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <small className="text-muted">Scraping metadata...</small>
+                  </div>
+                  <div className="placeholder-glow mt-2">
+                    <div className="placeholder w-50" style={{ height: '32px' }}></div>
+                  </div>
+                </div>
               ) : item.metadata?.title ? (
-                <Typography variant="h6" component="div">
-                  {item.metadata.title}
-                </Typography>
+                <h6 className="mb-0">{item.metadata.title}</h6>
               ) : item.error ? (
-                <Stack direction="row" spacing={1} alignItems="center" color="error.main">
-                  <Typography variant="body2" color="error">
-                    Scraping failed: {item.error}
-                  </Typography>
-                </Stack>
+                <div className="text-danger">
+                  <small>Scraping failed: {item.error}</small>
+                </div>
               ) : null}
-            </Stack>
+            </div>
 
             {/* URL */}
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            <small className="text-muted d-block mb-2">
               {item.url}
-            </Typography>
+            </small>
 
             {/* Status and metadata chips */}
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <div className="d-flex gap-2 align-items-center mb-2">
               {getStatusChip()}
               {isScrapingMetadata ? (
                 <>
-                  <Skeleton width={80} height={24} sx={{ borderRadius: '12px' }} animation="wave" />
-                  <Skeleton width={60} height={24} sx={{ borderRadius: '12px' }} animation="wave" />
+                  <div className="placeholder-glow">
+                    <span className="placeholder" style={{ width: '80px', height: '24px', borderRadius: '12px' }}></span>
+                  </div>
+                  <div className="placeholder-glow">
+                    <span className="placeholder" style={{ width: '60px', height: '24px', borderRadius: '12px' }}></span>
+                  </div>
                 </>
               ) : (
                 item.metadata?.contentType && (
-                  <Chip
-                    icon={item.metadata.contentType === ContentType.Image ? <ImageIcon /> : <VideoIcon />}
-                    label={item.metadata.contentType === ContentType.Image ? 'Image' : 'Video'}
-                    size="small"
-                    variant="outlined"
-                    color={item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'}
-                  />
+                  <span className={`badge ${item.metadata.contentType === ContentType.Image ? 'bg-secondary' : 'bg-primary'} bg-opacity-10 text-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'} border border-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'}`}>
+                    {item.metadata.contentType === ContentType.Image ? '🖼️ Image' : '🎥 Video'}
+                  </span>
                 )
               )}
-            </Stack>
+            </div>
             {item.error && (
-              <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+              <small className="text-danger mt-2 d-block">
                 {item.error}
-              </Typography>
+              </small>
             )}
-          </Box>
-          <Stack direction="row" spacing={1}>
+          </div>
+          <div className="d-flex gap-1 flex-wrap">
             {onDownload && item.status === DownloadStatus.Pending && (
-              <Button
-                size="small"
-                variant="contained"
-                color="success"
-                startIcon={<DownloadIcon />}
+              <button
+                className="btn btn-sm btn-success"
                 onClick={() => onDownload(item.id)}
                 title="Download directly without editing metadata"
               >
-                Download
-              </Button>
+                ⬇️ Download
+              </button>
             )}
             {onEdit && (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<EditIcon />}
+              <button
+                className="btn btn-sm btn-outline-primary"
                 onClick={() => onEdit(item.id)}
                 title={item.status === DownloadStatus.Complete ? "View metadata" : "Edit metadata & import"}
                 disabled={item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing}
               >
-                {item.status === DownloadStatus.Complete ? 'View' : 'Edit'}
-              </Button>
+                {item.status === DownloadStatus.Complete ? '👁️ View' : '📝 Edit'}
+              </button>
             )}
             {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
-              <IconButton
-                size="small"
-                color="primary"
+              <button
+                className="btn btn-sm btn-link text-primary p-1"
                 onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
                 title="Preview video"
               >
-                <PlayIcon />
-              </IconButton>
+                ▶️
+              </button>
             )}
             {onViewLogs && item.logs && item.logs.length > 0 && (
-              <Button
-                size="small"
-                variant="outlined"
+              <button
+                className="btn btn-sm btn-outline-secondary position-relative"
                 onClick={() => onViewLogs(item.id)}
                 title="View download logs"
-                startIcon={
-                  <Badge badgeContent={item.logs.length} color="primary" max={99}>
-                    <LogsIcon />
-                  </Badge>
-                }
               >
-                Logs
-              </Button>
+                📄 Logs
+                {item.logs.length > 0 && (
+                  <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary">
+                    {item.logs.length > 99 ? '99+' : item.logs.length}
+                  </span>
+                )}
+              </button>
             )}
-            <IconButton
-              size="small"
-              color="error"
+            <button
+              className="btn btn-sm btn-link text-danger p-1"
               onClick={() => onRemove(item.id)}
               disabled={item.status === DownloadStatus.Downloading}
               title="Remove"
             >
-              <DeleteIcon />
-            </IconButton>
-          </Stack>
-        </Stack>
+              🗑️
+            </button>
+          </div>
+        </div>
         {getProgressBar()}
-      </CardContent>
+      </div>
 
       {/* Media Preview Modal */}
       <MediaPreviewModal
@@ -270,6 +261,6 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
         mediaType={previewType}
         alt={item.metadata?.title || 'Preview'}
       />
-    </Card>
+    </div>
   );
 };

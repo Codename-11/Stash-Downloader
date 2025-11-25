@@ -3,8 +3,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Stack } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
 import { isValidUrl } from '@/utils';
 
 interface URLInputFormProps {
@@ -23,7 +21,6 @@ export const URLInputForm: React.FC<URLInputFormProps> = ({
   const [url, setUrl] = useState(initialValue);
   const [error, setError] = useState<string | null>(null);
 
-  // Update URL when initialValue changes (e.g., from clipboard)
   useEffect(() => {
     if (initialValue && initialValue !== url) {
       setUrl(initialValue);
@@ -53,12 +50,15 @@ export const URLInputForm: React.FC<URLInputFormProps> = ({
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
-      <Stack spacing={2}>
-        <TextField
+    <form onSubmit={handleSubmit} className="mb-3">
+      <div className="mb-3">
+        <label htmlFor="url-input" className="form-label">
+          Download URL
+        </label>
+        <input
           id="url-input"
-          label="Download URL"
           type="text"
+          className={`form-control ${error ? 'is-invalid' : ''}`}
           placeholder="https://example.com/video.mp4"
           value={url}
           onChange={(e) => {
@@ -69,21 +69,18 @@ export const URLInputForm: React.FC<URLInputFormProps> = ({
             }
           }}
           disabled={disabled}
-          error={!!error}
-          helperText={error || 'Enter a direct URL to a video or image file, or a URL from a supported site'}
-          fullWidth
-          variant="outlined"
         />
-        <Button
-          type="submit"
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled={disabled || !url.trim()}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          Add to Queue
-        </Button>
-      </Stack>
-    </Box>
+        <div className={error ? 'invalid-feedback' : 'form-text'}>
+          {error || 'Enter a direct URL to a video or image file, or a URL from a supported site'}
+        </div>
+      </div>
+      <button
+        type="submit"
+        className="btn btn-primary"
+        disabled={disabled || !url.trim()}
+      >
+        ➕ Add to Queue
+      </button>
+    </form>
   );
 };

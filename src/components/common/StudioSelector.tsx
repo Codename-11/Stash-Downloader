@@ -3,8 +3,6 @@
  */
 
 import React, { useState } from 'react';
-import { Autocomplete, TextField, Chip, Stack, Button, Box, Typography } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
 import type { IStashStudio } from '@/types';
 import { useStashData } from '@/hooks';
 import { debounce } from '@/utils';
@@ -23,21 +21,25 @@ export const StudioSelector: React.FC<StudioSelectorProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState<IStashStudio[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const { searchStudio } = useStashData();
 
   const debouncedSearch = React.useRef(
     debounce(async (query: string) => {
       if (query.length < 2) {
         setOptions([]);
+        setShowDropdown(false);
         return;
       }
       setLoading(true);
       try {
         const studio = await searchStudio(query);
         setOptions(studio ? [studio] : []);
+        setShowDropdown(!!studio);
       } catch (error) {
         console.error('Search error:', error);
         setOptions([]);
+        setShowDropdown(false);
       } finally {
         setLoading(false);
       }
@@ -49,14 +51,14 @@ export const StudioSelector: React.FC<StudioSelectorProps> = ({
       debouncedSearch(inputValue);
     } else {
       setOptions([]);
+      setShowDropdown(false);
     }
   }, [inputValue, debouncedSearch]);
 
-  const handleSelect = (studio: IStashStudio | null) => {
-    if (studio) {
-      onChange(studio);
-      setInputValue('');
-    }
+  const handleSelect = (studio: IStashStudio) => {
+    onChange(studio);
+    setInputValue('');
+    setShowDropdown(false);
   };
 
   const handleRemove = () => {
@@ -76,78 +78,84 @@ export const StudioSelector: React.FC<StudioSelectorProps> = ({
   };
 
   return (
-    <Box>
-      <Typography variant="body2" gutterBottom>
-        Studio
-      </Typography>
+    <div className="mb-3">
+      <label className="form-label">Studio</label>
 
-      {/* Selected studio */}
       {selectedStudio && (
-        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-          <Chip
-            label={selectedStudio.name}
-            onDelete={disabled ? undefined : handleRemove}
-            color="default"
-            size="small"
-          />
-        </Stack>
-      )}
-
-      {/* Autocomplete input */}
-      {!disabled && !selectedStudio && (
-        <Stack direction="row" spacing={1}>
-          <Autocomplete<IStashStudio, false, false, true>
-            freeSolo
-            options={options}
-            loading={loading}
-            inputValue={inputValue}
-            onInputChange={(_, newValue) => setInputValue(newValue)}
-            onChange={(_, newValue) => {
-              if (newValue && typeof newValue !== 'string') {
-                handleSelect(newValue);
-              }
-            }}
-            getOptionLabel={(option) => {
-              if (typeof option === 'string') return option;
-              return option.name;
-            }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                <Box>
-                  <Typography variant="body2" component="strong">
-                    {option.name}
-                  </Typography>
-                  {option.url && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {option.url}
-                    </Typography>
-                  )}
-                </Box>
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Search or add studio..."
-                variant="outlined"
-                size="small"
+        <div className="d-flex gap-1 mb-2">
+          <span className="badge bg-secondary d-inline-flex align-items-center gap-1">
+            {selectedStudio.name}
+            {!disabled && (
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                style={{ fontSize: '0.6rem' }}
+                onClick={handleRemove}
+                aria-label="Remove"
               />
             )}
-            sx={{ flexGrow: 1 }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={handleCreateNew}
-            disabled={!inputValue.trim()}
-          >
-            Create New
-          </Button>
-        </Stack>
+          </span>
+        </div>
       )}
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-        Search existing studio or type a name and click "Create New"
-      </Typography>
-    </Box>
+
+      {!disabled && !selectedStudio && (
+        <>
+          <div className="d-flex gap-2 position-relative">
+            <div className="flex-grow-1 position-relative">
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search or add studio..."
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={() => options.length > 0 && setShowDropdown(true)}
+                />
+                {loading && (
+                  <span className="input-group-text">
+                    <div className="spinner-border spinner-border-sm" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </span>
+                )}
+              </div>
+
+              {showDropdown && options.length > 0 && (
+                <ul
+                  className="list-group position-absolute w-100 shadow"
+                  style={{ zIndex: 1000, maxHeight: '200px', overflowY: 'auto' }}
+                >
+                  {options.map((option) => (
+                    <li
+                      key={option.id}
+                      className="list-group-item list-group-item-action"
+                      onClick={() => handleSelect(option)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <strong>{option.name}</strong>
+                      {option.url && (
+                        <div className="text-secondary small">{option.url}</div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={handleCreateNew}
+              disabled={!inputValue.trim()}
+            >
+              ➕ Create New
+            </button>
+          </div>
+          <small className="form-text text-secondary d-block mt-1">
+            Search existing studio or type a name and click "Create New"
+          </small>
+        </>
+      )}
+    </div>
   );
 };

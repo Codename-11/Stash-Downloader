@@ -1,11 +1,9 @@
 /**
  * AutocompleteInput - Generic autocomplete component
- * Note: This component is being replaced by MUI Autocomplete in selector components
- * Keeping for backward compatibility but will be deprecated
+ * Bootstrap-based implementation
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Autocomplete, TextField, CircularProgress } from '@mui/material';
 import { debounce } from '@/utils';
 
 interface AutocompleteInputProps<T> {
@@ -32,12 +30,14 @@ export function AutocompleteInput<T>({
   const [suggestions, setSuggestions] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Debounced search
   const debouncedSearch = useRef(
     debounce(async (query: string) => {
       if (query.length < minChars) {
         setSuggestions([]);
+        setShowDropdown(false);
         return;
       }
 
@@ -45,9 +45,11 @@ export function AutocompleteInput<T>({
       try {
         const results = await onSearch(query);
         setSuggestions(results);
+        setShowDropdown(results.length > 0);
       } catch (error) {
         console.error('Search error:', error);
         setSuggestions([]);
+        setShowDropdown(false);
       } finally {
         setIsLoading(false);
       }
@@ -63,51 +65,69 @@ export function AutocompleteInput<T>({
       debouncedSearch(inputValue);
     } else {
       setSuggestions([]);
+      setShowDropdown(false);
     }
   }, [inputValue, debouncedSearch, minChars]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    onChange(newValue);
+  };
+
+  const handleSelectItem = (item: T) => {
+    onSelect(item);
+    setShowDropdown(false);
+  };
+
   return (
-    <Autocomplete<T, false, false, true>
-      freeSolo
-      options={suggestions}
-      loading={isLoading}
-      inputValue={inputValue}
-      onInputChange={(_, newValue) => {
-        setInputValue(newValue);
-        onChange(newValue);
-      }}
-      onChange={(_, newValue) => {
-        if (newValue && typeof newValue !== 'string') {
-          onSelect(newValue);
-        }
-      }}
-      disabled={disabled}
-      getOptionLabel={(option) => {
-        if (typeof option === 'string') return option;
-        // For custom objects, try to get a display name
-        return (option as any).name || String(option);
-      }}
-      renderOption={(props, option) => (
-        <li {...props} key={(option as any).id || String(option)}>
-          {renderItem(option)}
-        </li>
-      )}
-      renderInput={(params) => (
-        <TextField
-          {...params}
+    <div ref={wrapperRef} className="position-relative flex-grow-1">
+      <div className="input-group">
+        <input
+          type="text"
+          className="form-control"
           placeholder={placeholder}
-          InputProps={{
-            ...params.InputProps,
-            endAdornment: (
-              <>
-                {isLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                {params.InputProps.endAdornment}
-              </>
-            ),
-          }}
+          value={inputValue}
+          onChange={handleInputChange}
+          disabled={disabled}
         />
+        {isLoading && (
+          <span className="input-group-text">
+            <div className="spinner-border spinner-border-sm" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+          </span>
+        )}
+      </div>
+
+      {showDropdown && suggestions.length > 0 && (
+        <ul
+          className="list-group position-absolute w-100 shadow"
+          style={{ zIndex: 1000, maxHeight: '300px', overflowY: 'auto' }}
+        >
+          {suggestions.map((item, index) => (
+            <li
+              key={(item as any).id || index}
+              className="list-group-item list-group-item-action cursor-pointer"
+              onClick={() => handleSelectItem(item)}
+              style={{ cursor: 'pointer' }}
+            >
+              {renderItem(item)}
+            </li>
+          ))}
+        </ul>
       )}
-      sx={{ flexGrow: 1 }}
-    />
+    </div>
   );
 }

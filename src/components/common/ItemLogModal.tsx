@@ -2,31 +2,7 @@
  * ItemLogModal - Modal for displaying logs for a specific download item
  */
 
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  IconButton,
-  Stack,
-  Typography,
-  Box,
-  Paper,
-  Chip,
-  Collapse,
-  Alert,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  Info as InfoIcon,
-  CheckCircle as SuccessIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-} from '@mui/icons-material';
+import React, { useState, useEffect } from 'react';
 import type { IItemLogEntry } from '@/types';
 
 interface ItemLogModalProps {
@@ -44,29 +20,53 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
 }) => {
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (open) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => document.body.classList.remove('modal-open');
+  }, [open]);
+
+  if (!open) return null;
+
   const getLevelIcon = (level: IItemLogEntry['level']) => {
     switch (level) {
       case 'success':
-        return <SuccessIcon fontSize="small" color="success" />;
+        return '✅';
       case 'warning':
-        return <WarningIcon fontSize="small" color="warning" />;
+        return '⚠️';
       case 'error':
-        return <ErrorIcon fontSize="small" color="error" />;
+        return '❌';
       default:
-        return <InfoIcon fontSize="small" color="info" />;
+        return 'ℹ️';
     }
   };
 
-  const getLevelColor = (level: IItemLogEntry['level']) => {
+  const getLevelBadgeClass = (level: IItemLogEntry['level']) => {
     switch (level) {
       case 'success':
-        return 'success';
+        return 'bg-success';
       case 'warning':
-        return 'warning';
+        return 'bg-warning';
       case 'error':
-        return 'error';
+        return 'bg-danger';
       default:
-        return 'info';
+        return 'bg-info';
+    }
+  };
+
+  const getLevelBorderClass = (level: IItemLogEntry['level']) => {
+    switch (level) {
+      case 'success':
+        return 'border-success';
+      case 'warning':
+        return 'border-warning';
+      case 'error':
+        return 'border-danger';
+      default:
+        return 'border-info';
     }
   };
 
@@ -81,121 +81,118 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6">Download Logs</Typography>
-          <IconButton edge="end" onClick={onClose} aria-label="close" size="small">
-            <CloseIcon />
-          </IconButton>
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {title}
-        </Typography>
-      </DialogTitle>
+    <>
+      <div className="modal-backdrop fade show" onClick={onClose} />
+      <div
+        className="modal fade show d-block"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-content">
+            <div className="modal-header">
+              <div className="flex-grow-1">
+                <h5 className="modal-title mb-0">Download Logs</h5>
+                <p className="text-secondary mb-0 small mt-1">{title}</p>
+              </div>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={onClose}
+                aria-label="Close"
+              />
+            </div>
 
-      <DialogContent dividers>
-        {logs.length === 0 ? (
-          <Alert severity="info">No logs available for this item yet.</Alert>
-        ) : (
-          <Stack spacing={1}>
-            {logs.map((log, index) => (
-              <Paper
-                key={index}
-                elevation={1}
-                sx={{
-                  p: 1.5,
-                  borderLeft: 4,
-                  borderColor: `${getLevelColor(log.level)}.main`,
-                }}
-              >
-                <Stack direction="row" alignItems="flex-start" spacing={1}>
-                  <Box sx={{ mt: 0.25 }}>{getLevelIcon(log.level)}</Box>
-                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={1}
-                      sx={{ mb: 0.5 }}
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {logs.length === 0 ? (
+                <div className="alert alert-info">No logs available for this item yet.</div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {logs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`card border-start border-4 ${getLevelBorderClass(log.level)}`}
                     >
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontFamily: 'monospace' }}
-                      >
-                        {formatTimestamp(log.timestamp)}
-                      </Typography>
-                      <Chip
-                        label={log.level.toUpperCase()}
-                        size="small"
-                        color={getLevelColor(log.level)}
-                        sx={{ height: 20, fontSize: '0.7rem' }}
-                      />
-                    </Stack>
-                    <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
-                      {log.message}
-                    </Typography>
-                    {log.details && (
-                      <>
-                        <IconButton
-                          size="small"
-                          onClick={() =>
-                            setExpandedLogId(expandedLogId === index ? null : index)
-                          }
-                          sx={{ mt: 0.5 }}
-                        >
-                          {expandedLogId === index ? (
-                            <ExpandLessIcon fontSize="small" />
-                          ) : (
-                            <ExpandMoreIcon fontSize="small" />
-                          )}
-                          <Typography variant="caption" sx={{ ml: 0.5 }}>
-                            {expandedLogId === index ? 'Hide' : 'Show'} Details
-                          </Typography>
-                        </IconButton>
-                        <Collapse in={expandedLogId === index}>
-                          <Paper
-                            variant="outlined"
-                            sx={{
-                              mt: 1,
-                              p: 1,
-                              backgroundColor: 'grey.50',
-                              maxHeight: 200,
-                              overflow: 'auto',
-                            }}
-                          >
-                            <Typography
-                              variant="caption"
-                              component="pre"
-                              sx={{
-                                fontFamily: 'monospace',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                                margin: 0,
-                              }}
-                            >
-                              {log.details}
-                            </Typography>
-                          </Paper>
-                        </Collapse>
-                      </>
-                    )}
-                  </Box>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
-        )}
-      </DialogContent>
+                      <div className="card-body p-3">
+                        <div className="d-flex align-items-start gap-2">
+                          <span style={{ fontSize: '1rem', marginTop: '2px' }}>
+                            {getLevelIcon(log.level)}
+                          </span>
+                          <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                            <div className="d-flex align-items-center gap-2 mb-1">
+                              <span
+                                className="text-secondary small"
+                                style={{ fontFamily: 'monospace' }}
+                              >
+                                {formatTimestamp(log.timestamp)}
+                              </span>
+                              <span
+                                className={`badge ${getLevelBadgeClass(log.level)}`}
+                                style={{ fontSize: '0.65rem' }}
+                              >
+                                {log.level.toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="mb-0" style={{ wordBreak: 'break-word' }}>
+                              {log.message}
+                            </p>
+                            {log.details && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-link p-0 mt-1"
+                                  onClick={() =>
+                                    setExpandedLogId(expandedLogId === index ? null : index)
+                                  }
+                                >
+                                  <span className="small">
+                                    {expandedLogId === index ? '▲' : '▼'}{' '}
+                                    {expandedLogId === index ? 'Hide' : 'Show'} Details
+                                  </span>
+                                </button>
+                                {expandedLogId === index && (
+                                  <div
+                                    className="border rounded mt-2 p-2 bg-light"
+                                    style={{
+                                      maxHeight: '200px',
+                                      overflow: 'auto',
+                                    }}
+                                  >
+                                    <pre
+                                      className="small mb-0"
+                                      style={{
+                                        fontFamily: 'monospace',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                      }}
+                                    >
+                                      {log.details}
+                                    </pre>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-      <DialogActions>
-        <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
-          {logs.length} log {logs.length === 1 ? 'entry' : 'entries'}
-        </Typography>
-        <Button onClick={onClose} variant="contained">
-          Close
-        </Button>
-      </DialogActions>
-    </Dialog>
+            <div className="modal-footer">
+              <span className="text-secondary small flex-grow-1">
+                {logs.length} log {logs.length === 1 ? 'entry' : 'entries'}
+              </span>
+              <button type="button" className="btn btn-primary" onClick={onClose}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };

@@ -3,20 +3,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  TextField,
-  Button,
-  Box,
-  Stack,
-  Typography,
-  InputAdornment,
-  Rating,
-  CircularProgress,
-} from '@mui/material';
-import { Search as SearchIcon, Star as StarIcon, PlayCircle as PlayIcon } from '@mui/icons-material';
 import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { ContentType } from '@/types';
 import { PerformerSelector } from '@/components/common/PerformerSelector';
@@ -128,31 +114,27 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   };
 
   return (
-    <Card>
-      <CardHeader title="Edit Metadata" />
-      <CardContent>
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={3}>
+    <div className="card">
+      <div className="card-header">
+        <h6 className="mb-0">Edit Metadata</h6>
+      </div>
+      <div className="card-body">
+        <form onSubmit={handleSubmit}>
+          <div className="d-flex flex-column gap-3">
             {/* Preview thumbnail if available */}
             {item.metadata?.thumbnailUrl && (
-              <Box sx={{ textAlign: 'center' }}>
-                <Stack direction="row" spacing={2} alignItems="center" justifyContent="center">
-                  <Box
-                    component="img"
+              <div className="text-center">
+                <div className="d-flex gap-2 align-items-center justify-content-center">
+                  <img
                     src={item.metadata.thumbnailUrl}
                     alt="Preview"
-                    sx={{
-                      maxHeight: 200,
+                    style={{
+                      maxHeight: '200px',
                       maxWidth: '100%',
                       cursor: 'pointer',
-                      borderRadius: 1,
-                      border: 1,
-                      borderColor: 'divider',
+                      borderRadius: '4px',
+                      border: '1px solid #dee2e6',
                       transition: 'transform 0.2s, box-shadow 0.2s',
-                      '&:hover': {
-                        transform: 'scale(1.02)',
-                        boxShadow: 4,
-                      },
                     }}
                     onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
                     onError={(e) => {
@@ -169,123 +151,140 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                         }
                       }
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 0.5rem 1rem rgba(0,0,0,0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
                     title="Click to view full size"
                   />
                   {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      startIcon={<PlayIcon />}
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
                       onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
                       title="Preview video"
                     >
-                      Preview Video
-                    </Button>
+                      ▶ Preview Video
+                    </button>
                   )}
-                </Stack>
-              </Box>
+                </div>
+              </div>
             )}
 
             {/* Source URL with Scrape button */}
-            <Box>
-              <TextField
-                label="Source URL"
-                value={item.url}
-                disabled
-                fullWidth
-                variant="outlined"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Button
-                        variant="outlined"
-                        startIcon={isScraping ? <CircularProgress size={16} /> : <SearchIcon />}
-                        onClick={handleScrapeMetadata}
-                        disabled={isScraping}
-                      >
-                        {isScraping ? 'Scraping...' : 'Scrape Metadata'}
-                      </Button>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <div className="mb-3">
+              <label className="form-label">Source URL</label>
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control"
+                  value={item.url}
+                  disabled
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={handleScrapeMetadata}
+                  disabled={isScraping}
+                >
+                  {isScraping ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                      Scraping...
+                    </>
+                  ) : (
+                    <>🔍 Scrape Metadata</>
+                  )}
+                </button>
+              </div>
               {scrapeError && (
-                <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                <div className="text-danger small mt-1">
                   {scrapeError}
-                </Typography>
+                </div>
               )}
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              <div className="text-muted small mt-1">
                 Click "Scrape Metadata" to fetch title, description, and other data from the website.
                 {!localStorage.getItem('corsProxyEnabled') && (
-                  <Typography component="span" color="warning.main">
+                  <span className="text-warning">
                     {' '}Enable CORS proxy for better results!
-                  </Typography>
+                  </span>
                 )}
-              </Typography>
-            </Box>
+              </div>
+            </div>
 
             {/* Title */}
-            <TextField
-              id="title"
-              label="Title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              fullWidth
-              variant="outlined"
-            />
+            <div className="mb-3">
+              <label htmlFor="title" className="form-label">Title *</label>
+              <input
+                id="title"
+                type="text"
+                className="form-control"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </div>
 
             {/* Description */}
-            <TextField
-              id="description"
-              label="Description"
-              multiline
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              fullWidth
-              variant="outlined"
-            />
+            <div className="mb-3">
+              <label htmlFor="description" className="form-label">Description</label>
+              <textarea
+                id="description"
+                className="form-control"
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
 
             {/* Date */}
-            <TextField
-              id="date"
-              label="Date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              fullWidth
-              variant="outlined"
-              InputLabelProps={{
-                shrink: true,
-              }}
-            />
+            <div className="mb-3">
+              <label htmlFor="date" className="form-label">Date</label>
+              <input
+                id="date"
+                type="date"
+                className="form-control"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
 
             {/* Rating */}
-            <Box>
-              <Typography variant="body2" gutterBottom>
-                Rating
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Rating
-                  value={rating / 20}
-                  max={5}
-                  onChange={(_, newValue) => {
-                    setRating(newValue ? newValue * 20 : 0);
-                  }}
-                  emptyIcon={<StarIcon style={{ opacity: 0.55 }} fontSize="inherit" />}
-                />
+            <div className="mb-3">
+              <label className="form-label d-block">Rating</label>
+              <div className="d-flex gap-2 align-items-center">
+                <div className="d-flex gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      style={{
+                        cursor: 'pointer',
+                        fontSize: '1.5rem',
+                        color: star <= rating / 20 ? '#ffc107' : '#dee2e6',
+                      }}
+                      onClick={() => setRating(star * 20)}
+                      title={`${star} star${star > 1 ? 's' : ''}`}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
                 {rating > 0 && (
-                  <Button size="small" variant="outlined" onClick={() => setRating(0)}>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={() => setRating(0)}
+                  >
                     Clear
-                  </Button>
+                  </button>
                 )}
-              </Stack>
-              <Typography variant="caption" color="text.secondary">
-                Rating: {rating}/100
-              </Typography>
-            </Box>
+              </div>
+              <small className="text-muted">Rating: {rating}/100</small>
+            </div>
 
             {/* Performers */}
             <PerformerSelector
@@ -300,17 +299,17 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             <StudioSelector selectedStudio={studio} onChange={setStudio} />
 
             {/* Actions */}
-            <Stack direction="row" spacing={2}>
-              <Button type="submit" variant="contained">
-                Save & Import to Stash
-              </Button>
-              <Button variant="outlined" onClick={onCancel}>
+            <div className="d-flex gap-2">
+              <button type="submit" className="btn btn-primary">
+                💾 Save & Import to Stash
+              </button>
+              <button type="button" className="btn btn-outline-secondary" onClick={onCancel}>
                 Cancel
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      </CardContent>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
 
       {/* Media Preview Modal */}
       <MediaPreviewModal
@@ -320,6 +319,6 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
         mediaType={previewType}
         alt={title || item.metadata?.title || 'Preview'}
       />
-    </Card>
+    </div>
   );
 };

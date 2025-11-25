@@ -1,10 +1,8 @@
 /**
- * ErrorMessage - Display error messages
+ * ErrorMessage - Display error messages (Bootstrap)
  */
 
 import React from 'react';
-import { Alert, AlertTitle, Button, Stack } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
 
 interface ErrorMessageProps {
   error: string | Error;
@@ -20,30 +18,28 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({
   const errorText = typeof error === 'string' ? error : error.message;
 
   return (
-    <Alert
-      severity="error"
-      action={
-        onDismiss && (
-          <Button
-            color="inherit"
-            size="small"
-            onClick={onDismiss}
-            startIcon={<CloseIcon />}
-          >
-            Dismiss
-          </Button>
-        )
-      }
-    >
-      <AlertTitle>Error</AlertTitle>
-      {errorText}
+    <div className="alert alert-danger alert-dismissible" role="alert">
+      <h6 className="alert-heading">Error</h6>
+      <p className="mb-0">{errorText}</p>
       {onRetry && (
-        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-          <Button size="small" variant="outlined" color="error" onClick={onRetry}>
+        <div className="mt-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger"
+            onClick={onRetry}
+          >
             Retry
-          </Button>
-        </Stack>
+          </button>
+        </div>
       )}
-    </Alert>
+      {onDismiss && (
+        <button
+          type="button"
+          className="btn-close"
+          onClick={onDismiss}
+          aria-label="Close"
+        />
+      )}
+    </div>
   );
 };

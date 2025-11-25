@@ -3,8 +3,6 @@
  */
 
 import React, { useState } from 'react';
-import { Autocomplete, TextField, Chip, Stack, Button, Box, Typography } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
 import type { IStashPerformer } from '@/types';
 import { useStashData } from '@/hooks';
 import { debounce } from '@/utils';
@@ -23,21 +21,25 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState<IStashPerformer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const { searchPerformers } = useStashData();
 
   const debouncedSearch = React.useRef(
     debounce(async (query: string) => {
       if (query.length < 2) {
         setOptions([]);
+        setShowDropdown(false);
         return;
       }
       setLoading(true);
       try {
         const results = await searchPerformers(query);
         setOptions(results);
+        setShowDropdown(results.length > 0);
       } catch (error) {
         console.error('Search error:', error);
         setOptions([]);
+        setShowDropdown(false);
       } finally {
         setLoading(false);
       }
@@ -49,13 +51,15 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
       debouncedSearch(inputValue);
     } else {
       setOptions([]);
+      setShowDropdown(false);
     }
   }, [inputValue, debouncedSearch]);
 
-  const handleSelect = (performer: IStashPerformer | null) => {
-    if (performer && !selectedPerformers.some((p) => p.id === performer.id)) {
+  const handleSelect = (performer: IStashPerformer) => {
+    if (!selectedPerformers.some((p) => p.id === performer.id)) {
       onChange([...selectedPerformers, performer]);
       setInputValue('');
+      setShowDropdown(false);
     }
   };
 
@@ -76,81 +80,88 @@ export const PerformerSelector: React.FC<PerformerSelectorProps> = ({
   };
 
   return (
-    <Box>
-      <Typography variant="body2" gutterBottom>
-        Performers
-      </Typography>
+    <div className="mb-3">
+      <label className="form-label">Performers</label>
 
-      {/* Selected performers */}
       {selectedPerformers.length > 0 && (
-        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+        <div className="d-flex flex-wrap gap-1 mb-2">
           {selectedPerformers.map((performer) => (
-            <Chip
-              key={performer.id}
-              label={performer.name}
-              onDelete={disabled ? undefined : () => handleRemove(performer.id)}
-              color="primary"
-              size="small"
-            />
+            <span key={performer.id} className="badge bg-primary d-inline-flex align-items-center gap-1">
+              {performer.name}
+              {!disabled && (
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  style={{ fontSize: '0.6rem' }}
+                  onClick={() => handleRemove(performer.id)}
+                  aria-label="Remove"
+                />
+              )}
+            </span>
           ))}
-        </Stack>
+        </div>
       )}
 
-      {/* Autocomplete input */}
       {!disabled && (
-        <Stack direction="row" spacing={1}>
-          <Autocomplete<IStashPerformer, false, false, true>
-            freeSolo
-            options={options}
-            loading={loading}
-            inputValue={inputValue}
-            onInputChange={(_, newValue) => setInputValue(newValue)}
-            onChange={(_, newValue) => {
-              if (newValue && typeof newValue !== 'string') {
-                handleSelect(newValue);
-              }
-            }}
-            getOptionLabel={(option) => {
-              if (typeof option === 'string') return option;
-              return option.name;
-            }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                <Box>
-                  <Typography variant="body2" component="strong">
-                    {option.name}
-                  </Typography>
-                  {option.disambiguation && (
-                    <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                      ({option.disambiguation})
-                    </Typography>
-                  )}
-                </Box>
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Search or add performer..."
-                variant="outlined"
-                size="small"
-              />
-            )}
-            sx={{ flexGrow: 1 }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={handleCreateNew}
-            disabled={!inputValue.trim()}
-          >
-            Create New
-          </Button>
-        </Stack>
+        <>
+          <div className="d-flex gap-2 position-relative">
+            <div className="flex-grow-1 position-relative">
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search or add performer..."
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onFocus={() => options.length > 0 && setShowDropdown(true)}
+                />
+                {loading && (
+                  <span className="input-group-text">
+                    <div className="spinner-border spinner-border-sm" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </span>
+                )}
+              </div>
+
+              {showDropdown && options.length > 0 && (
+                <ul
+                  className="list-group position-absolute w-100 shadow"
+                  style={{ zIndex: 1000, maxHeight: '200px', overflowY: 'auto' }}
+                >
+                  {options.map((option) => (
+                    <li
+                      key={option.id}
+                      className="list-group-item list-group-item-action"
+                      onClick={() => handleSelect(option)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <strong>{option.name}</strong>
+                      {option.disambiguation && (
+                        <span className="text-secondary small ms-1">
+                          ({option.disambiguation})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={handleCreateNew}
+              disabled={!inputValue.trim()}
+            >
+              ➕ Create New
+            </button>
+          </div>
+          <small className="form-text text-secondary d-block mt-1">
+            Search existing performers or type a name and click "Create New"
+          </small>
+        </>
       )}
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-        Search existing performers or type a name and click "Create New"
-      </Typography>
-    </Box>
+    </div>
   );
 };

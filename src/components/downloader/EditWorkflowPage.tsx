@@ -3,8 +3,6 @@
  */
 
 import React, { useState } from 'react';
-import { Container, Box, Typography, LinearProgress, Chip, Stack, Button, Alert, AppBar, Toolbar } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, SkipNext as SkipNextIcon } from '@mui/icons-material';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus } from '@/types';
@@ -135,113 +133,103 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
 
   if (!currentItem) {
     return (
-      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-        <AppBar position="static" color="default" elevation={1}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Edit & Import
-            </Typography>
+      <div className="d-flex flex-column min-vh-100">
+        <nav className="navbar navbar-light bg-light border-bottom">
+          <div className="container-fluid">
+            <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
             <ThemeToggle />
-          </Toolbar>
-        </AppBar>
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Alert severity="info" sx={{ mb: 2 }}>
+          </div>
+        </nav>
+        <div className="container-lg py-4">
+          <div className="alert alert-info mb-3">
             No items to edit
-          </Alert>
-          <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
-            Back to Queue
-          </Button>
-        </Container>
-      </Box>
+          </div>
+          <button className="btn btn-outline-secondary" onClick={onBack}>
+            ← Back to Queue
+          </button>
+        </div>
+      </div>
     );
   }
 
   if (isImporting) {
     return (
-      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-        <AppBar position="static" color="default" elevation={1}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Edit & Import
-            </Typography>
+      <div className="d-flex flex-column min-vh-100">
+        <nav className="navbar navbar-light bg-light border-bottom">
+          <div className="container-fluid">
+            <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
             <ThemeToggle />
-          </Toolbar>
-        </AppBar>
-        <Container maxWidth="lg" sx={{ py: 4 }}>
+          </div>
+        </nav>
+        <div className="container-lg py-4">
           <LoadingSpinner size="lg" text="Importing to Stash..." />
-        </Container>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   const progressPercentage = ((currentIndex + 1) / items.length) * 100;
 
   return (
-    <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Edit & Import
-          </Typography>
+    <div className="d-flex flex-column min-vh-100">
+      <nav className="navbar navbar-light bg-light border-bottom">
+        <div className="container-fluid">
+          <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
           <ThemeToggle />
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth={false} sx={{ py: 4, px: 3 }}>
-        <Stack spacing={3}>
+        </div>
+      </nav>
+      <div className="container-fluid py-4 px-3">
+        <div className="d-flex flex-column gap-3">
           {/* Progress indicator */}
-          <Box sx={{ mb: 4 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-              <Typography variant="h5" component="h4">
-                Edit & Import
-              </Typography>
-              <Chip label={`${currentIndex + 1} / ${items.length}`} color="primary" />
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={progressPercentage}
-              sx={{ height: 8, borderRadius: 1 }}
-            />
-          </Box>
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="mb-0">Edit & Import</h5>
+              <span className="badge bg-primary">{currentIndex + 1} / {items.length}</span>
+            </div>
+            <div className="progress" style={{ height: '8px' }}>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                style={{ width: `${progressPercentage}%` }}
+                aria-valuenow={progressPercentage}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              ></div>
+            </div>
+          </div>
 
           {/* Navigation */}
-          <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ArrowBackIcon />}
+          <div className="d-flex gap-2 mb-3">
+            <button
+              className="btn btn-outline-secondary btn-sm"
               onClick={onBack}
             >
-              Back to Queue
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<ArrowBackIcon />}
+              ← Back to Queue
+            </button>
+            <button
+              className="btn btn-outline-secondary btn-sm"
               onClick={handlePrevious}
               disabled={currentIndex === 0}
             >
-              Previous
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              color="warning"
-              endIcon={<SkipNextIcon />}
+              ← Previous
+            </button>
+            <button
+              className="btn btn-outline-warning btn-sm"
               onClick={handleSkip}
             >
-              Skip This Item
-            </Button>
-          </Stack>
+              Skip This Item →
+            </button>
+          </div>
 
           {/* Error display */}
           {error && (
-            <Box sx={{ mb: 3 }}>
+            <div className="mb-3">
               <ErrorMessage
                 error={error}
                 onRetry={() => setError(null)}
                 onDismiss={() => setError(null)}
               />
-            </Box>
+            </div>
           )}
 
           {/* Metadata editor */}
@@ -250,8 +238,8 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
             onSave={handleSave}
             onCancel={handleSkip}
           />
-        </Stack>
-      </Container>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };

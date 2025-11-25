@@ -1,9 +1,8 @@
 /**
- * LoadingSpinner - Reusable loading indicator
+ * LoadingSpinner - Reusable loading indicator (Bootstrap)
  */
 
 import React from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -14,28 +13,16 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'md',
   text,
 }) => {
-  const sizeMap = {
-    sm: 24,
-    md: 40,
-    lg: 56,
-  };
+  const sizeClass = size === 'sm' ? 'spinner-border-sm' : '';
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 4,
-      }}
-    >
-      <CircularProgress size={sizeMap[size]} />
+    <div className="d-flex flex-column align-items-center justify-content-center p-4">
+      <div className={`spinner-border ${sizeClass}`} role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
       {text && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          {text}
-        </Typography>
+        <p className="text-secondary mt-2 mb-0">{text}</p>
       )}
-    </Box>
+    </div>
   );
 };

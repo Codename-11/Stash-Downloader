@@ -1,11 +1,10 @@
 /**
- * Material UI Theme Provider
- * Wraps the application with Material UI theme and provides dark/light mode support
+ * Simple Theme Provider (Bootstrap-compatible)
+ * Provides theme mode context without Material UI dependency
+ * Stash handles actual theming, this is just for test-app
  */
 
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
-import { ThemeProvider as MuiThemeProvider, CssBaseline } from '@mui/material';
-import { createAppTheme } from './theme';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -34,7 +33,8 @@ interface ThemeProviderProps {
 }
 
 /**
- * Theme Provider component that wraps the app with Material UI theme
+ * Theme Provider component for test-app
+ * Note: In actual Stash plugin, Stash controls theming
  */
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   children,
@@ -53,11 +53,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('stash-downloader-theme-mode', mode);
+      // Apply Bootstrap theme class to body
+      document.body.setAttribute('data-bs-theme', mode);
     }
   }, [mode]);
-
-  // Create theme based on current mode
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
 
   const toggleMode = () => {
     setModeState((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -78,11 +77,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 
   return (
     <ThemeContext.Provider value={contextValue}>
-      <MuiThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </MuiThemeProvider>
+      {children}
     </ThemeContext.Provider>
   );
 };
-

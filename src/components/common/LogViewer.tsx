@@ -2,41 +2,7 @@
  * LogViewer - Component for displaying application logs
  */
 
-import React, { useState, useMemo } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  Box,
-  Typography,
-  Chip,
-  Button,
-  Stack,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  Grid,
-} from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Delete as DeleteIcon,
-  Visibility as VisibilityIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLog, type LogLevel, type ILogEntry } from '@/contexts/LogContext';
 
 interface LogViewerProps {
@@ -51,16 +17,23 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   const { logs, clearLogs } = useLog();
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | 'all'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isExpanded, setIsExpanded] = useState(true); // Default to expanded
+  const [isExpanded, setIsExpanded] = useState(true);
   const [selectedLog, setSelectedLog] = useState<ILogEntry | null>(null);
 
-  // Get unique categories
+  useEffect(() => {
+    if (selectedLog) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => document.body.classList.remove('modal-open');
+  }, [selectedLog]);
+
   const categories = useMemo(() => {
     const uniqueCategories = new Set(logs.map((log) => log.category));
     return Array.from(uniqueCategories).sort();
   }, [logs]);
 
-  // Filter logs
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       const levelMatch = selectedLevel === 'all' || log.level === selectedLevel;
@@ -69,16 +42,16 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     });
   }, [logs, selectedLevel, selectedCategory]);
 
-  const getLevelColor = (level: LogLevel): 'error' | 'warning' | 'success' | 'info' => {
+  const getLevelBadgeClass = (level: LogLevel): string => {
     switch (level) {
       case 'error':
-        return 'error';
+        return 'bg-danger';
       case 'warning':
-        return 'warning';
+        return 'bg-warning';
       case 'success':
-        return 'success';
+        return 'bg-success';
       default:
-        return 'info';
+        return 'bg-info';
     }
   };
 
@@ -103,241 +76,223 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     } as any).format(date);
   };
 
-  const handleViewDetails = (log: ILogEntry) => {
-    setSelectedLog(log);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedLog(null);
-  };
-
   return (
-    <Card sx={{ mt: 3 }}>
-      <CardHeader
-        title={
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="h6">Activity Log</Typography>
-            {logs.length > 0 && <Chip label={logs.length} size="small" color="default" />}
-          </Stack>
-        }
-        action={
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+    <div className="card mt-3">
+      <div className="card-header">
+        <div className="d-flex justify-content-between align-items-center">
+          <div className="d-flex align-items-center gap-2">
+            <h6 className="mb-0">Activity Log</h6>
+            {logs.length > 0 && <span className="badge bg-secondary">{logs.length}</span>}
+          </div>
+          <div className="d-flex gap-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
               onClick={() => setIsExpanded(!isExpanded)}
             >
-              {isExpanded ? 'Collapse' : 'Expand'}
-            </Button>
+              {isExpanded ? '▲' : '▼'} {isExpanded ? 'Collapse' : 'Expand'}
+            </button>
             {logs.length > 0 && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-danger"
                 onClick={clearLogs}
               >
-                Clear
-              </Button>
+                🗑️ Clear
+              </button>
             )}
-          </Stack>
-        }
-      />
+          </div>
+        </div>
+      </div>
+
       {isExpanded && (
         <>
           {showFilters && (
-            <CardContent sx={{ borderBottom: 1, borderColor: 'divider' }}>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Filter by Level</InputLabel>
-                    <Select
-                      value={selectedLevel}
-                      label="Filter by Level"
-                      onChange={(e) => setSelectedLevel(e.target.value as LogLevel | 'all')}
-                    >
-                      <MenuItem value="all">All Levels</MenuItem>
-                      <MenuItem value="info">Info</MenuItem>
-                      <MenuItem value="success">Success</MenuItem>
-                      <MenuItem value="warning">Warning</MenuItem>
-                      <MenuItem value="error">Error</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>Filter by Category</InputLabel>
-                    <Select
-                      value={selectedCategory}
-                      label="Filter by Category"
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <MenuItem value="all">All Categories</MenuItem>
-                      {categories.map((cat) => (
-                        <MenuItem key={cat} value={cat}>
-                          {cat}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </CardContent>
+            <div className="card-body border-bottom">
+              <div className="row g-2">
+                <div className="col-12 col-md-6">
+                  <label className="form-label small">Filter by Level</label>
+                  <select
+                    className="form-select form-select-sm"
+                    value={selectedLevel}
+                    onChange={(e) => setSelectedLevel(e.target.value as LogLevel | 'all')}
+                  >
+                    <option value="all">All Levels</option>
+                    <option value="info">Info</option>
+                    <option value="success">Success</option>
+                    <option value="warning">Warning</option>
+                    <option value="error">Error</option>
+                  </select>
+                </div>
+                <div className="col-12 col-md-6">
+                  <label className="form-label small">Filter by Category</label>
+                  <select
+                    className="form-select form-select-sm"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
           )}
-          <Box
-            sx={{
-              maxHeight,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-            }}
-          >
+
+          <div style={{ maxHeight, overflowY: 'auto', overflowX: 'hidden' }}>
             {filteredLogs.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 3 }}>
-                <Typography variant="body2" color="text.secondary">
-                  No logs to display
-                </Typography>
-              </Box>
+              <div className="text-center py-3">
+                <p className="text-secondary mb-0 small">No logs to display</p>
+              </div>
             ) : (
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ width: '120px' }}>Time</TableCell>
-                      <TableCell sx={{ width: '80px' }}>Level</TableCell>
-                      <TableCell sx={{ width: '120px' }}>Category</TableCell>
-                      <TableCell>Message</TableCell>
-                      <TableCell sx={{ width: '60px' }}>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
+              <div className="table-responsive">
+                <table className="table table-sm table-hover mb-0">
+                  <thead className="sticky-top bg-white">
+                    <tr>
+                      <th style={{ width: '120px' }}>Time</th>
+                      <th style={{ width: '80px' }}>Level</th>
+                      <th style={{ width: '120px' }}>Category</th>
+                      <th>Message</th>
+                      <th style={{ width: '60px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {filteredLogs.map((log) => (
-                      <TableRow key={log.id} hover>
-                        <TableCell>
-                          <Typography variant="caption" color="text.secondary">
+                      <tr key={log.id}>
+                        <td>
+                          <span className="text-secondary small">
                             {formatTimestamp(log.timestamp)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={log.level} color={getLevelColor(log.level)} size="small" />
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={log.category} size="small" />
-                        </TableCell>
-                        <TableCell>{log.message}</TableCell>
-                        <TableCell>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewDetails(log)}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${getLevelBadgeClass(log.level)}`}>
+                            {log.level}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="badge bg-secondary">{log.category}</span>
+                        </td>
+                        <td>{log.message}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link p-0"
+                            onClick={() => setSelectedLog(log)}
                             title="View full details"
                           >
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
+                            👁️
+                          </button>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                  </tbody>
+                </table>
+              </div>
             )}
-          </Box>
+          </div>
         </>
       )}
 
-      {/* Log Details Dialog */}
-      <Dialog open={!!selectedLog} onClose={handleCloseModal} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Stack direction="row" spacing={1} alignItems="center">
-            {selectedLog && (
-              <Chip label={selectedLog.level} color={getLevelColor(selectedLog.level)} size="small" />
-            )}
-            <Typography variant="h6">Log Entry Details</Typography>
-            <Box sx={{ flexGrow: 1 }} />
-            <IconButton onClick={handleCloseModal} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          {selectedLog && (
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                  Timestamp
-                </Typography>
-                <Typography variant="body2">{formatFullTimestamp(selectedLog.timestamp)}</Typography>
-              </Box>
+      {/* Log Details Modal */}
+      {selectedLog && (
+        <>
+          <div className="modal-backdrop fade show" onClick={() => setSelectedLog(null)} />
+          <div
+            className="modal fade show d-block"
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`badge ${getLevelBadgeClass(selectedLog.level)}`}>
+                      {selectedLog.level}
+                    </span>
+                    <h5 className="modal-title mb-0">Log Entry Details</h5>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => setSelectedLog(null)}
+                    aria-label="Close"
+                  />
+                </div>
+                <div className="modal-body">
+                  <div className="d-flex flex-column gap-3">
+                    <div>
+                      <p className="text-secondary small mb-1 fw-bold">Timestamp</p>
+                      <p className="mb-0">{formatFullTimestamp(selectedLog.timestamp)}</p>
+                    </div>
 
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                  Level
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>
-                  <Chip label={selectedLog.level} color={getLevelColor(selectedLog.level)} size="small" />
-                </Box>
-              </Box>
+                    <div>
+                      <p className="text-secondary small mb-1 fw-bold">Level</p>
+                      <span className={`badge ${getLevelBadgeClass(selectedLog.level)}`}>
+                        {selectedLog.level}
+                      </span>
+                    </div>
 
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                  Category
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>
-                  <Chip label={selectedLog.category} size="small" />
-                </Box>
-              </Box>
+                    <div>
+                      <p className="text-secondary small mb-1 fw-bold">Category</p>
+                      <span className="badge bg-secondary">{selectedLog.category}</span>
+                    </div>
 
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                  Message
-                </Typography>
-                <Paper sx={{ p: 2, mt: 0.5, bgcolor: 'action.hover' }}>
-                  <Typography variant="body2">{selectedLog.message}</Typography>
-                </Paper>
-              </Box>
+                    <div>
+                      <p className="text-secondary small mb-1 fw-bold">Message</p>
+                      <div className="p-2 bg-light border rounded">
+                        <p className="mb-0">{selectedLog.message}</p>
+                      </div>
+                    </div>
 
-              {selectedLog.details && (
-                <Box>
-                  <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                    Details
-                  </Typography>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      mt: 0.5,
-                      bgcolor: 'grey.900',
-                      color: 'grey.100',
-                      maxHeight: 400,
-                      overflow: 'auto',
-                    }}
+                    {selectedLog.details && (
+                      <div>
+                        <p className="text-secondary small mb-1 fw-bold">Details</p>
+                        <div
+                          className="p-2 bg-dark text-white border rounded"
+                          style={{ maxHeight: '400px', overflow: 'auto' }}
+                        >
+                          <pre
+                            className="mb-0 small"
+                            style={{
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              fontFamily: 'monospace',
+                              color: 'inherit',
+                            }}
+                          >
+                            {selectedLog.details}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+
+                    {!selectedLog.details && (
+                      <p className="text-secondary small mb-0">
+                        No additional details available
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setSelectedLog(null)}
                   >
-                    <Typography
-                      component="pre"
-                      variant="caption"
-                      sx={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        fontFamily: 'monospace',
-                      }}
-                    >
-                      {selectedLog.details}
-                    </Typography>
-                  </Paper>
-                </Box>
-              )}
-
-              {!selectedLog.details && (
-                <Typography variant="caption" color="text.secondary">
-                  No additional details available
-                </Typography>
-              )}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseModal}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    </Card>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 };
 

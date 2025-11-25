@@ -2,20 +2,7 @@
  * EditMetadataModal - Modal for editing item metadata
  */
 
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
-  Stack,
-  Typography,
-  Box,
-  Alert,
-  LinearProgress,
-} from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import React, { useState, useEffect } from 'react';
 import { MetadataEditorForm } from './MetadataEditorForm';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
@@ -180,105 +167,117 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
     onClose();
   };
 
-  const handleClose = (_event: {}, _reason: string) => {
-    // Allow closing during import (progress will continue in background and show in queue)
-    handleCancel();
-  };
+  // Add/remove modal-open class on body when modal opens/closes
+  useEffect(() => {
+    if (open) {
+      document.body.classList.add('modal-open');
+      return () => {
+        document.body.classList.remove('modal-open');
+      };
+    }
+    return undefined;
+  }, [open]);
 
-  if (!item) {
+  if (!item || !open) {
     return null;
   }
 
   return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="lg"
-      fullWidth
-      disableEscapeKeyDown={isImporting}
-    >
-      <DialogTitle>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6">
-            {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
-          </Typography>
-          <IconButton
-            edge="end"
-            onClick={handleCancel}
-            aria-label="close"
-          >
-            <CloseIcon />
-          </IconButton>
-        </Stack>
-      </DialogTitle>
+    <>
+      <div className="modal-backdrop fade show"></div>
+      <div className="modal fade show d-block" tabIndex={-1} role="dialog">
+        <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+          <div className="modal-content">
+            {/* Modal Header */}
+            <div className="modal-header">
+              <h5 className="modal-title">
+                {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                onClick={handleCancel}
+                aria-label="Close"
+              ></button>
+            </div>
 
-      <DialogContent dividers>
-        {isImporting ? (
-          <Box sx={{ py: 6 }}>
-            <Stack spacing={3} alignItems="center">
-              <LoadingSpinner size="lg" text={importStatus} />
+            {/* Modal Body */}
+            <div className="modal-body">
+              {isImporting ? (
+                <div className="py-5">
+                  <div className="d-flex flex-column gap-3 align-items-center">
+                    <LoadingSpinner size="lg" text={importStatus} />
 
-              {downloadProgress && (
-                <Box sx={{ width: '100%', maxWidth: 600 }}>
-                  <Stack spacing={1}>
-                    <Typography variant="body2" align="center" color="text.secondary">
-                      {downloadProgress.totalBytes > 0
-                        ? `${downloadProgress.percentage.toFixed(1)}% - ${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(downloadProgress.totalBytes)}`
-                        : `Downloaded: ${formatBytes(downloadProgress.bytesDownloaded)}`}
-                    </Typography>
+                    {downloadProgress && (
+                      <div className="w-100" style={{ maxWidth: '600px' }}>
+                        <div className="d-flex flex-column gap-2">
+                          <p className="text-center text-muted small mb-0">
+                            {downloadProgress.totalBytes > 0
+                              ? `${downloadProgress.percentage.toFixed(1)}% - ${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(downloadProgress.totalBytes)}`
+                              : `Downloaded: ${formatBytes(downloadProgress.bytesDownloaded)}`}
+                          </p>
 
-                    <LinearProgress
-                      variant={downloadProgress.totalBytes > 0 ? 'determinate' : 'indeterminate'}
-                      value={downloadProgress.percentage}
-                      sx={{ height: 8, borderRadius: 1 }}
-                    />
+                          <div className="progress" style={{ height: '8px' }}>
+                            <div
+                              className={`progress-bar ${downloadProgress.totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''}`}
+                              role="progressbar"
+                              style={{ width: `${downloadProgress.totalBytes > 0 ? downloadProgress.percentage : 100}%` }}
+                              aria-valuenow={downloadProgress.percentage}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                            ></div>
+                          </div>
 
-                    {downloadProgress.speed > 0 && (
-                      <Typography variant="caption" align="center" color="text.secondary">
-                        Speed: {formatBytes(downloadProgress.speed)}/s
-                        {downloadProgress.timeRemaining && downloadProgress.timeRemaining < 3600 && (
-                          <> • ETA: {Math.ceil(downloadProgress.timeRemaining)}s</>
-                        )}
-                      </Typography>
+                          {downloadProgress.speed > 0 && (
+                            <p className="text-center text-muted small mb-0">
+                              Speed: {formatBytes(downloadProgress.speed)}/s
+                              {downloadProgress.timeRemaining && downloadProgress.timeRemaining < 3600 && (
+                                <> • ETA: {Math.ceil(downloadProgress.timeRemaining)}s</>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </Stack>
-                </Box>
+                  </div>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  {/* Error display */}
+                  {error && (
+                    <ErrorMessage
+                      error={error}
+                      onRetry={() => setError(null)}
+                      onDismiss={() => setError(null)}
+                    />
+                  )}
+
+                  {/* URL display */}
+                  <div className="alert alert-info">
+                    <small style={{ wordBreak: 'break-all' }}>
+                      <strong>URL:</strong> {item.url}
+                    </small>
+                  </div>
+
+                  {/* Metadata editor */}
+                  <MetadataEditorForm
+                    item={item}
+                    onSave={handleSave}
+                    onCancel={handleCancel}
+                  />
+                </div>
               )}
-            </Stack>
-          </Box>
-        ) : (
-          <Stack spacing={3}>
-            {/* Error display */}
-            {error && (
-              <ErrorMessage
-                error={error}
-                onRetry={() => setError(null)}
-                onDismiss={() => setError(null)}
-              />
-            )}
+            </div>
 
-            {/* URL display */}
-            <Alert severity="info">
-              <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
-                <strong>URL:</strong> {item.url}
-              </Typography>
-            </Alert>
-
-            {/* Metadata editor */}
-            <MetadataEditorForm
-              item={item}
-              onSave={handleSave}
-              onCancel={handleCancel}
-            />
-          </Stack>
-        )}
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flexGrow: 1 }}>
-          {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
-        </Typography>
-      </DialogActions>
-    </Dialog>
+            {/* Modal Footer */}
+            <div className="modal-footer">
+              <small className="text-muted flex-grow-1">
+                {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
