@@ -3,7 +3,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
 import { URLInputForm } from './URLInputForm';
@@ -294,7 +293,6 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
           {isTestMode && (
             <span className="badge bg-warning me-2">DEVELOPMENT MODE</span>
           )}
-          <ThemeToggle />
         </div>
       </nav>
       <div className="container-lg py-4">

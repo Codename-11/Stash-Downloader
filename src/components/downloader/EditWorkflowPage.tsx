@@ -3,7 +3,6 @@
  */
 
 import React, { useState } from 'react';
-import { ThemeToggle } from '@/components/common/ThemeToggle';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus } from '@/types';
 import { MetadataEditorForm } from './MetadataEditorForm';
@@ -137,7 +136,6 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
         <nav className="navbar navbar-light bg-light border-bottom">
           <div className="container-fluid">
             <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
-            <ThemeToggle />
           </div>
         </nav>
         <div className="container-lg py-4">
@@ -158,7 +156,6 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
         <nav className="navbar navbar-light bg-light border-bottom">
           <div className="container-fluid">
             <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
-            <ThemeToggle />
           </div>
         </nav>
         <div className="container-lg py-4">
@@ -175,7 +172,6 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
       <nav className="navbar navbar-light bg-light border-bottom">
         <div className="container-fluid">
           <h6 className="mb-0 flex-grow-1">Edit & Import</h6>
-          <ThemeToggle />
         </div>
       </nav>
       <div className="container-fluid py-4 px-3">

@@ -75,14 +75,16 @@ function initializePlugin() {
           return [...output, downloaderLink];
         }
 
-        // If output is null/undefined or empty object, return just our link in an array
+        // If output is null/undefined or empty object, just return our link
+        // Note: We return ONLY our link here - we cannot access other nav items
+        // This is expected behavior when patch.after receives empty output
         if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
+          console.log(`[${PLUGIN_ID}] MainNavBar output was empty, adding our link only`);
           return [downloaderLink];
         }
 
-        // For other cases, try to append (but log for debugging)
-        console.warn(`[${PLUGIN_ID}] Unexpected output type:`, typeof output, output);
-        return [downloaderLink];
+        // For React elements or other valid children, wrap in array with our link
+        return [output, downloaderLink];
       } catch (patchError) {
         console.error(`[${PLUGIN_ID}] Error in MainNavBar patch:`, patchError);
         return output;
