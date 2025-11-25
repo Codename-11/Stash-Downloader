@@ -523,8 +523,29 @@ That's it! The content is now in your Stash library with all metadata.
 The plugin uses Stash's `PluginApi` for integration:
 
 - **Routes**: Registered at `/downloader` using `PluginApi.register.route()`
+- **Navigation**: Added to navbar via `PluginApi.patch.after('MainNavBar.MenuItems', ...)`
 - **Dependencies**: Uses React, ReactDOM, Bootstrap provided by Stash (not bundled)
 - **GraphQL**: Communicates with Stash via `PluginApi.GQL`
+- **Styling**: Bootstrap utility classes + Stash theme colors via inline styles
+
+### Libraries Available via PluginApi
+
+Stash provides these libraries (do NOT bundle them):
+- `PluginApi.React` - React
+- `PluginApi.ReactDOM` - ReactDOM
+- `PluginApi.libraries.ReactRouterDOM` - React Router (NavLink, etc.)
+- `PluginApi.libraries.Bootstrap` - React-Bootstrap components
+- `PluginApi.libraries.Apollo` - Apollo Client
+- `PluginApi.libraries.Intl` - React-Intl
+- `PluginApi.libraries.FontAwesomeSolid/Regular/Brands` - Icons
+
+### Stash Theme Colors
+
+For consistent dark theme styling, use these colors:
+- Card backgrounds: `#30404d`
+- Headers/inputs: `#243340`
+- Borders: `#394b59`
+- Muted text: `#8b9fad`
 
 ### Data Flow
 
@@ -538,28 +559,6 @@ User Input → Metadata Scraper → Download Service → Stash GraphQL → Scene
 - **Context**: Download queue, settings
 - **Apollo Cache**: Stash data (performers, tags, studios)
 - **localStorage**: User preferences
-
-## Troubleshooting
-
-### Plugin doesn't load
-
-- Check browser console for errors
-- Ensure `dist/stash-downloader.js` exists
-- Verify plugin YAML configuration is correct
-- Restart Stash
-
-### GraphQL errors
-
-- Check Stash GraphQL playground at `/playground`
-- Verify your Stash version supports the required mutations
-- Check authentication/session cookies
-
-### Downloads fail
-
-- Verify the URL is accessible
-- Check CORS settings
-- Ensure sufficient disk space
-- Check browser console for network errors
 
 ## Contributing
 
