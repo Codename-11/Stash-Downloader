@@ -52,13 +52,14 @@ export const URLInputForm: React.FC<URLInputFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="mb-3">
       <div className="mb-3">
-        <label htmlFor="url-input" className="form-label">
+        <label htmlFor="url-input" className="form-label text-light">
           Download URL
         </label>
         <input
           id="url-input"
           type="text"
-          className={`form-control ${error ? 'is-invalid' : ''}`}
+          className={`form-control text-light ${error ? 'is-invalid' : ''}`}
+          style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
           placeholder="https://example.com/video.mp4"
           value={url}
           onChange={(e) => {
@@ -70,13 +71,13 @@ export const URLInputForm: React.FC<URLInputFormProps> = ({
           }}
           disabled={disabled}
         />
-        <div className={error ? 'invalid-feedback' : 'form-text'}>
+        <div className={error ? 'invalid-feedback' : 'form-text'} style={{ color: '#8b9fad' }}>
           {error || 'Enter a direct URL to a video or image file, or a URL from a supported site'}
         </div>
       </div>
       <button
         type="submit"
-        className="btn btn-primary"
+        className="btn btn-success"
         disabled={disabled || !url.trim()}
       >
         ➕ Add to Queue

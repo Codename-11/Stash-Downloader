@@ -92,7 +92,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
   const isScrapingMetadata = !item.metadata && !item.error && item.status === DownloadStatus.Pending;
 
   return (
-    <div className="card mb-3">
+    <div className="card text-light mb-3" style={{ backgroundColor: '#30404d' }}>
       <div className="card-body">
         <div className="d-flex gap-3 align-items-start">
           {/* Thumbnail preview or skeleton */}
@@ -101,7 +101,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               className="placeholder-glow"
               style={{ width: '120px', height: '80px', flexShrink: 0 }}
             >
-              <div className="placeholder w-100 h-100 rounded"></div>
+              <div className="placeholder bg-dark w-100 h-100 rounded"></div>
             </div>
           ) : item.metadata?.thumbnailUrl ? (
             <img
@@ -113,7 +113,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 objectFit: 'cover',
                 cursor: 'pointer',
                 borderRadius: '4px',
-                border: '1px solid #dee2e6',
+                border: '1px solid #495057',
                 flexShrink: 0,
                 transition: 'transform 0.2s',
               }}
@@ -148,13 +148,13 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               {isScrapingMetadata ? (
                 <div className="w-100">
                   <div className="d-flex gap-2 align-items-center">
-                    <div className="spinner-border spinner-border-sm" role="status">
+                    <div className="spinner-border spinner-border-sm text-light" role="status">
                       <span className="visually-hidden">Loading...</span>
                     </div>
                     <small className="text-muted">Scraping metadata...</small>
                   </div>
                   <div className="placeholder-glow mt-2">
-                    <div className="placeholder w-50" style={{ height: '32px' }}></div>
+                    <div className="placeholder bg-dark w-50" style={{ height: '32px' }}></div>
                   </div>
                 </div>
               ) : item.metadata?.title ? (
@@ -177,10 +177,10 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               {isScrapingMetadata ? (
                 <>
                   <div className="placeholder-glow">
-                    <span className="placeholder" style={{ width: '80px', height: '24px', borderRadius: '12px' }}></span>
+                    <span className="placeholder bg-dark" style={{ width: '80px', height: '24px', borderRadius: '12px' }}></span>
                   </div>
                   <div className="placeholder-glow">
-                    <span className="placeholder" style={{ width: '60px', height: '24px', borderRadius: '12px' }}></span>
+                    <span className="placeholder bg-dark" style={{ width: '60px', height: '24px', borderRadius: '12px' }}></span>
                   </div>
                 </>
               ) : (
@@ -209,7 +209,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
             {onEdit && (
               <button
-                className="btn btn-sm btn-outline-primary"
+                className="btn btn-sm btn-outline-light"
                 onClick={() => onEdit(item.id)}
                 title={item.status === DownloadStatus.Complete ? "View metadata" : "Edit metadata & import"}
                 disabled={item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing}
@@ -219,7 +219,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
             {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
               <button
-                className="btn btn-sm btn-link text-primary p-1"
+                className="btn btn-sm btn-link text-info p-1"
                 onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
                 title="Preview video"
               >
@@ -228,7 +228,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
             {onViewLogs && item.logs && item.logs.length > 0 && (
               <button
-                className="btn btn-sm btn-outline-secondary position-relative"
+                className="btn btn-sm btn-outline-light position-relative"
                 onClick={() => onViewLogs(item.id)}
                 title="View download logs"
               >

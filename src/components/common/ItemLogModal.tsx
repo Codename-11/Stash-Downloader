@@ -90,15 +90,15 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
         aria-modal="true"
       >
         <div className="modal-dialog modal-dialog-centered modal-lg">
-          <div className="modal-content">
-            <div className="modal-header">
+          <div className="modal-content bg-dark text-light">
+            <div className="modal-header border-secondary">
               <div className="flex-grow-1">
                 <h5 className="modal-title mb-0">Download Logs</h5>
-                <p className="text-secondary mb-0 small mt-1">{title}</p>
+                <p className="text-muted mb-0 small mt-1">{title}</p>
               </div>
               <button
                 type="button"
-                className="btn-close"
+                className="btn-close btn-close-white"
                 onClick={onClose}
                 aria-label="Close"
               />
@@ -112,7 +112,7 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
                   {logs.map((log, index) => (
                     <div
                       key={index}
-                      className={`card border-start border-4 ${getLevelBorderClass(log.level)}`}
+                      className={`card bg-secondary border-start border-4 ${getLevelBorderClass(log.level)}`}
                     >
                       <div className="card-body p-3">
                         <div className="d-flex align-items-start gap-2">
@@ -122,7 +122,7 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
                           <div className="flex-grow-1" style={{ minWidth: 0 }}>
                             <div className="d-flex align-items-center gap-2 mb-1">
                               <span
-                                className="text-secondary small"
+                                className="text-muted small"
                                 style={{ fontFamily: 'monospace' }}
                               >
                                 {formatTimestamp(log.timestamp)}
@@ -134,14 +134,14 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
                                 {log.level.toUpperCase()}
                               </span>
                             </div>
-                            <p className="mb-0" style={{ wordBreak: 'break-word' }}>
+                            <p className="mb-0 text-light" style={{ wordBreak: 'break-word' }}>
                               {log.message}
                             </p>
                             {log.details && (
                               <>
                                 <button
                                   type="button"
-                                  className="btn btn-sm btn-link p-0 mt-1"
+                                  className="btn btn-sm btn-link text-info p-0 mt-1"
                                   onClick={() =>
                                     setExpandedLogId(expandedLogId === index ? null : index)
                                   }
@@ -153,14 +153,14 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
                                 </button>
                                 {expandedLogId === index && (
                                   <div
-                                    className="border rounded mt-2 p-2 bg-light"
+                                    className="border border-dark rounded mt-2 p-2 bg-black"
                                     style={{
                                       maxHeight: '200px',
                                       overflow: 'auto',
                                     }}
                                   >
                                     <pre
-                                      className="small mb-0"
+                                      className="small mb-0 text-light"
                                       style={{
                                         fontFamily: 'monospace',
                                         whiteSpace: 'pre-wrap',
@@ -182,8 +182,8 @@ export const ItemLogModal: React.FC<ItemLogModalProps> = ({
               )}
             </div>
 
-            <div className="modal-footer">
-              <span className="text-secondary small flex-grow-1">
+            <div className="modal-footer border-secondary">
+              <span className="text-muted small flex-grow-1">
                 {logs.length} log {logs.length === 1 ? 'entry' : 'entries'}
               </span>
               <button type="button" className="btn btn-primary" onClick={onClose}>

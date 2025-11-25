@@ -92,8 +92,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({
         aria-modal="true"
       >
         <div className="modal-dialog modal-dialog-centered">
-          <div className="modal-content">
-            <div className="modal-header">
+          <div className="modal-content bg-dark text-light">
+            <div className="modal-header border-secondary">
               <div className="d-flex align-items-center gap-2 flex-grow-1">
                 <span style={{ fontSize: '1.2rem' }}>{getSeverityIcon()}</span>
                 <h5 className="modal-title mb-0">{title}</h5>
@@ -101,7 +101,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
               {showCloseButton && (
                 <button
                   type="button"
-                  className="btn-close"
+                  className="btn-close btn-close-white"
                   onClick={onClose}
                   aria-label="Close"
                 />
@@ -113,7 +113,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({
             </div>
 
             {(actions || showCloseButton) && (
-              <div className="modal-footer">
+              <div className="modal-footer border-secondary">
                 {actions?.map((action, index) => (
                   <button
                     key={index}

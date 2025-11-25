@@ -280,23 +280,35 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
 
   return (
     <div className="d-flex flex-column min-vh-100">
-      <nav className="navbar navbar-light bg-light border-bottom">
-        <div className="container-fluid">
-          <div className="d-flex align-items-center gap-3 flex-grow-1">
-            <img
-              src={logoSvg}
-              alt="Stash Downloader Logo"
-              style={{ width: '40px', height: '40px' }}
-            />
-            <h6 className="mb-0">Stash Downloader</h6>
-          </div>
-          {isTestMode && (
+      {/* Header - only shown in test mode, Stash provides its own header */}
+      {isTestMode && (
+        <nav className="navbar navbar-dark bg-dark border-bottom border-secondary">
+          <div className="container-fluid">
+            <div className="d-flex align-items-center gap-3 flex-grow-1">
+              <img
+                src={logoSvg}
+                alt="Stash Downloader Logo"
+                style={{ width: '40px', height: '40px' }}
+              />
+              <h6 className="mb-0 text-light">Stash Downloader</h6>
+            </div>
             <span className="badge bg-warning me-2">DEVELOPMENT MODE</span>
-          )}
-        </div>
-      </nav>
+          </div>
+        </nav>
+      )}
       <div className="container-lg py-4">
         <div className="d-flex flex-column gap-3">
+          {/* Logo and title when not in test mode (Stash context) */}
+          {!isTestMode && (
+            <div className="d-flex align-items-center gap-3 mb-2" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
+              <img
+                src={logoSvg}
+                alt="Stash Downloader Logo"
+                style={{ width: '40px', height: '40px' }}
+              />
+            </div>
+          )}
+
           {/* Test settings panel in test mode */}
           {isTestMode && testSettingsPanel}
 
@@ -317,24 +329,24 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
           </div>
 
           {/* Queue Statistics */}
-          <div className="card mb-3">
+          <div className="card text-light mb-3" style={{ backgroundColor: '#30404d' }}>
             <div className="card-body">
               <div className="d-flex justify-content-around align-items-center">
                 <div className="text-center">
                   <h5 className="mb-0">{queue.stats.total}</h5>
-                  <small className="text-muted">Total</small>
+                  <small style={{ color: '#8b9fad' }}>Total</small>
                 </div>
                 <div className="text-center">
-                  <h5 className="mb-0 text-primary">{queue.stats.downloading}</h5>
-                  <small className="text-muted">Downloading</small>
+                  <h5 className="mb-0 text-info">{queue.stats.downloading}</h5>
+                  <small style={{ color: '#8b9fad' }}>Downloading</small>
                 </div>
                 <div className="text-center">
                   <h5 className="mb-0 text-success">{queue.stats.complete}</h5>
-                  <small className="text-muted">Complete</small>
+                  <small style={{ color: '#8b9fad' }}>Complete</small>
                 </div>
                 <div className="text-center">
                   <h5 className="mb-0 text-danger">{queue.stats.failed}</h5>
-                  <small className="text-muted">Failed</small>
+                  <small style={{ color: '#8b9fad' }}>Failed</small>
                 </div>
               </div>
             </div>

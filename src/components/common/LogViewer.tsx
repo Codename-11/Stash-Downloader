@@ -77,8 +77,8 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   return (
-    <div className="card mt-3">
-      <div className="card-header">
+    <div className="card text-light mt-3" style={{ backgroundColor: '#30404d' }}>
+      <div className="card-header" style={{ backgroundColor: '#243340' }}>
         <div className="d-flex justify-content-between align-items-center">
           <div className="d-flex align-items-center gap-2">
             <h6 className="mb-0">Activity Log</h6>
@@ -87,7 +87,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
           <div className="d-flex gap-2">
             <button
               type="button"
-              className="btn btn-sm btn-outline-secondary"
+              className="btn btn-sm btn-outline-light"
               onClick={() => setIsExpanded(!isExpanded)}
             >
               {isExpanded ? '▲' : '▼'} {isExpanded ? 'Collapse' : 'Expand'}
@@ -108,12 +108,13 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       {isExpanded && (
         <>
           {showFilters && (
-            <div className="card-body border-bottom">
+            <div className="card-body" style={{ borderBottom: '1px solid #243340' }}>
               <div className="row g-2">
                 <div className="col-12 col-md-6">
-                  <label className="form-label small">Filter by Level</label>
+                  <label className="form-label small" style={{ color: '#8b9fad' }}>Filter by Level</label>
                   <select
-                    className="form-select form-select-sm"
+                    className="form-select form-select-sm text-light"
+                    style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                     value={selectedLevel}
                     onChange={(e) => setSelectedLevel(e.target.value as LogLevel | 'all')}
                   >
@@ -125,9 +126,10 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                   </select>
                 </div>
                 <div className="col-12 col-md-6">
-                  <label className="form-label small">Filter by Category</label>
+                  <label className="form-label small" style={{ color: '#8b9fad' }}>Filter by Category</label>
                   <select
-                    className="form-select form-select-sm"
+                    className="form-select form-select-sm text-light"
+                    style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                   >
@@ -146,12 +148,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({
           <div style={{ maxHeight, overflowY: 'auto', overflowX: 'hidden' }}>
             {filteredLogs.length === 0 ? (
               <div className="text-center py-3">
-                <p className="text-secondary mb-0 small">No logs to display</p>
+                <p className="text-muted mb-0 small">No logs to display</p>
               </div>
             ) : (
               <div className="table-responsive">
-                <table className="table table-sm table-hover mb-0">
-                  <thead className="sticky-top bg-white">
+                <table className="table table-sm table-hover mb-0" style={{ backgroundColor: '#30404d', color: '#fff' }}>
+                  <thead className="sticky-top" style={{ backgroundColor: '#243340' }}>
                     <tr>
                       <th style={{ width: '120px' }}>Time</th>
                       <th style={{ width: '80px' }}>Level</th>
@@ -208,8 +210,8 @@ export const LogViewer: React.FC<LogViewerProps> = ({
             aria-modal="true"
           >
             <div className="modal-dialog modal-dialog-centered modal-lg">
-              <div className="modal-content">
-                <div className="modal-header">
+              <div className="modal-content bg-dark text-light">
+                <div className="modal-header border-secondary">
                   <div className="d-flex align-items-center gap-2">
                     <span className={`badge ${getLevelBadgeClass(selectedLog.level)}`}>
                       {selectedLog.level}
@@ -218,7 +220,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                   </div>
                   <button
                     type="button"
-                    className="btn-close"
+                    className="btn-close btn-close-white"
                     onClick={() => setSelectedLog(null)}
                     aria-label="Close"
                   />
@@ -226,34 +228,34 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                 <div className="modal-body">
                   <div className="d-flex flex-column gap-3">
                     <div>
-                      <p className="text-secondary small mb-1 fw-bold">Timestamp</p>
+                      <p className="text-muted small mb-1 fw-bold">Timestamp</p>
                       <p className="mb-0">{formatFullTimestamp(selectedLog.timestamp)}</p>
                     </div>
 
                     <div>
-                      <p className="text-secondary small mb-1 fw-bold">Level</p>
+                      <p className="text-muted small mb-1 fw-bold">Level</p>
                       <span className={`badge ${getLevelBadgeClass(selectedLog.level)}`}>
                         {selectedLog.level}
                       </span>
                     </div>
 
                     <div>
-                      <p className="text-secondary small mb-1 fw-bold">Category</p>
+                      <p className="text-muted small mb-1 fw-bold">Category</p>
                       <span className="badge bg-secondary">{selectedLog.category}</span>
                     </div>
 
                     <div>
-                      <p className="text-secondary small mb-1 fw-bold">Message</p>
-                      <div className="p-2 bg-light border rounded">
+                      <p className="text-muted small mb-1 fw-bold">Message</p>
+                      <div className="p-2 bg-secondary border border-secondary rounded">
                         <p className="mb-0">{selectedLog.message}</p>
                       </div>
                     </div>
 
                     {selectedLog.details && (
                       <div>
-                        <p className="text-secondary small mb-1 fw-bold">Details</p>
+                        <p className="text-muted small mb-1 fw-bold">Details</p>
                         <div
-                          className="p-2 bg-dark text-white border rounded"
+                          className="p-2 bg-black text-white border border-secondary rounded"
                           style={{ maxHeight: '400px', overflow: 'auto' }}
                         >
                           <pre
@@ -272,13 +274,13 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                     )}
 
                     {!selectedLog.details && (
-                      <p className="text-secondary small mb-0">
+                      <p className="text-muted small mb-0">
                         No additional details available
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="modal-footer">
+                <div className="modal-footer border-secondary">
                   <button
                     type="button"
                     className="btn btn-secondary"

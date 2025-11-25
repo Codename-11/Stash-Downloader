@@ -108,7 +108,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
       <div className="d-flex gap-2">
         <button
           type="button"
-          className="btn btn-outline-secondary"
+          className="btn btn-outline-light"
           onClick={handleImportFromClipboard}
           title="Import single URL from clipboard (autofills URL field) or multiple URLs (opens batch import)"
         >
@@ -116,7 +116,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
         </button>
         <button
           type="button"
-          className="btn btn-outline-secondary"
+          className="btn btn-outline-warning"
           onClick={handleBatchImportClick}
           title="Open batch import dialog to paste multiple URLs"
         >
@@ -134,22 +134,22 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
             aria-modal="true"
           >
             <div className="modal-dialog modal-dialog-centered modal-lg">
-              <div className="modal-content">
-                <div className="modal-header">
+              <div className="modal-content bg-dark text-light">
+                <div className="modal-header border-secondary">
                   <h5 className="modal-title">Batch Import URLs</h5>
                   <button
                     type="button"
-                    className="btn-close"
+                    className="btn-close btn-close-white"
                     onClick={handleCancel}
                     aria-label="Close"
                   />
                 </div>
                 <div className="modal-body">
-                  <p className="text-secondary mb-3">
+                  <p className="text-muted mb-3">
                     Paste URLs (one per line). Invalid URLs will be automatically filtered out.
                   </p>
                   <textarea
-                    className={`form-control ${error ? 'is-invalid' : ''}`}
+                    className={`form-control bg-dark text-light border-secondary ${error ? 'is-invalid' : ''}`}
                     rows={10}
                     value={textInput}
                     onChange={(e) => {
@@ -159,11 +159,11 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
                     placeholder="https://example.com/video1.mp4&#10;https://example.com/video2.mp4&#10;https://example.com/video3.mp4"
                   />
                   {error && <div className="invalid-feedback d-block">{error}</div>}
-                  <p className="text-secondary small mt-2 mb-0">
+                  <p className="text-muted small mt-2 mb-0">
                     Valid URLs found: <strong>{getUrlCount()}</strong>
                   </p>
                 </div>
-                <div className="modal-footer">
+                <div className="modal-footer border-secondary">
                   <button type="button" className="btn btn-secondary" onClick={handleCancel}>
                     Cancel
                   </button>
