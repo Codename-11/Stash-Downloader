@@ -15,8 +15,46 @@
 Stash loads plugin JS →
 Plugin registers with PluginApi →
 PluginApi.register.route() adds routes →
+PluginApi.patch.after() adds nav link →
 User navigates to /downloader →
 React components render
+```
+
+### Critical Plugin Entry Point Pattern
+```typescript
+// src/index.tsx - MUST follow this pattern
+
+if (!window.PluginApi) {
+  throw new Error('PluginApi not found');
+}
+
+const { React } = window.PluginApi;
+
+// Register route
+window.PluginApi.register.route('/downloader', (props) => {
+  return React.createElement(DownloaderMain, props);
+});
+
+// Patch navbar - MUST handle edge cases
+window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
+  const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
+  if (!NavLink) return output;
+
+  const link = React.createElement(NavLink, {
+    to: '/downloader',
+    className: 'nav-link',
+    key: 'downloader-nav'
+  }, 'Downloader');
+
+  // CRITICAL: Handle empty object case (causes React Error #31)
+  if (Array.isArray(output)) {
+    return [...output, link];
+  }
+  if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
+    return [link];  // Return array, not empty object
+  }
+  return [output, link];
+});
 ```
 
 ## Module System
@@ -73,7 +111,7 @@ Component Re-render
 
 4. **Persistent State** (localStorage)
    - User preferences (download paths, auto-tag rules)
-   - UI preferences (Material UI theme mode, layout)
+   - UI preferences (layout)
    - Fallback to defaults if unavailable
 
 ### Context Structure
@@ -90,90 +128,71 @@ SettingsContext
 └── resetToDefaults: () => void
 ```
 
-## Material UI Integration
+## Styling Architecture
 
-### Theme Provider Structure
-The application uses Material UI v7 with a custom theme provider:
+### Bootstrap Integration (Stash-Provided)
+Stash provides Bootstrap via PluginApi. **DO NOT bundle Bootstrap**.
 
-```
-ThemeProvider (src/theme/ThemeProvider.tsx)
-├── MuiThemeProvider (from @mui/material)
-│   ├── CssBaseline (normalizes browser styles)
-│   └── App Components
-└── ThemeContext (provides mode toggle)
+```typescript
+// Access Bootstrap components if needed
+const { Modal, Button } = window.PluginApi.libraries.Bootstrap;
 ```
 
-### Theme Configuration
-- **Location**: `src/theme/theme.ts`
-- **Features**:
-  - Custom color palette matching Stash aesthetic
-  - Dark/light mode support
-  - Typography configuration
-  - Component style overrides
-- **Mode Persistence**: Theme mode stored in localStorage (`stash-downloader-theme-mode`)
+### Stash Theme Colors
+Use inline styles for Stash-specific colors not in Bootstrap:
 
-### Component Patterns
+```typescript
+// Stash dark theme palette
+const stashColors = {
+  cardBg: '#30404d',
+  headerBg: '#243340',
+  inputBg: '#243340',
+  border: '#394b59',
+  mutedText: '#8b9fad',
+  text: '#fff',
+};
+```
 
-**Layout Components**:
-- Use `Container` for page-level containers
-- Use `Grid` for responsive layouts
-- Use `Box` for spacing and flex containers
-- Use `Stack` for simple flex layouts
+### Component Styling Pattern
+```tsx
+// Card with Stash dark theme
+<div className="card text-light" style={{ backgroundColor: '#30404d' }}>
+  <div className="card-header" style={{ backgroundColor: '#243340' }}>
+    Header
+  </div>
+  <div className="card-body">
+    <input
+      className="form-control text-light"
+      style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
+    />
+  </div>
+</div>
+```
 
-**Form Components**:
-- Use `TextField` for text inputs
-- Use `Autocomplete` for searchable selects
-- Use `Button` with variants (contained, outlined, text)
-- Use `Dialog` for modals
-
-**Feedback Components**:
-- Use `Alert` for error/success messages
-- Use `Snackbar` for toast notifications
-- Use `CircularProgress` for loading spinners
-- Use `LinearProgress` for progress bars
-
-**Data Display**:
-- Use `Card` and `CardContent` for content sections
-- Use `Chip` for tags/badges
-- Use `Table` for tabular data
-- Use `Typography` for text
-
-### Styling Approach
-- **Theme-based**: Use theme colors, spacing, and typography
-- **SX Prop**: Prefer `sx` prop for component-level styling
-- **Styled Components**: Use `styled()` for reusable styled components when needed
-- **No CSS Classes**: Avoid Bootstrap-style className usage
-
-### Icon Usage
-- Import icons from `@mui/icons-material`
-- Use with `startIcon`/`endIcon` props on buttons
-- Use `IconButton` for icon-only buttons
+### What NOT to Do
+- Don't bundle MUI, Emotion, or styled-components
+- Don't use custom ThemeProvider that requires React context
+- Don't import Bootstrap CSS (Stash provides it)
+- Don't use `bg-secondary` (too light for Stash theme)
 
 ## Component Architecture
 
 ### Component Hierarchy
 ```
 DownloaderPlugin (Route Container)
-├── DownloaderHeader
-├── NavigationTabs
-├── Routes
-│   ├── /downloader/queue → QueuePage
-│   │   ├── URLInputForm
-│   │   ├── DownloadQueue
-│   │   │   └── DownloadQueueItem (repeat)
-│   │   └── BulkActions
-│   ├── /downloader/metadata → MetadataEditor
-│   │   ├── PreviewPanel
-│   │   ├── MetadataForm
-│   │   │   ├── PerformerSelector
-│   │   │   ├── TagSelector
-│   │   │   └── StudioSelector
-│   │   └── ActionButtons
-│   └── /downloader/settings → SettingsPage
-│       ├── PathConfiguration
-│       ├── ScraperToggles
-│       └── AutoTagRules
-└── NotificationToast
+├── URLInputForm
+├── BatchImport
+├── QueueStats
+├── DownloadQueue
+│   └── QueueItem (repeat)
+├── LogViewer
+├── EditWorkflowPage (when editing)
+│   ├── MetadataEditorForm
+│   │   ├── PerformerSelector
+│   │   ├── TagSelector
+│   │   └── StudioSelector
+│   └── ActionButtons
+└── Modals (InfoModal, ItemLogModal, etc.)
 ```
 
 ### Component Types
@@ -244,14 +263,6 @@ ScraperRegistry.register(new RedditScraper());
 - Metadata mapping rules configurable by user
 - No code changes needed for common customizations
 
-### Event System (Future)
-```typescript
-// Plugins can listen to download lifecycle events
-DownloadEventBus.on('download:complete', (item) => {
-  // Custom post-processing
-});
-```
-
 ## Error Handling Strategy
 
 ### Error Categories
@@ -261,17 +272,22 @@ DownloadEventBus.on('download:complete', (item) => {
 3. **GraphQL Errors**: Parse and present actionable messages
 4. **Unexpected Errors**: Catch with error boundary, log, show generic message
 
-### Error Boundary Placement
-- Top-level: Catches catastrophic failures
-- Route-level: Isolates errors to specific pages
-- Component-level: Granular error handling for critical components
+### Common Plugin Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| React Error #31 | Returning `{}` from patch | Check for empty object, return `[link]` |
+| IntlProvider error | Stash internal code | Ignore - not plugin's fault |
+| useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
+| Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
 
 ## Performance Optimizations
 
 ### Bundle Size
 - External dependencies (React, Apollo) not bundled
-- Code splitting for routes and heavy components
+- Bootstrap provided by Stash - not bundled
 - Tree-shaking enabled in production build
+- Target: <150KB bundle size
 
 ### Runtime Performance
 - Virtual scrolling for large download queues
@@ -284,187 +300,204 @@ DownloadEventBus.on('download:complete', (item) => {
 - Request deduplication for metadata fetching
 - Apollo cache prevents redundant GraphQL queries
 
-## Security Considerations
-
-### Input Validation
-- URL format validation before download
-- Sanitize filenames to prevent path traversal
-- Validate metadata before GraphQL mutations
-
-### Content Security
-- Respect Stash's CSP policies
-- No eval() or Function() constructors
-- Sanitize any user-provided HTML
-
-### Authentication
-- Leverage Stash's session cookies
-- No credential storage in plugin
-- Use Stash's API key if needed for external services
-
 ## Build & Deployment
 
 ### Build Configuration
-- **Development**: Source maps, hot reload, verbose logging
-- **Production**: Minified, optimized, source maps removed
-- **Library Mode**: Single bundle, external dependencies
+- **Format**: IIFE (Immediately Invoked Function Expression)
+- **External**: react, react-dom, react-router-dom, @apollo/client
+- **Output**: Single `dist/stash-downloader.js` file
+- **Source Maps**: Disabled in production
 
-### Plugin Distribution
+### Vite Config Key Settings
+```typescript
+build: {
+  lib: {
+    entry: 'src/index.tsx',
+    name: 'StashDownloader',
+    formats: ['iife'],
+    fileName: () => 'stash-downloader.js',
+  },
+  rollupOptions: {
+    external: ['react', 'react-dom', 'react-router-dom', '@apollo/client'],
+    output: {
+      globals: {
+        react: 'PluginApi.React',
+        'react-dom': 'PluginApi.ReactDOM',
+        'react-router-dom': 'PluginApi.libraries.ReactRouterDOM',
+        '@apollo/client': 'PluginApi.libraries.Apollo',
+      },
+    },
+  },
+}
 ```
-stash-downloader-plugin/
-├── dist/
-│   └── stash-downloader.js    # Built bundle
-├── stash-downloader.yml        # Plugin config
-└── README.md                   # User documentation
-```
 
-### Versioning
-- Semantic versioning (MAJOR.MINOR.PATCH)
-- Breaking changes in MAJOR
-- New features in MINOR
-- Bug fixes in PATCH
-
-## Testing Strategy
-
-### Unit Tests (Services & Utilities)
-- Test business logic in isolation
-- Mock external dependencies
-- High coverage for critical paths
-
-### Integration Tests (Components + Services)
-- Test PluginApi integration
-- Mock GraphQL responses
-- Verify component behavior with real services
-
-### Manual Testing Checklist
-- Plugin loads without errors
-- Routes register correctly
-- GraphQL mutations create scenes
-- Downloads complete successfully
-- Error states display properly
-
-## Monitoring & Debugging
-
-### Development Tools
-- React DevTools for component inspection
-- Apollo DevTools for GraphQL debugging
-- Browser DevTools for network and console
-
-### Logging Strategy
-- Development: Verbose logging to console
-- Production: Error logging only
-- User-facing: Actionable error messages
-
-### Performance Monitoring
-- Track download speeds
-- Monitor GraphQL query times
-- Log slow component renders (with profiler in dev)
-
-## Plugin Deployment & Updates
-
-### GitHub Pages Publishing
-**Decision**: Use GitHub Actions to build and publish plugin as ZIP package
-
-**Workflow**:
-1. Push to main branch triggers GitHub Actions
-2. Build plugin with `npm run build`
-3. Package plugin directory into ZIP file
-4. Calculate SHA256 checksum for integrity verification
-5. Generate `index.yml` with version from package.json
-6. Deploy to GitHub Pages via `actions/upload-pages-artifact`
-
-**Key Files**:
-- `.github/workflows/publish.yml` - Automated build and deploy
-- `build_site.sh` - Local testing script (matches workflow)
-- `_site/` directory - Output containing `index.yml` and `.zip`
-
-### Plugin Manifest Format
-**Decision**: Use minimal manifest structure matching Stash's Config struct
-
-**Required fields** (from `pkg/plugin/config.go`):
+### Plugin Manifest (stash-downloader.yml)
 ```yaml
-name: Plugin Name
-description: ...
-version: 0.1.0  # Must match package.json
+name: Stash Downloader
+description: Download and import content with metadata
+version: 0.1.0
 url: https://github.com/user/repo
+
+# Settings - only STRING, NUMBER, BOOLEAN supported
+# NO default values, NO enum fields
 settings:
-  settingKey:
-    displayName: Display Name
-    description: Setting description
-    type: STRING | NUMBER | BOOLEAN  # Only these types supported
+  downloadPath:
+    displayName: Download Path
+    description: Where to save downloaded files
+    type: STRING
+
 ui:
   javascript:
     - dist/stash-downloader.js
+
 interface: js  # Must be "js" for JavaScript plugins
 ```
 
-**Not supported** (will cause parse errors):
-- `default` field in settings (no default values)
-- `enum` field in settings (put options in description instead)
-- Root-level `js` field (must be `ui.javascript`)
+**Manifest Gotchas:**
+- `default` field NOT supported (causes parse errors)
+- `enum` field NOT supported (put options in description)
+- Must use `ui.javascript` not root-level `js`
+- `interface: js` required for JS plugins
 
 ### Version Management
-**Decision**: Single source of truth in package.json
+- Single source of truth in `package.json`
+- GitHub Actions reads version and publishes
+- Stash detects updates by comparing versions
+- Format: `MAJOR.MINOR.PATCH` (semver)
 
-**Process**:
-1. Update version in `package.json` (semantic versioning)
-2. Commit and push to main
-3. GitHub Actions reads version and publishes
-4. Stash detects update by comparing versions
-5. Users see "Update" button in Settings → Plugins
+## GitHub Pages Deployment
 
-**Version format**: `MAJOR.MINOR.PATCH` (e.g., `0.1.0` → `0.1.1`)
+### Required Files
+1. `.github/workflows/publish.yml` - GitHub Actions workflow
+2. `build_site.sh` - Local build script (optional, for testing)
 
-### Plugin Repository Index
-**Decision**: Flat YAML array format (not nested structure)
+### GitHub Pages Configuration
+1. Go to repo **Settings → Pages**
+2. Under "Build and deployment"
+3. Select **Source: GitHub Actions** (not "Deploy from a branch")
+4. Workflow deploys to `https://username.github.io/repo-name/index.yml`
 
-**Structure**:
+### Workflow Key Steps
+```yaml
+- name: Build plugin
+  run: npm run build
+
+- name: Create ZIP package
+  run: |
+    mkdir -p _site/stash-downloader
+    cp -r dist _site/stash-downloader/
+    cp stash-downloader.yml _site/stash-downloader/
+    cd _site && zip -r stash-downloader.zip stash-downloader/
+    SHA256=$(sha256sum stash-downloader.zip | cut -d' ' -f1)
+
+- name: Generate index.yml
+  run: |
+    CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
+    cat > _site/index.yml << EOF
+    - id: stash-downloader
+      name: Stash Downloader
+      version: ${VERSION}
+      date: ${CURRENT_DATETIME}
+      path: stash-downloader.zip
+      sha256: ${SHA256}
+      description: Download and import content
+      url: https://github.com/user/repo
+    EOF
+
+- name: Deploy to GitHub Pages
+  uses: actions/deploy-pages@v4
+```
+
+### Required Permissions
+```yaml
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+```
+
+## Plugin Repository Index Format
+
+### Required Structure (index.yml)
+**MUST be a flat YAML array** at root level:
+
 ```yaml
 - id: stash-downloader
   name: Stash Downloader
-  version: 0.1.0  # From package.json
+  version: 0.1.0
   date: 2025-11-24 14:30:45  # MUST include time component
-  path: stash-downloader.zip  # ZIP file, not directory
-  sha256: [64-char hash]  # For integrity verification
-  description: ...
+  path: stash-downloader.zip
+  sha256: abc123...def456    # 64-char hash of ZIP
+  description: Plugin description
   url: https://github.com/user/repo
 ```
 
-**Critical requirements**:
-- Date must include time: `YYYY-MM-DD HH:MM:SS` (Go time.Parse format)
-- Path must be ZIP file with SHA256 checksum
-- Both index.yml and ZIP must be in same directory
-- Array at root level (not nested under `sources:` or `plugins:`)
+### Critical Format Requirements
 
-### Navigation Integration
-**Decision**: Patch Navbar component to add "Downloader" link
+| Field | Format | Notes |
+|-------|--------|-------|
+| `date` | `YYYY-MM-DD HH:MM:SS` | **Must include time** - Go's time.Parse requires it |
+| `path` | `filename.zip` | Must be ZIP file, not directory |
+| `sha256` | 64-char hex | Hash of the ZIP file |
+| Root | Array `- id:` | NOT nested under `sources:` or `plugins:` |
 
-**Implementation**:
+### Common Index Issues
+
+**"parsing time ... cannot parse '' as '15'"**
+- Cause: Date missing time component
+- Fix: Use `date +'%Y-%m-%d %H:%M:%S'`
+
+**"cannot unmarshal !!map into []pkg.RemotePackage"**
+- Cause: Nested structure instead of flat array
+- Fix: Remove `version:` and `sources:` wrappers
+
+**"failed to get package file: 404 Not Found"**
+- Cause: Path points to directory, not ZIP
+- Fix: Package as ZIP with correct path and sha256
+
+**"$(date +%Y-%m-%d)" literal in output**
+- Cause: Heredoc uses `'EOF'` (quoted) preventing expansion
+- Fix: Use unquoted `EOF` and store date in variable first
+
+## Adding Plugin to Stash
+
+### As Custom Source (Recommended)
+1. Stash → **Settings → Plugins → Available Plugins**
+2. Click **"Add Source"**
+3. Enter: `https://username.github.io/repo-name/index.yml`
+4. Click **"Add"**
+5. Find plugin in list → Click **"Install"**
+
+### Manual Installation
+1. Copy plugin folder to `~/.stash/plugins/plugin-name/`
+2. Stash → **Settings → Plugins**
+3. Toggle plugin **ON**
+4. Click **"Reload Plugins"** if needed
+
+## Navigation Integration
+
+### Adding Nav Link
 ```typescript
-window.PluginApi.patch.after('Navbar', (_props: any, output: any) => {
-  // Add NavLink component to navbar children
-  // Users can access plugin from any page
+window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
+  const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
+  if (!NavLink) return output;
+
+  const link = React.createElement(NavLink, {
+    to: '/downloader',
+    className: 'nav-link',
+    key: 'downloader-nav'
+  }, 'Downloader');
+
+  // CRITICAL: Handle empty object (causes React Error #31)
+  if (Array.isArray(output)) return [...output, link];
+  if (!output || Object.keys(output).length === 0) return [link];
+  return [output, link];
 });
 ```
 
-**Rationale**:
-- Provides persistent access from top navigation
-- More discoverable than buried in settings
-- Consistent with Stash's navigation patterns
-
-## Future Architecture Considerations
-
-### Scalability
-- Support for hundreds of items in queue
-- Efficient metadata caching
-- Background processing for large batches
-
-### Interoperability
-- Export download templates for sharing
-- Import from bookmark files
-- Integration with browser extensions
-
-### Advanced Features
-- Scheduled downloads
-- Watch folders for automatic import
-- Duplicate detection before download
-- Custom post-processing scripts
+### Route Registration
+```typescript
+window.PluginApi.register.route('/downloader', (props) => {
+  return React.createElement(DownloaderMain, props);
+});
+```

@@ -12,8 +12,8 @@ Streamline the process of importing content into Stash by:
 
 ## Technology Stack
 - **Frontend**: React 18+ with TypeScript
-- **Build Tool**: Vite (fast, modern, optimized for libraries)
-- **Styling**: Material UI v7 (bundled in plugin)
+- **Build Tool**: Vite (IIFE bundle format for Stash plugins)
+- **Styling**: Bootstrap utility classes (provided by Stash via PluginApi)
 - **API**: GraphQL via Apollo Client (provided by Stash)
 - **State Management**: React Context + Hooks
 - **Plugin API**: Stash PluginApi (window.PluginApi)
@@ -38,55 +38,56 @@ JavaScript Extension / Web-UI Plugin for Stash
    - File organization according to Stash library structure
 
 4. **User Experience**
-   - Clean, intuitive interface
+   - Dark-themed interface matching Stash's UI
    - Real-time progress indicators
    - Error handling with actionable messages
    - Preview before finalizing
 
 ## External Dependencies (NOT Bundled)
-These are provided by Stash and marked as external in build config:
+These are provided by Stash via PluginApi and marked as external in build config:
 - react
 - react-dom
 - react-router-dom
 - @apollo/client
 
-## Bundled Dependencies
-These are bundled with the plugin:
-- @mui/material (Material UI v7)
-- @mui/icons-material (Material UI icons)
-- @emotion/react (CSS-in-JS runtime for MUI)
-- @emotion/styled (Styled components for MUI)
+## Libraries Available via PluginApi
+Stash provides these libraries through `window.PluginApi.libraries`:
+- **ReactRouterDOM**: NavLink, useNavigate, etc.
+- **Bootstrap**: React-Bootstrap components
+- **Apollo**: Apollo Client for GraphQL
+- **Intl**: React-Intl for internationalization
+- **FontAwesomeSolid/Regular/Brands**: FontAwesome icons
+- **Mousetrap**: Keyboard shortcuts
+- **ReactSelect**: Advanced select components
 
-## Material UI Installation & Usage
-
-### Installation
-Material UI dependencies are already included in `package.json`:
-```bash
-pnpm install
-```
-
-### Theme Customization
-The plugin uses a custom Material UI theme with dark/light mode support:
-- Theme configuration: `src/theme/theme.ts`
-- Theme provider: `src/theme/ThemeProvider.tsx`
-- Theme mode is persisted in localStorage
-
-### Using Material UI Components
-Import components from `@mui/material`:
-```typescript
-import { Button, TextField, Card, CardContent } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-```
-
-### Theme Mode
-The theme supports both light and dark modes. The mode preference is stored in localStorage and can be toggled programmatically using the `useThemeMode` hook from `@/theme/ThemeProvider`.
+## Styling Approach
+- **Bootstrap Utility Classes**: Layout, spacing, colors
+- **Stash Theme Colors**: Use inline styles with Stash's color palette
+  - Card backgrounds: `#30404d`
+  - Header/input backgrounds: `#243340`
+  - Borders: `#394b59`
+  - Muted text: `#8b9fad`
+- **NO CSS-in-JS libraries**: MUI/Emotion removed to reduce bundle size and avoid context conflicts
 
 ## Development Workflow
 1. Develop components in `src/`
-2. Build with `pnpm build` (outputs to `dist/`)
+2. Build with `npm run build` (outputs to `dist/`)
 3. Plugin YAML points to `dist/stash-downloader.js`
-4. Place plugin folder in Stash's plugins directory
+4. Deploy via GitHub Pages for custom source installation
 5. Test in Stash instance at http://localhost:9999
+
+## Plugin Entry Point (src/index.tsx)
+The plugin must:
+1. Register routes via `PluginApi.register.route()`
+2. Patch navbar via `PluginApi.patch.after('MainNavBar.MenuItems', ...)`
+3. Handle edge cases (empty output, missing libraries)
+4. NOT use contexts that require providers (ThemeProvider, etc.)
+
+## Common Integration Issues
+- **React Error #31**: MainNavBar patch receives empty object `{}` - must check and return `[link]`
+- **IntlProvider errors**: Stash's own code may log these - not plugin's fault
+- **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
+- **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
 
 ## Future Enhancement Considerations
 - Plugin architecture supports adding new source scrapers
