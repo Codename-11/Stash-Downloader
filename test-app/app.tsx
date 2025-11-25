@@ -5,22 +5,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {
-  Container,
-  Typography,
-  Alert,
-  Card,
-  CardContent,
-  FormControlLabel,
-  Switch,
-  TextField,
-  Box,
-  Stack,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-} from '@mui/material';
-import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { ROUTES } from '../src/constants';
 import { installMockPluginApi, setMockData } from './mocks/mockPluginApi';
@@ -127,118 +112,122 @@ const TestApp: React.FC = () => {
 
   // Create the test settings panel
   const testSettingsPanel = (
-    <Accordion
-      expanded={testSectionExpanded}
-      onChange={handleTestSectionToggle}
-      sx={{ bgcolor: 'background.paper' }}
-    >
-      <AccordionSummary
-        expandIcon={<ExpandMoreIcon />}
-        aria-controls="test-section-content"
-        id="test-section-header"
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-          Test Environment Settings
-        </Typography>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Stack spacing={3}>
-          <Alert severity="success">
-            <Typography variant="h6" gutterBottom>
-              Test Environment Active
-            </Typography>
-            <Box component="ul" sx={{ m: 0, pl: 2 }}>
-              <li>✅ Mock PluginApi installed</li>
-              <li>✅ Mock data loaded: {mockPerformers.length} performers, {mockTags.length} tags, {mockStudios.length} studios</li>
-              <li>✅ Mock scraper registered</li>
-              <li>✅ <strong>CORS proxy running</strong> on <code>http://localhost:8080</code></li>
-              <li>✅ <strong>Files save to Downloads folder</strong> with Stash-compatible metadata</li>
-              <li>Current route: <code>{currentRoute}</code></li>
-            </Box>
-            <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-              💡 <strong>Tip:</strong> Downloaded files are saved with <code>.json</code> metadata sidecar files
-              that Stash can read when you import them!
-            </Typography>
-          </Alert>
+    <div className="accordion mb-3" id="testSettingsAccordion">
+      <div className="accordion-item bg-dark">
+        <h2 className="accordion-header">
+          <button
+            className={`accordion-button bg-dark text-light ${testSectionExpanded ? '' : 'collapsed'}`}
+            type="button"
+            onClick={handleTestSectionToggle}
+            aria-expanded={testSectionExpanded}
+            aria-controls="test-section-content"
+          >
+            <strong>Test Environment Settings</strong>
+          </button>
+        </h2>
+        <div
+          id="test-section-content"
+          className={`accordion-collapse collapse ${testSectionExpanded ? 'show' : ''}`}
+        >
+          <div className="accordion-body">
+            <div className="d-flex flex-column gap-3">
+              {/* Status Alert */}
+              <div className="alert alert-success">
+                <h5 className="alert-heading">Test Environment Active</h5>
+                <ul className="mb-2">
+                  <li>✅ Mock PluginApi installed</li>
+                  <li>✅ Mock data loaded: {mockPerformers.length} performers, {mockTags.length} tags, {mockStudios.length} studios</li>
+                  <li>✅ Mock scraper registered</li>
+                  <li>✅ <strong>CORS proxy running</strong> on <code>http://localhost:8080</code></li>
+                  <li>✅ <strong>Files save to Downloads folder</strong> with Stash-compatible metadata</li>
+                  <li>Current route: <code>{currentRoute}</code></li>
+                </ul>
+                <small className="text-muted">
+                  💡 <strong>Tip:</strong> Downloaded files are saved with <code>.json</code> metadata sidecar files
+                  that Stash can read when you import them!
+                </small>
+              </div>
 
-          {/* CORS Proxy Settings */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                CORS Proxy Settings
-              </Typography>
-              <Stack spacing={2}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={corsProxyEnabled}
-                      onChange={(e) => handleCorsProxyToggle(e.target.checked)}
-                    />
-                  }
-                  label={`Enable CORS Proxy ${corsProxyEnabled ? '✅' : ''}`}
-                />
-                {corsProxyEnabled && (
-                  <TextField
-                    label="Proxy URL"
-                    size="small"
-                    value={corsProxyUrl}
-                    onChange={(e) => handleCorsProxyUrlChange(e.target.value)}
-                    placeholder="http://localhost:8080"
-                    fullWidth
-                  />
-                )}
-                <Typography variant="caption" color="text.secondary">
-                  {corsProxyEnabled ? (
-                    <>
-                      ✅ CORS proxy is <strong>enabled</strong>. All downloads will be proxied through{' '}
-                      <code>{corsProxyUrl}</code>. Make sure the proxy server is running:{' '}
-                      <code>npm run test:proxy</code>
-                    </>
-                  ) : (
-                    <>
-                      ⚠️ CORS proxy is <strong>disabled</strong>. Only sites with CORS headers will work.
-                      Enable proxy to download from sites like pornhub. See{' '}
-                      <a href="test/CORS_LIMITATIONS.md" target="_blank">CORS_LIMITATIONS.md</a>
-                    </>
-                  )}
-                </Typography>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Stack>
-      </AccordionDetails>
-    </Accordion>
+              {/* CORS Proxy Settings */}
+              <div className="card bg-secondary">
+                <div className="card-body">
+                  <h6 className="card-title text-light">CORS Proxy Settings</h6>
+                  <div className="d-flex flex-column gap-2">
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="corsProxyToggle"
+                        checked={corsProxyEnabled}
+                        onChange={(e) => handleCorsProxyToggle(e.target.checked)}
+                      />
+                      <label className="form-check-label text-light" htmlFor="corsProxyToggle">
+                        Enable CORS Proxy {corsProxyEnabled ? '✅' : ''}
+                      </label>
+                    </div>
+                    {corsProxyEnabled && (
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="http://localhost:8080"
+                        value={corsProxyUrl}
+                        onChange={(e) => handleCorsProxyUrlChange(e.target.value)}
+                      />
+                    )}
+                    <small className="text-muted">
+                      {corsProxyEnabled ? (
+                        <>
+                          ✅ CORS proxy is <strong>enabled</strong>. All downloads will be proxied through{' '}
+                          <code>{corsProxyUrl}</code>. Make sure the proxy server is running:{' '}
+                          <code>npm run test:proxy</code>
+                        </>
+                      ) : (
+                        <>
+                          ⚠️ CORS proxy is <strong>disabled</strong>. Only sites with CORS headers will work.
+                          Enable proxy to download from sites like pornhub. See{' '}
+                          <a href="test/CORS_LIMITATIONS.md" target="_blank" rel="noreferrer">CORS_LIMITATIONS.md</a>
+                        </>
+                      )}
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   return (
     <ThemeProvider>
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <div className="min-vh-100 bg-dark text-light">
         {/* Render the plugin */}
         {isInitializing ? (
-          <Container maxWidth="lg" sx={{ py: 3 }}>
-            <Alert severity="info">
+          <div className="container py-3">
+            <div className="alert alert-info">
               Initializing plugin...
-            </Alert>
-          </Container>
+            </div>
+          </div>
         ) : RouteComponent ? (
           <RouteComponent isTestMode={true} testSettingsPanel={testSettingsPanel} />
         ) : (
-          <Container maxWidth="lg" sx={{ py: 3 }}>
-            <Alert severity="warning">
+          <div className="container py-3">
+            <div className="alert alert-warning">
               No component registered for route: {currentRoute}
-            </Alert>
-          </Container>
+            </div>
+          </div>
         )}
 
         {/* Debug footer */}
-        <Box component="footer" sx={{ mt: 5, py: 3, borderTop: 1, borderColor: 'divider' }}>
-          <Container maxWidth="lg">
-            <Typography variant="caption" color="text.secondary">
+        <footer className="mt-5 py-3 border-top border-secondary">
+          <div className="container">
+            <small className="text-muted">
               Test app for Stash Downloader Plugin | Mock data and services active
-            </Typography>
-          </Container>
-        </Box>
-      </Box>
+            </small>
+          </div>
+        </footer>
+      </div>
     </ThemeProvider>
   );
 };
