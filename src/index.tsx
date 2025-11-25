@@ -13,8 +13,27 @@ if (!window.PluginApi) {
   throw new Error('PluginApi not found');
 }
 
-// Get React from PluginApi
-const React = window.PluginApi.React;
+// Get React from PluginApi - use this consistently throughout
+const { React } = window.PluginApi;
+
+/**
+ * Wrapper component that provides Stash's IntlProvider context
+ */
+function PluginWrapper(props: any) {
+  const { IntlProvider } = window.PluginApi.libraries.Intl || {};
+
+  // If IntlProvider is available, wrap our component with it
+  if (IntlProvider) {
+    return React.createElement(
+      IntlProvider,
+      { locale: 'en', messages: {} },
+      React.createElement(DownloaderMain, props)
+    );
+  }
+
+  // Fallback: render without IntlProvider
+  return React.createElement(DownloaderMain, props);
+}
 
 /**
  * Initialize and register the plugin
@@ -22,35 +41,52 @@ const React = window.PluginApi.React;
 function initializePlugin() {
   try {
     console.log(`[${PLUGIN_ID}] Initializing plugin...`);
+    console.log(`[${PLUGIN_ID}] Available libraries:`, Object.keys(window.PluginApi.libraries || {}));
 
-    // Register main route - accept props for test mode
+    // Register main route with IntlProvider wrapper
     window.PluginApi.register.route(ROUTES.MAIN, (props?: any) => {
-      return React.createElement(DownloaderMain, props);
+      return React.createElement(PluginWrapper, props);
     });
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
     // Add navigation link to Stash's main navbar
     window.PluginApi.patch.after('MainNavBar.MenuItems', (_props: any, output: any) => {
-      const { React } = window.PluginApi;
-      const { NavLink } = window.PluginApi.libraries.ReactRouterDOM;
+      try {
+        const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
 
-      const downloaderLink = React.createElement(
-        NavLink,
-        {
-          to: ROUTES.MAIN,
-          className: 'nav-link',
-          key: 'stash-downloader-nav-link',
-        },
-        'Downloader'
-      );
+        if (!NavLink) {
+          console.warn(`[${PLUGIN_ID}] NavLink not available`);
+          return output;
+        }
 
-      // Add link to menu items
-      if (Array.isArray(output)) {
-        return [...output, downloaderLink];
+        const downloaderLink = React.createElement(
+          NavLink,
+          {
+            to: ROUTES.MAIN,
+            className: 'nav-link',
+            key: 'stash-downloader-nav-link',
+          },
+          'Downloader'
+        );
+
+        // Safely add link to menu items
+        if (Array.isArray(output)) {
+          return [...output, downloaderLink];
+        }
+
+        // If output is null/undefined, return just our link in an array
+        if (output == null) {
+          return [downloaderLink];
+        }
+
+        // For other cases, try to append
+        console.warn(`[${PLUGIN_ID}] Unexpected output type:`, typeof output, output);
+        return output;
+      } catch (patchError) {
+        console.error(`[${PLUGIN_ID}] Error in MainNavBar patch:`, patchError);
+        return output;
       }
-
-      return output;
     });
 
     console.log(`[${PLUGIN_ID}] Navigation link added to MainNavBar`);
