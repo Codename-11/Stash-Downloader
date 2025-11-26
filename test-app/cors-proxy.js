@@ -189,12 +189,13 @@ const server = http.createServer((req, res) => {
 function handleYtDlpExtraction(req, res) {
   const urlParams = new URLParser(req.url, `http://${req.headers.host}`);
   const videoUrl = urlParams.searchParams.get('url');
+  const proxyUrl = urlParams.searchParams.get('proxy') || process.env.HTTP_PROXY || process.env.http_proxy;
 
   if (!videoUrl) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       error: 'Missing url parameter',
-      usage: '/api/extract?url=https://example.com/video'
+      usage: '/api/extract?url=https://example.com/video&proxy=socks5://user:pass@host:port'
     }));
     return;
   }
@@ -215,19 +216,31 @@ function handleYtDlpExtraction(req, res) {
   }
 
   console.log(`[yt-dlp] Extracting metadata for: ${validatedUrl}`);
+  if (proxyUrl) {
+    console.log(`[yt-dlp] Using proxy: ${proxyUrl.replace(/:[^:@]*@/, ':****@')}`); // Hide password in logs
+  } else {
+    console.log(`[yt-dlp] No proxy configured - using direct connection`);
+  }
 
-  // Run yt-dlp to extract video information
-  // According to yt-dlp docs: --dump-json outputs JSON metadata
-  // Added flags to help with sites like Pornhub that may need special handling
-  const ytDlp = spawn('yt-dlp', [
+  // Build yt-dlp command arguments
+  const ytDlpArgs = [
     '--dump-json', // Output video info as JSON
     '--no-playlist', // Don't extract from playlists, only single video
     '--quiet', // Suppress most output
     '--no-warnings', // Suppress warnings
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     '--referer', 'https://www.pornhub.com/',
-    validatedUrl
-  ]);
+  ];
+
+  // Add proxy if configured (yt-dlp supports http://, https://, socks4://, socks5://, socks5h://)
+  if (proxyUrl) {
+    ytDlpArgs.push('--proxy', proxyUrl);
+  }
+
+  ytDlpArgs.push(validatedUrl);
+
+  // Run yt-dlp to extract video information
+  const ytDlp = spawn('yt-dlp', ytDlpArgs);
 
   let stdout = '';
   let stderr = '';
@@ -293,17 +306,23 @@ function handleYtDlpDownload(req, res) {
   const urlParams = new URLParser(req.url, `http://${req.headers.host}`);
   const videoUrl = urlParams.searchParams.get('url');
   const format = urlParams.searchParams.get('format') || 'best'; // Default to best quality
+  const proxyUrl = urlParams.searchParams.get('proxy') || process.env.HTTP_PROXY || process.env.http_proxy;
 
   if (!videoUrl) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       error: 'Missing url parameter',
-      usage: '/api/download?url=https://example.com/video&format=best'
+      usage: '/api/download?url=https://example.com/video&format=best&proxy=socks5://user:pass@host:port'
     }));
     return;
   }
 
   console.log(`[yt-dlp] Downloading video from: ${videoUrl} (format: ${format})`);
+  if (proxyUrl) {
+    console.log(`[yt-dlp] Using proxy: ${proxyUrl.replace(/:[^:@]*@/, ':****@')}`); // Hide password in logs
+  } else {
+    console.log(`[yt-dlp] No proxy configured - using direct connection`);
+  }
 
   // Set headers for streaming
   res.setHeader('Content-Type', 'application/octet-stream');
@@ -349,11 +368,8 @@ function handleYtDlpDownload(req, res) {
     return;
   }
 
-  // Run yt-dlp to download and stream the video
-  // Use -o - to output to stdout, and specify format
-  // According to yt-dlp docs: -f best selects best quality, -o - outputs to stdout
-  // Added flags to help with sites like Pornhub that may need special handling
-  const ytDlp = spawn('yt-dlp', [
+  // Build yt-dlp command arguments
+  const ytDlpArgs = [
     '-f', format, // Format selector (best, worst, or specific format ID)
     '-o', '-', // Output to stdout
     '--no-playlist', // Don't download playlists, only single video
@@ -362,8 +378,17 @@ function handleYtDlpDownload(req, res) {
     '--no-warnings', // Suppress warnings (they go to stderr anyway)
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     '--referer', 'https://www.pornhub.com/',
-    validatedUrl
-  ]);
+  ];
+
+  // Add proxy if configured (yt-dlp supports http://, https://, socks4://, socks5://, socks5h://)
+  if (proxyUrl) {
+    ytDlpArgs.push('--proxy', proxyUrl);
+  }
+
+  ytDlpArgs.push(validatedUrl);
+
+  // Run yt-dlp to download and stream the video
+  const ytDlp = spawn('yt-dlp', ytDlpArgs);
 
   let stderr = '';
 

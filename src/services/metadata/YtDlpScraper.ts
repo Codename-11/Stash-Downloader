@@ -218,7 +218,27 @@ export class YtDlpScraper implements IMetadataScraper {
   private async scrapeClientSide(url: string): Promise<IScrapedMetadata> {
     try {
       const proxyUrl = this.getProxyUrl();
-      const extractUrl = `${proxyUrl}/api/extract?url=${encodeURIComponent(url)}`;
+      
+      // Get HTTP proxy setting if enabled (for routing yt-dlp through HTTP/SOCKS proxy)
+      let httpProxyUrl: string | undefined;
+      if (typeof window !== 'undefined') {
+        try {
+          const settings = localStorage.getItem('stash-downloader:settings');
+          if (settings) {
+            const parsed = JSON.parse(settings);
+            httpProxyUrl = parsed.httpProxy;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      
+      // Build extract URL with optional proxy parameter
+      let extractUrl = `${proxyUrl}/api/extract?url=${encodeURIComponent(url)}`;
+      if (httpProxyUrl) {
+        extractUrl += `&proxy=${encodeURIComponent(httpProxyUrl)}`;
+        console.log('[YtDlpScraper] yt-dlp will use HTTP proxy for extraction');
+      }
 
       console.log('[YtDlpScraper] Calling yt-dlp API:', extractUrl);
 
