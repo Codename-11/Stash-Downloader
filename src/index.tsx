@@ -51,6 +51,8 @@ function initializePlugin() {
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
     // Add navigation link to Stash's main navbar
+    // The MainNavBar.MenuItems component renders a <Nav> element with children
+    // We need to clone it and add our link to its children
     window.PluginApi.patch.after('MainNavBar.MenuItems', (_props: any, output: any) => {
       try {
         const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
@@ -70,28 +72,50 @@ function initializePlugin() {
           'Downloader'
         );
 
-        // Safely add link to menu items
+        // If output is a valid React element with props, clone it and add our link to children
+        if (output && typeof output === 'object' && output.props !== undefined) {
+          // Get existing children and convert to array
+          const existingChildren = React.Children.toArray(output.props.children || []);
+
+          // Check if our link is already added (avoid duplicates)
+          const alreadyAdded = existingChildren.some(
+            (child: any) => child?.key === 'stash-downloader-nav-link'
+          );
+
+          if (alreadyAdded) {
+            return output;
+          }
+
+          // Clone the element with our link added to children
+          return React.cloneElement(output, {}, ...existingChildren, downloaderLink);
+        }
+
+        // If output is an array (unlikely but possible), add to it
         if (Array.isArray(output)) {
+          const alreadyAdded = output.some(
+            (child: any) => child?.key === 'stash-downloader-nav-link'
+          );
+          if (alreadyAdded) return output;
           return [...output, downloaderLink];
         }
 
-        // If output is null/undefined or empty object, just return our link
-        // Note: We return ONLY our link here - we cannot access other nav items
-        // This is expected behavior when patch.after receives empty output
+        // If output is null/undefined or empty, return unchanged
+        // This prevents breaking the navbar if something unexpected happens
         if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
-          console.log(`[${PLUGIN_ID}] MainNavBar output was empty, adding our link only`);
-          return [downloaderLink];
+          console.warn(`[${PLUGIN_ID}] MainNavBar output was empty/null, cannot add link safely`);
+          return output;
         }
 
-        // For React elements or other valid children, wrap in array with our link
-        return [output, downloaderLink];
+        // Unknown output type - return as-is to avoid breaking navbar
+        console.warn(`[${PLUGIN_ID}] Unexpected MainNavBar output type:`, typeof output);
+        return output;
       } catch (patchError) {
         console.error(`[${PLUGIN_ID}] Error in MainNavBar patch:`, patchError);
         return output;
       }
     });
 
-    console.log(`[${PLUGIN_ID}] Navigation link added to MainNavBar`);
+    console.log(`[${PLUGIN_ID}] Navigation link patched to MainNavBar`);
 
   } catch (error) {
     console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);

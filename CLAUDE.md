@@ -25,6 +25,8 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 - **Build**: Vite (IIFE bundle for Stash plugins)
 - **Styling**: Bootstrap utilities (provided by Stash)
 - **API**: GraphQL via Apollo Client (provided by Stash)
+- **Backend**: Python + yt-dlp for server-side downloads
+- **Scraping**: Dual-mode (server-side via Stash, client-side with CORS proxy)
 
 ## Key Constraints
 
@@ -44,4 +46,12 @@ Muted text: #8b9fad
 
 ## Plugin Entry Pattern
 
-The plugin registers via `PluginApi.register.route()` and patches navbar via `PluginApi.patch.after()`. Must handle edge cases like empty output from MainNavBar patch.
+The plugin registers via `PluginApi.register.route()` and patches navbar via `PluginApi.patch.after()`. Use `React.cloneElement` to append nav link without removing existing menu items.
+
+## Scraper Priority
+
+1. **StashScraper** - Server-side via Stash GraphQL (NO CORS)
+2. **YtDlpScraper** - Video URL extraction
+3. **Site-specific** - PornhubScraper, YouPornScraper
+4. **HTMLScraper** - Generic Open Graph tags
+5. **GenericScraper** - Fallback URL parsing

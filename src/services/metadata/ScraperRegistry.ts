@@ -8,6 +8,7 @@ import { HTMLScraper } from './HTMLScraper';
 import { PornhubScraper } from './PornhubScraper';
 import { YouPornScraper } from './YouPornScraper';
 import { YtDlpScraper } from './YtDlpScraper';
+import { StashScraper } from './StashScraper';
 import { withTimeout } from '@/utils';
 
 export class ScraperRegistry {
@@ -19,8 +20,13 @@ export class ScraperRegistry {
     this.fallbackScraper = new GenericScraper();
 
     // Register built-in scrapers
-    // Order matters: yt-dlp first (if available), then specific scrapers, then generic
-    this.register(new YtDlpScraper());  // Try yt-dlp first for all URLs
+    // Order matters:
+    // 1. Stash built-in (server-side, no CORS) - highest priority in Stash environment
+    // 2. yt-dlp (if available) - best for getting actual video URLs
+    // 3. Specific site scrapers
+    // 4. Generic HTML scraper
+    this.register(new StashScraper());  // Try Stash first (server-side, no CORS)
+    this.register(new YtDlpScraper());  // Then yt-dlp for video URLs
     this.register(new PornhubScraper());
     this.register(new YouPornScraper());
     this.register(new HTMLScraper());
@@ -37,8 +43,21 @@ export class ScraperRegistry {
    * Find appropriate scraper for URL
    */
   findScraper(url: string): IMetadataScraper {
-    // ALWAYS try yt-dlp first as it usually gets the best quality
-    // yt-dlp is designed to extract the highest quality streams available
+    // Priority order:
+    // 1. Stash Built-in (server-side, no CORS) - if in Stash environment
+    // 2. yt-dlp (for video URL extraction)
+    // 3. Site-specific scrapers
+    // 4. Generic HTML scraper
+    // 5. Fallback
+
+    // Try Stash built-in first (server-side, no CORS issues)
+    const stashScraper = this.scrapers.find((s) => s.name === 'Stash Built-in');
+    if (stashScraper && stashScraper.canHandle(url)) {
+      console.log(`[ScraperRegistry] Using ${stashScraper.name} for ${url} (server-side, no CORS)`);
+      return stashScraper;
+    }
+
+    // Try yt-dlp next as it usually gets the best quality video URLs
     const ytDlpScraper = this.scrapers.find((s) => s.name === 'yt-dlp');
     if (ytDlpScraper && ytDlpScraper.canHandle(url)) {
       console.log(`[ScraperRegistry] Using ${ytDlpScraper.name} for ${url} (priority scraper for best quality)`);
@@ -48,7 +67,7 @@ export class ScraperRegistry {
     // Use canHandle method for more accurate matching
     // Prioritize specific scrapers over wildcard scrapers
     const specificScraper = this.scrapers.find(
-      (s) => s.name !== 'yt-dlp' && !s.supportedDomains.includes('*') && s.canHandle(url)
+      (s) => s.name !== 'yt-dlp' && s.name !== 'Stash Built-in' && !s.supportedDomains.includes('*') && s.canHandle(url)
     );
 
     if (specificScraper) {
@@ -56,9 +75,9 @@ export class ScraperRegistry {
       return specificScraper;
     }
 
-    // Fall back to wildcard scrapers (excluding yt-dlp which was already tried)
+    // Fall back to wildcard scrapers (excluding already-tried scrapers)
     const wildcardScraper = this.scrapers.find(
-      (s) => s.name !== 'yt-dlp' && s.supportedDomains.includes('*') && s.canHandle(url)
+      (s) => s.name !== 'yt-dlp' && s.name !== 'Stash Built-in' && s.supportedDomains.includes('*') && s.canHandle(url)
     );
 
     if (wildcardScraper) {
@@ -85,6 +104,7 @@ export class ScraperRegistry {
 
   /**
    * Internal scrape method (without timeout wrapper)
+   * Priority: Stash Built-in -> yt-dlp -> Site-specific -> HTML -> Generic
    */
   private async _scrape(url: string): Promise<IScrapedMetadata> {
     const scraper = this.findScraper(url);
@@ -94,87 +114,61 @@ export class ScraperRegistry {
     console.log(`[ScraperRegistry] Available scrapers:`, this.scrapers.map(s => s.name).join(', '));
     console.log(`[ScraperRegistry] ========================================`);
 
-    // If using yt-dlp, try it but fall back to other scrapers if it fails
-    if (scraper.name === 'yt-dlp') {
+    const triedScrapers = new Set<string>();
+    let lastErrorMsg = 'Unknown error';
+
+    // Helper to try a scraper
+    const tryScraper = async (s: IMetadataScraper): Promise<IScrapedMetadata | null> => {
+      if (triedScrapers.has(s.name)) return null;
+      triedScrapers.add(s.name);
+
       try {
-        console.log('[ScraperRegistry] Attempting yt-dlp extraction...');
-        const result = await scraper.scrape(url);
-        console.log('[ScraperRegistry] yt-dlp extraction successful');
+        console.log(`[ScraperRegistry] Attempting ${s.name} extraction...`);
+        const result = await s.scrape(url);
+        console.log(`[ScraperRegistry] ${s.name} extraction successful`);
         return result;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
-        console.warn('[ScraperRegistry] yt-dlp failed, falling back to HTML scrapers:', errorMsg);
-        console.warn('[ScraperRegistry] yt-dlp error details:', error);
+        lastErrorMsg = errorMsg;
+        console.warn(`[ScraperRegistry] ${s.name} failed: ${errorMsg}`);
+        return null;
+      }
+    };
 
-        // Find the next best scraper (skip yt-dlp)
-        const fallbackScraper = this.scrapers.find(
-          (s) => s.name !== 'yt-dlp' && !s.supportedDomains.includes('*') && s.canHandle(url)
-        );
+    // Try selected scraper first
+    let result = await tryScraper(scraper);
+    if (result) return result;
 
-        if (fallbackScraper) {
-          console.log(`[ScraperRegistry] Trying fallback scraper: ${fallbackScraper.name}`);
-          try {
-            const result = await fallbackScraper.scrape(url);
-            console.log(`[ScraperRegistry] Fallback scraper ${fallbackScraper.name} succeeded`);
-            return result;
-          } catch (fallbackError) {
-            console.error(`[ScraperRegistry] Fallback scraper ${fallbackScraper.name} also failed:`, fallbackError);
-            // Continue to next fallback
-          }
-        }
+    // If Stash scraper failed or wasn't selected, try yt-dlp
+    const ytDlpScraper = this.scrapers.find((s) => s.name === 'yt-dlp');
+    if (ytDlpScraper && ytDlpScraper.canHandle(url)) {
+      result = await tryScraper(ytDlpScraper);
+      if (result) return result;
+    }
 
-        // Try wildcard scrapers
-        const wildcardScraper = this.scrapers.find(
-          (s) => s.name !== 'yt-dlp' && s.supportedDomains.includes('*') && s.canHandle(url)
-        );
-
-        if (wildcardScraper) {
-          console.log(`[ScraperRegistry] Trying wildcard fallback: ${wildcardScraper.name}`);
-          try {
-            const result = await wildcardScraper.scrape(url);
-            console.log(`[ScraperRegistry] Wildcard scraper ${wildcardScraper.name} succeeded`);
-            return result;
-          } catch (wildcardError) {
-            console.error(`[ScraperRegistry] Wildcard scraper ${wildcardScraper.name} also failed:`, wildcardError);
-            // Continue to final fallback
-          }
-        }
-
-        // Last resort: use generic scraper
-        console.log('[ScraperRegistry] Using final fallback: GenericScraper');
-        return await this.fallbackScraper.scrape(url);
+    // Try site-specific scrapers
+    for (const s of this.scrapers) {
+      if (s.name !== 'yt-dlp' && s.name !== 'Stash Built-in' && !s.supportedDomains.includes('*') && s.canHandle(url)) {
+        result = await tryScraper(s);
+        if (result) return result;
       }
     }
 
-    // For non-yt-dlp scrapers, try them directly
-    let lastError: Error | null = null;
-
-    try {
-      console.log(`[ScraperRegistry] Attempting ${scraper.name} extraction...`);
-      const result = await scraper.scrape(url);
-      console.log(`[ScraperRegistry] ${scraper.name} extraction successful`);
-      return result;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      lastError = error instanceof Error ? error : new Error(errorMsg);
-      console.error(`[ScraperRegistry] ${scraper.name} failed:`, errorMsg);
-      console.error('[ScraperRegistry] Full error:', error);
-
-      // If specific scraper fails, try HTML scraper as fallback
-      const htmlScraper = this.scrapers.find(s => s.name === 'HTML Meta Tags');
-      if (htmlScraper && htmlScraper !== scraper) {
-        console.log('[ScraperRegistry] Trying HTML scraper as fallback...');
-        try {
-          return await htmlScraper.scrape(url);
-        } catch (htmlError) {
-          console.error('[ScraperRegistry] HTML scraper also failed:', htmlError);
-          lastError = htmlError instanceof Error ? htmlError : new Error(String(htmlError));
-        }
+    // Try wildcard scrapers (HTML Meta Tags, etc.)
+    for (const s of this.scrapers) {
+      if (s.supportedDomains.includes('*') && s.name !== 'Stash Built-in' && s.canHandle(url)) {
+        result = await tryScraper(s);
+        if (result) return result;
       }
+    }
 
-      // All scrapers failed - throw the last error instead of using fallback
-      console.error('[ScraperRegistry] All scrapers failed, throwing error');
-      throw new Error(`All scrapers failed for ${url}. Last error: ${lastError.message}`);
+    // Last resort: use generic scraper
+    console.log('[ScraperRegistry] All scrapers failed, using GenericScraper as last resort');
+    try {
+      return await this.fallbackScraper.scrape(url);
+    } catch (fallbackError) {
+      console.error('[ScraperRegistry] Even GenericScraper failed:', fallbackError);
+      throw new Error(`All scrapers failed for ${url}. Last error: ${lastErrorMsg}`);
     }
   }
 

@@ -4,16 +4,29 @@ The plugin includes a flexible scraper system that automatically extracts metada
 
 ## Built-in Scrapers
 
-The plugin comes with these scrapers out of the box:
+The plugin comes with these scrapers out of the box (in priority order):
 
-1. **PornhubScraper** - Specialized for pornhub.com
+1. **StashScraper** - Uses Stash's built-in scraping (server-side, NO CORS)
+   - Leverages community scrapers installed in Stash
+   - Runs on server, bypasses browser CORS restrictions
+   - Best option when running in production Stash
+
+2. **YtDlpScraper** - Uses yt-dlp for video URL extraction
+   - Gets highest quality video stream URLs
+   - Requires CORS proxy or server-side yt-dlp
+   - Best for sites that require authentication or complex extraction
+
+3. **PornhubScraper** - Specialized for pornhub.com
    - Extracts: title, performers, tags, description, duration, thumbnail, date
 
-2. **HTMLScraper** - Generic HTML meta tag parser
+4. **YouPornScraper** - Specialized for youporn.com
+   - Extracts: title, performers, tags, description, duration, thumbnail
+
+5. **HTMLScraper** - Generic HTML meta tag parser
    - Works with any site that has Open Graph tags
    - Extracts: title, description, thumbnail from og:tags
 
-3. **GenericScraper** - Basic fallback
+6. **GenericScraper** - Basic fallback
    - Extracts filename from URL
    - Detects content type from extension
 

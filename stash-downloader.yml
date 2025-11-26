@@ -35,6 +35,26 @@ settings:
     displayName: Enable Notifications
     description: Show browser notifications for download completion
     type: BOOLEAN
+
+# Python backend for server-side downloads (bypasses CORS)
+exec:
+  - python
+  - "{pluginDir}/scripts/download.py"
+
+tasks:
+  - name: Download Video
+    description: Download a video from URL using yt-dlp (server-side)
+    defaultArgs:
+      task: download
+  - name: Extract Metadata
+    description: Extract video metadata without downloading
+    defaultArgs:
+      task: extract_metadata
+  - name: Check yt-dlp
+    description: Check if yt-dlp is installed and available
+    defaultArgs:
+      task: check_ytdlp
+
 ui:
   javascript:
     - dist/stash-downloader.js

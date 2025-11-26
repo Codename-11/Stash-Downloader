@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""
+Stash Downloader - Python Backend Script
+
+This script handles server-side downloads using yt-dlp.
+It's invoked via Stash's runPluginTask GraphQL mutation.
+
+Requirements:
+- Python 3.7+
+- yt-dlp (pip install yt-dlp)
+- requests (pip install requests)
+
+Usage:
+  Called automatically by the Stash Downloader plugin via runPluginTask.
+  Not intended to be run directly.
+"""
+
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[stash-downloader] %(levelname)s: %(message)s',
+    handlers=[logging.StreamHandler(sys.stderr)]
+)
+log = logging.getLogger(__name__)
+
+# Read input from stdin (Stash passes JSON)
+def read_input() -> dict:
+    """Read JSON input from stdin."""
+    try:
+        input_data = sys.stdin.read()
+        if input_data:
+            return json.loads(input_data)
+    except json.JSONDecodeError as e:
+        log.error(f"Failed to parse input JSON: {e}")
+    return {}
+
+
+def write_output(result: dict) -> None:
+    """Write JSON output to stdout."""
+    print(json.dumps(result))
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize filename for filesystem."""
+    # Remove or replace invalid characters
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    # Limit length
+    return sanitized[:200] if len(sanitized) > 200 else sanitized
+
+
+def check_ytdlp() -> bool:
+    """Check if yt-dlp is installed and accessible."""
+    try:
+        result = subprocess.run(
+            ['yt-dlp', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        log.info(f"yt-dlp version: {result.stdout.strip()}")
+        return result.returncode == 0
+    except FileNotFoundError:
+        log.error("yt-dlp not found. Please install it: pip install yt-dlp")
+        return False
+    except subprocess.TimeoutExpired:
+        log.error("yt-dlp version check timed out")
+        return False
+
+
+def extract_metadata(url: str) -> Optional[dict]:
+    """Extract metadata using yt-dlp without downloading."""
+    try:
+        result = subprocess.run(
+            [
+                'yt-dlp',
+                '--dump-json',
+                '--no-download',
+                '--no-playlist',
+                url
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0 and result.stdout:
+            return json.loads(result.stdout)
+        else:
+            log.error(f"yt-dlp metadata extraction failed: {result.stderr}")
+            return None
+    except subprocess.TimeoutExpired:
+        log.error("yt-dlp metadata extraction timed out")
+        return None
+    except json.JSONDecodeError as e:
+        log.error(f"Failed to parse yt-dlp output: {e}")
+        return None
+
+
+def download_video(
+    url: str,
+    output_dir: str,
+    filename_template: str = '%(title)s.%(ext)s',
+    quality: str = 'best',
+    progress_callback: Optional[callable] = None
+) -> Optional[str]:
+    """
+    Download video using yt-dlp.
+
+    Args:
+        url: Video URL to download
+        output_dir: Directory to save the video
+        filename_template: yt-dlp output template
+        quality: Quality preference (best, 1080p, 720p, 480p)
+        progress_callback: Optional callback for progress updates
+
+    Returns:
+        Path to downloaded file, or None if failed
+    """
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Build format string based on quality preference
+    format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+    if quality == '1080p':
+        format_str = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best'
+    elif quality == '720p':
+        format_str = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best'
+    elif quality == '480p':
+        format_str = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best'
+
+    output_template = os.path.join(output_dir, filename_template)
+
+    cmd = [
+        'yt-dlp',
+        '-f', format_str,
+        '-o', output_template,
+        '--no-playlist',
+        '--newline',  # For progress parsing
+        '--print', 'after_move:filepath',  # Print final path
+        url
+    ]
+
+    log.info(f"Starting download: {url}")
+    log.info(f"Output directory: {output_dir}")
+    log.info(f"Quality: {quality}")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=3600  # 1 hour timeout
+        )
+
+        if result.returncode == 0:
+            # Last line of stdout should be the file path
+            lines = result.stdout.strip().split('\n')
+            file_path = lines[-1] if lines else None
+
+            if file_path and os.path.exists(file_path):
+                log.info(f"Download complete: {file_path}")
+                return file_path
+            else:
+                # Try to find the file in output directory
+                log.warning("Could not determine output path, searching directory...")
+                files = list(Path(output_dir).glob('*'))
+                if files:
+                    newest = max(files, key=os.path.getmtime)
+                    log.info(f"Found downloaded file: {newest}")
+                    return str(newest)
+
+        log.error(f"yt-dlp download failed: {result.stderr}")
+        return None
+
+    except subprocess.TimeoutExpired:
+        log.error("Download timed out after 1 hour")
+        return None
+    except Exception as e:
+        log.error(f"Download error: {e}")
+        return None
+
+
+def task_download(args: dict) -> dict:
+    """
+    Handle download task.
+
+    Args:
+        url: URL to download
+        output_dir: Directory to save file
+        filename: Optional custom filename
+        quality: Quality preference (best, 1080p, 720p, 480p)
+
+    Returns:
+        Dict with file_path on success, error on failure
+    """
+    url = args.get('url')
+    output_dir = args.get('output_dir', tempfile.gettempdir())
+    filename = args.get('filename')
+    quality = args.get('quality', 'best')
+
+    if not url:
+        return {'error': 'No URL provided'}
+
+    # Check yt-dlp availability
+    if not check_ytdlp():
+        return {'error': 'yt-dlp is not installed or not accessible'}
+
+    # Build filename template
+    if filename:
+        # Sanitize custom filename
+        safe_name = sanitize_filename(filename)
+        template = f'{safe_name}.%(ext)s'
+    else:
+        template = '%(title)s.%(ext)s'
+
+    # Download
+    file_path = download_video(url, output_dir, template, quality)
+
+    if file_path:
+        file_size = os.path.getsize(file_path)
+        return {
+            'file_path': file_path,
+            'file_size': file_size,
+            'success': True
+        }
+    else:
+        return {'error': 'Download failed', 'success': False}
+
+
+def task_extract_metadata(args: dict) -> dict:
+    """
+    Extract metadata without downloading.
+
+    Args:
+        url: URL to extract metadata from
+
+    Returns:
+        Dict with metadata on success, error on failure
+    """
+    url = args.get('url')
+
+    if not url:
+        return {'error': 'No URL provided'}
+
+    if not check_ytdlp():
+        return {'error': 'yt-dlp is not installed'}
+
+    metadata = extract_metadata(url)
+
+    if metadata:
+        return {
+            'success': True,
+            'title': metadata.get('title'),
+            'description': metadata.get('description'),
+            'duration': metadata.get('duration'),
+            'uploader': metadata.get('uploader'),
+            'upload_date': metadata.get('upload_date'),
+            'thumbnail': metadata.get('thumbnail'),
+            'formats': [
+                {
+                    'format_id': f.get('format_id'),
+                    'ext': f.get('ext'),
+                    'height': f.get('height'),
+                    'width': f.get('width'),
+                    'filesize': f.get('filesize'),
+                }
+                for f in metadata.get('formats', [])
+                if f.get('height')
+            ][:5]  # Limit to top 5 formats
+        }
+    else:
+        return {'error': 'Failed to extract metadata', 'success': False}
+
+
+def task_check_ytdlp(args: dict) -> dict:
+    """Check if yt-dlp is available."""
+    available = check_ytdlp()
+    return {
+        'available': available,
+        'success': available
+    }
+
+
+def main():
+    """Main entry point."""
+    input_data = read_input()
+
+    # Get task name and arguments
+    task_name = input_data.get('args', {}).get('task') or input_data.get('task', 'download')
+    args = input_data.get('args', {})
+
+    log.info(f"Running task: {task_name}")
+    log.debug(f"Arguments: {args}")
+
+    # Route to appropriate task handler
+    tasks = {
+        'download': task_download,
+        'extract_metadata': task_extract_metadata,
+        'check_ytdlp': task_check_ytdlp,
+    }
+
+    handler = tasks.get(task_name)
+    if handler:
+        result = handler(args)
+    else:
+        result = {'error': f'Unknown task: {task_name}'}
+
+    write_output(result)
+
+
+if __name__ == '__main__':
+    main()

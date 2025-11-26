@@ -17,6 +17,8 @@ Streamline the process of importing content into Stash by:
 - **API**: GraphQL via Apollo Client (provided by Stash)
 - **State Management**: React Context + Hooks
 - **Plugin API**: Stash PluginApi (window.PluginApi)
+- **Backend**: Python scripts with yt-dlp for server-side downloads
+- **Scraping**: Dual-mode (server-side via Stash GraphQL, client-side with CORS proxy)
 
 ## Plugin Type
 JavaScript Extension / Web-UI Plugin for Stash
@@ -26,14 +28,19 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Support for multiple video/image hosting sites
    - Batch download support
    - Progress tracking and queue management
+   - Server-side downloads via yt-dlp (bypasses CORS)
 
 2. **Metadata Intelligence**
    - Automatic metadata extraction from sources
+   - Server-side scraping via Stash's built-in scrapers (no CORS issues)
+   - Site-specific scrapers (Pornhub, YouPorn, etc.)
    - Smart matching against existing Stash data
    - Manual override and editing capabilities
 
 3. **Stash Integration**
    - GraphQL mutations for scene/image/gallery creation
+   - Server-side scraping: `scrapeSceneURL`, `scrapeGalleryURL`
+   - Plugin task execution: `runPluginTask`, `runPluginOperation`
    - Performer, tag, and studio association
    - File organization according to Stash library structure
 
@@ -42,6 +49,10 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Real-time progress indicators
    - Error handling with actionable messages
    - Preview before finalizing
+
+5. **Dual-Mode Architecture**
+   - **Production (Stash)**: Server-side scraping/downloading, no CORS issues
+   - **Development (test-app)**: Client-side with CORS proxy fallback
 
 ## External Dependencies (NOT Bundled)
 These are provided by Stash via PluginApi and marked as external in build config:
@@ -84,10 +95,12 @@ The plugin must:
 4. NOT use contexts that require providers (ThemeProvider, etc.)
 
 ## Common Integration Issues
-- **React Error #31**: MainNavBar patch receives empty object `{}` - must check and return `[link]`
+- **Navbar items disappear**: Use `React.cloneElement` to append link - don't replace the entire output
+- **React Error #31**: MainNavBar patch receives empty object `{}` - return unchanged to avoid breaking
 - **IntlProvider errors**: Stash's own code may log these - not plugin's fault
 - **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
 - **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
+- **CORS errors**: Use StashScraper (server-side) instead of client-side fetch, or enable CORS proxy
 
 ## Future Enhancement Considerations
 - Plugin architecture supports adding new source scrapers

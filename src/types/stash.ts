@@ -170,3 +170,125 @@ export interface IStudioCreateInput {
   aliases?: string[];
   parent_id?: string;
 }
+
+// Stash Scraping Types (from scrapeSceneURL, scrapeURL, etc.)
+export interface IStashScrapedPerformer {
+  stored_id?: string;
+  name: string;
+  disambiguation?: string;
+  gender?: string;
+  url?: string;
+  twitter?: string;
+  instagram?: string;
+  birthdate?: string;
+  ethnicity?: string;
+  country?: string;
+  eye_color?: string;
+  height?: string;
+  measurements?: string;
+  fake_tits?: string;
+  career_length?: string;
+  tattoos?: string;
+  piercings?: string;
+  aliases?: string;
+  images?: string[];
+  details?: string;
+  death_date?: string;
+  hair_color?: string;
+  weight?: string;
+  remote_site_id?: string;
+}
+
+export interface IStashScrapedTag {
+  stored_id?: string;
+  name: string;
+}
+
+export interface IStashScrapedStudio {
+  stored_id?: string;
+  name: string;
+  url?: string;
+  image?: string;
+  remote_site_id?: string;
+}
+
+export interface IStashScrapedFile {
+  size?: string;
+  duration?: number;
+  video_codec?: string;
+  audio_codec?: string;
+  width?: number;
+  height?: number;
+  framerate?: number;
+  bitrate?: number;
+}
+
+export interface IStashScrapedScene {
+  title?: string;
+  code?: string;
+  details?: string;
+  director?: string;
+  url?: string;
+  urls?: string[];
+  date?: string;
+  image?: string; // Base64 or URL for thumbnail
+  file?: IStashScrapedFile;
+  studio?: IStashScrapedStudio;
+  tags?: IStashScrapedTag[];
+  performers?: IStashScrapedPerformer[];
+  remote_site_id?: string;
+  duration?: number;
+  fingerprints?: Array<{
+    algorithm: string;
+    hash: string;
+    duration: number;
+  }>;
+}
+
+export interface IStashScrapedGallery {
+  title?: string;
+  code?: string;
+  details?: string;
+  photographer?: string;
+  url?: string;
+  urls?: string[];
+  date?: string;
+  studio?: IStashScrapedStudio;
+  tags?: IStashScrapedTag[];
+  performers?: IStashScrapedPerformer[];
+}
+
+export interface IStashScrapedImage {
+  title?: string;
+  code?: string;
+  details?: string;
+  photographer?: string;
+  url?: string;
+  urls?: string[];
+  date?: string;
+  studio?: IStashScrapedStudio;
+  tags?: IStashScrapedTag[];
+  performers?: IStashScrapedPerformer[];
+}
+
+// Scraper info types
+export interface IStashScraper {
+  id: string;
+  name: string;
+  scene?: IStashScraperSpec;
+  gallery?: IStashScraperSpec;
+  performer?: IStashScraperSpec;
+}
+
+export interface IStashScraperSpec {
+  urls?: string[];
+  supported_scrapes: string[];
+}
+
+// Plugin task types
+export interface IPluginTaskResult {
+  data?: Record<string, unknown>;
+  error?: string;
+}
+
+export type ScrapeContentType = 'SCENE' | 'GALLERY' | 'PERFORMER' | 'MOVIE' | 'GROUP';

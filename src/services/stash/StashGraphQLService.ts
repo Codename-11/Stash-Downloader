@@ -15,6 +15,12 @@ import type {
   IPerformerCreateInput,
   ITagCreateInput,
   IStudioCreateInput,
+  IStashScrapedScene,
+  IStashScrapedGallery,
+  IStashScrapedImage,
+  IStashScraper,
+  IPluginTaskResult,
+  ScrapeContentType,
 } from '@/types';
 
 export class StashGraphQLService {
@@ -261,6 +267,302 @@ export class StashGraphQLService {
     }
 
     return await this.createStudio({ name });
+  }
+
+  // ============================================
+  // Scraping Methods (Server-side, no CORS)
+  // ============================================
+
+  /**
+   * Scrape a scene from URL using Stash's built-in scrapers
+   * This runs server-side, bypassing CORS restrictions
+   */
+  async scrapeSceneURL(url: string): Promise<IStashScrapedScene | null> {
+    const query = `
+      query ScrapeSceneURL($url: String!) {
+        scrapeSceneURL(url: $url) {
+          title
+          code
+          details
+          director
+          url
+          urls
+          date
+          image
+          studio {
+            stored_id
+            name
+            url
+            image
+            remote_site_id
+          }
+          tags {
+            stored_id
+            name
+          }
+          performers {
+            stored_id
+            name
+            disambiguation
+            gender
+            url
+            images
+            details
+            remote_site_id
+          }
+          duration
+          fingerprints {
+            algorithm
+            hash
+            duration
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gql.query(query, { url });
+      return result.data?.scrapeSceneURL || null;
+    } catch (error) {
+      console.error('[StashGraphQL] scrapeSceneURL failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape a gallery from URL using Stash's built-in scrapers
+   */
+  async scrapeGalleryURL(url: string): Promise<IStashScrapedGallery | null> {
+    const query = `
+      query ScrapeGalleryURL($url: String!) {
+        scrapeGalleryURL(url: $url) {
+          title
+          code
+          details
+          photographer
+          url
+          urls
+          date
+          studio {
+            stored_id
+            name
+            url
+            image
+          }
+          tags {
+            stored_id
+            name
+          }
+          performers {
+            stored_id
+            name
+            gender
+            url
+            images
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gql.query(query, { url });
+      return result.data?.scrapeGalleryURL || null;
+    } catch (error) {
+      console.error('[StashGraphQL] scrapeGalleryURL failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape an image from URL using Stash's built-in scrapers
+   */
+  async scrapeImageURL(url: string): Promise<IStashScrapedImage | null> {
+    const query = `
+      query ScrapeImageURL($url: String!) {
+        scrapeImageURL(url: $url) {
+          title
+          code
+          details
+          photographer
+          url
+          urls
+          date
+          studio {
+            stored_id
+            name
+            url
+            image
+          }
+          tags {
+            stored_id
+            name
+          }
+          performers {
+            stored_id
+            name
+            gender
+            url
+            images
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gql.query(query, { url });
+      return result.data?.scrapeImageURL || null;
+    } catch (error) {
+      console.error('[StashGraphQL] scrapeImageURL failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * List available scrapers for a content type
+   */
+  async listScrapers(types: ScrapeContentType[]): Promise<IStashScraper[]> {
+    const query = `
+      query ListScrapers($types: [ScrapeContentType!]!) {
+        listScrapers(types: $types) {
+          id
+          name
+          scene {
+            urls
+            supported_scrapes
+          }
+          gallery {
+            urls
+            supported_scrapes
+          }
+          performer {
+            urls
+            supported_scrapes
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gql.query(query, { types });
+      return result.data?.listScrapers || [];
+    } catch (error) {
+      console.error('[StashGraphQL] listScrapers failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if Stash has a scraper that can handle a URL
+   */
+  async canScrapeURL(url: string, contentType: ScrapeContentType = 'SCENE'): Promise<boolean> {
+    try {
+      const scrapers = await this.listScrapers([contentType]);
+      const urlHost = new URL(url).hostname.replace('www.', '');
+
+      for (const scraper of scrapers) {
+        const spec = contentType === 'SCENE' ? scraper.scene :
+                     contentType === 'GALLERY' ? scraper.gallery :
+                     scraper.performer;
+
+        if (spec?.urls) {
+          for (const scraperUrl of spec.urls) {
+            // Check if scraper URL pattern matches
+            if (scraperUrl.includes(urlHost) || urlHost.includes(scraperUrl.replace('www.', ''))) {
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('[StashGraphQL] canScrapeURL failed:', error);
+      return false;
+    }
+  }
+
+  // ============================================
+  // Plugin Task Methods
+  // ============================================
+
+  /**
+   * Run a plugin task (queued execution)
+   * Returns job ID for tracking
+   */
+  async runPluginTask(
+    pluginId: string,
+    taskName: string,
+    args?: Record<string, unknown>
+  ): Promise<string | null> {
+    const mutation = `
+      mutation RunPluginTask($plugin_id: ID!, $task_name: String, $args_map: Map) {
+        runPluginTask(plugin_id: $plugin_id, task_name: $task_name, args_map: $args_map)
+      }
+    `;
+
+    try {
+      const result = await this.gql.mutate(mutation, {
+        plugin_id: pluginId,
+        task_name: taskName,
+        args_map: args || {},
+      });
+      return result.data?.runPluginTask || null;
+    } catch (error) {
+      console.error('[StashGraphQL] runPluginTask failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Run a plugin operation (immediate execution, no queue)
+   * Returns the result directly
+   */
+  async runPluginOperation(
+    pluginId: string,
+    args?: Record<string, unknown>
+  ): Promise<IPluginTaskResult | null> {
+    const mutation = `
+      mutation RunPluginOperation($plugin_id: ID!, $args: Map) {
+        runPluginOperation(plugin_id: $plugin_id, args: $args)
+      }
+    `;
+
+    try {
+      const result = await this.gql.mutate(mutation, {
+        plugin_id: pluginId,
+        args: args || {},
+      });
+      return result.data?.runPluginOperation || null;
+    } catch (error) {
+      console.error('[StashGraphQL] runPluginOperation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Stop a running job
+   */
+  async stopJob(jobId: string): Promise<boolean> {
+    const mutation = `
+      mutation StopJob($job_id: ID!) {
+        stopJob(job_id: $job_id)
+      }
+    `;
+
+    try {
+      const result = await this.gql.mutate(mutation, { job_id: jobId });
+      return result.data?.stopJob || false;
+    } catch (error) {
+      console.error('[StashGraphQL] stopJob failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if we're running in Stash (vs test-app)
+   */
+  isStashEnvironment(): boolean {
+    return !!(window.PluginApi?.GQL && !(window as any).__TEST_APP__);
   }
 }
 

@@ -1,16 +1,46 @@
 /**
  * DownloadService - Handles file downloads
+ *
+ * Priority order:
+ * 1. Server-side download via Stash plugin task (no CORS, requires yt-dlp on server)
+ * 2. Direct URL download (if videoUrl/imageUrl provided by scraper)
+ * 3. yt-dlp via CORS proxy (test-app or fallback)
+ * 4. Direct fetch with CORS proxy
  */
 
 import type { IDownloadProgress } from '@/types';
 import { fetchWithTimeout } from '@/utils';
+import { getStashService } from '@/services/stash/StashGraphQLService';
+import { PLUGIN_ID } from '@/constants';
 
 export interface IDownloadOptions {
   onProgress?: (progress: IDownloadProgress) => void;
   signal?: AbortSignal;
+  outputDir?: string;
+  filename?: string;
+  quality?: 'best' | '1080p' | '720p' | '480p';
+}
+
+export interface IServerDownloadResult {
+  success: boolean;
+  file_path?: string;
+  file_size?: number;
+  error?: string;
 }
 
 export class DownloadService {
+  /**
+   * Check if we're running in Stash environment (vs test-app)
+   */
+  isStashEnvironment(): boolean {
+    try {
+      const stashService = getStashService();
+      return stashService.isStashEnvironment();
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Check if CORS proxy is enabled (for test environment)
    */
@@ -34,6 +64,72 @@ export class DownloadService {
     if (!this.isCorsProxyEnabled()) return url;
     const proxyUrl = this.getCorsProxyUrl();
     return `${proxyUrl}/${url}`;
+  }
+
+  /**
+   * Download using server-side plugin task (no CORS issues)
+   * This uses Stash's runPluginTask to execute the Python backend
+   */
+  async downloadServerSide(
+    url: string,
+    options: IDownloadOptions = {}
+  ): Promise<IServerDownloadResult> {
+    console.log('[DownloadService] Attempting server-side download via plugin task');
+
+    try {
+      const stashService = getStashService();
+
+      if (!stashService.isStashEnvironment()) {
+        return { success: false, error: 'Not in Stash environment' };
+      }
+
+      // Run the download task
+      const jobId = await stashService.runPluginTask(PLUGIN_ID, 'Download Video', {
+        task: 'download',
+        url: url,
+        output_dir: options.outputDir,
+        filename: options.filename,
+        quality: options.quality || 'best',
+      });
+
+      if (!jobId) {
+        return { success: false, error: 'Failed to start download task' };
+      }
+
+      console.log('[DownloadService] Server-side download task started, job ID:', jobId);
+
+      // Note: For now, we return the job ID and let the caller handle polling
+      // In the future, we could implement job status polling here
+      return {
+        success: true,
+        file_path: `Job started: ${jobId}`,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[DownloadService] Server-side download failed:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Check if yt-dlp is available on the server
+   */
+  async checkServerYtDlp(): Promise<boolean> {
+    try {
+      const stashService = getStashService();
+
+      if (!stashService.isStashEnvironment()) {
+        return false;
+      }
+
+      const result = await stashService.runPluginOperation(PLUGIN_ID, {
+        task: 'check_ytdlp',
+      });
+
+      return result?.data?.available === true;
+    } catch {
+      return false;
+    }
   }
 
   /**

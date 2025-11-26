@@ -35,7 +35,7 @@ window.PluginApi.register.route('/downloader', (props) => {
   return React.createElement(DownloaderMain, props);
 });
 
-// Patch navbar - MUST handle edge cases
+// Patch navbar - use React.cloneElement to preserve existing children
 window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
   const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
   if (!NavLink) return output;
@@ -43,17 +43,30 @@ window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
   const link = React.createElement(NavLink, {
     to: '/downloader',
     className: 'nav-link',
-    key: 'downloader-nav'
+    key: 'stash-downloader-nav-link'
   }, 'Downloader');
 
-  // CRITICAL: Handle empty object case (causes React Error #31)
+  // If output is a React element with children, clone it and append our link
+  if (output && typeof output === 'object' && output.props !== undefined) {
+    const existingChildren = React.Children.toArray(output.props.children || []);
+    const alreadyAdded = existingChildren.some(
+      (child) => child?.key === 'stash-downloader-nav-link'
+    );
+    if (alreadyAdded) return output;
+    return React.cloneElement(output, {}, ...existingChildren, link);
+  }
+
+  // Handle array output (rare)
   if (Array.isArray(output)) {
     return [...output, link];
   }
-  if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
-    return [link];  // Return array, not empty object
+
+  // Return unchanged if empty/null to avoid breaking navbar
+  if (output == null || Object.keys(output).length === 0) {
+    console.warn('MainNavBar output was empty, cannot add link safely');
+    return output;
   }
-  return [output, link];
+  return output;
 });
 ```
 
@@ -65,20 +78,34 @@ All external interactions go through dedicated services:
 **StashGraphQLService**
 - Wraps PluginApi.GQL and PluginApi.StashService
 - Provides typed methods for all Stash operations
+- Server-side scraping: `scrapeSceneURL()`, `scrapeGalleryURL()`, `scrapeImageURL()`
+- Plugin task execution: `runPluginTask()`, `runPluginOperation()`
+- Job management: `stopJob()`
+- Environment detection: `isStashEnvironment()`
 - Handles authentication and error mapping
-- Centralizes retry logic and error handling
 
 **DownloadService**
 - Manages HTTP requests to external sources
 - Implements queue with concurrency limits
 - Progress tracking and cancellation support
+- Server-side downloads via `downloadServerSide()` (uses Python backend)
+- yt-dlp availability check via `checkServerYtDlp()`
 - Temporary file handling
 
-**MetadataService**
-- Pluggable scraper architecture
-- Each source has dedicated scraper module
-- Common metadata mapping interface
-- Extensible via configuration
+**MetadataService (ScraperRegistry)**
+- Pluggable scraper architecture with priority ordering
+- **StashScraper**: Server-side via Stash GraphQL (NO CORS, highest priority)
+- **YtDlpScraper**: yt-dlp metadata extraction
+- **Site-specific**: PornhubScraper, YouPornScraper
+- **HTMLScraper**: Generic Open Graph tag parser
+- **GenericScraper**: Fallback for basic URL parsing
+- Common `IScrapedMetadata` interface
+
+**Python Backend (scripts/download.py)**
+- Server-side downloads using yt-dlp
+- Quality selection (best, 1080p, 720p, 480p)
+- Metadata extraction without downloading
+- Invoked via Stash's `runPluginTask` mutation
 
 ### Data Flow
 ```
@@ -250,13 +277,30 @@ interface IMetadataScraper {
   name: string;
   supportedDomains: string[];
   canHandle(url: string): boolean;
-  scrape(url: string): Promise<ScrapedMetadata>;
+  scrape(url: string): Promise<IScrapedMetadata>;
 }
 
-// New scrapers register themselves
-ScraperRegistry.register(new TwitterScraper());
-ScraperRegistry.register(new RedditScraper());
+// Scrapers registered in priority order (first match wins)
+class ScraperRegistry {
+  constructor() {
+    this.register(new StashScraper());    // Server-side, no CORS
+    this.register(new YtDlpScraper());    // Video URL extraction
+    this.register(new PornhubScraper());  // Site-specific
+    this.register(new YouPornScraper());
+    this.register(new HTMLScraper());     // Generic OG tags
+    // GenericScraper is fallback (always last)
+  }
+}
 ```
+
+### Scraper Fallback Chain
+1. **StashScraper** - Tries Stash's built-in scrapers (server-side)
+2. **YtDlpScraper** - For sites supported by yt-dlp
+3. **Site-Specific** - Custom scrapers for known sites
+4. **HTMLScraper** - Parses Open Graph meta tags
+5. **GenericScraper** - Extracts filename from URL (last resort)
+
+If a scraper throws an error, the registry tries the next one.
 
 ### Settings-Driven Configuration
 - Scrapers can be enabled/disabled via settings
@@ -276,10 +320,12 @@ ScraperRegistry.register(new RedditScraper());
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| React Error #31 | Returning `{}` from patch | Check for empty object, return `[link]` |
+| Navbar items disappear | Replacing output instead of appending | Use `React.cloneElement` to preserve children |
+| React Error #31 | Returning `{}` from patch | Check for empty object, return unchanged |
 | IntlProvider error | Stash internal code | Ignore - not plugin's fault |
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
+| CORS errors (scraping) | Browser security restrictions | Use `StashScraper` (server-side) or CORS proxy |
 
 ## Performance Optimizations
 
@@ -338,8 +384,27 @@ description: Download and import content with metadata
 version: 0.1.0
 url: https://github.com/user/repo
 
+# Python backend for server-side downloads
+exec:
+  - python
+  - "{pluginDir}/scripts/download.py"
+
+# Plugin tasks (invoked via runPluginTask mutation)
+tasks:
+  - name: Download Video
+    description: Download video using yt-dlp
+    defaultArgs:
+      task: download
+  - name: Extract Metadata
+    description: Extract metadata without downloading
+    defaultArgs:
+      task: extract_metadata
+  - name: Check yt-dlp
+    description: Verify yt-dlp is installed
+    defaultArgs:
+      task: check_ytdlp
+
 # Settings - only STRING, NUMBER, BOOLEAN supported
-# NO default values, NO enum fields
 settings:
   downloadPath:
     displayName: Download Path
@@ -358,6 +423,8 @@ interface: js  # Must be "js" for JavaScript plugins
 - `enum` field NOT supported (put options in description)
 - Must use `ui.javascript` not root-level `js`
 - `interface: js` required for JS plugins
+- `exec` defines the Python script for server-side tasks
+- `tasks` defines available plugin operations
 
 ### Version Management
 - Single source of truth in `package.json`
@@ -476,7 +543,9 @@ permissions:
 
 ## Navigation Integration
 
-### Adding Nav Link
+### Adding Nav Link (React.cloneElement Pattern)
+The MainNavBar.MenuItems patch receives a React element, not an array. Use `React.cloneElement` to append our link to the existing children without losing default menu items:
+
 ```typescript
 window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
   const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
@@ -485,13 +554,25 @@ window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
   const link = React.createElement(NavLink, {
     to: '/downloader',
     className: 'nav-link',
-    key: 'downloader-nav'
+    key: 'stash-downloader-nav-link'
   }, 'Downloader');
 
-  // CRITICAL: Handle empty object (causes React Error #31)
+  // Clone the React element and append our link to its children
+  if (output && typeof output === 'object' && output.props !== undefined) {
+    const existingChildren = React.Children.toArray(output.props.children || []);
+
+    // Prevent duplicate additions
+    const alreadyAdded = existingChildren.some(
+      (child) => child?.key === 'stash-downloader-nav-link'
+    );
+    if (alreadyAdded) return output;
+
+    return React.cloneElement(output, {}, ...existingChildren, link);
+  }
+
+  // Fallback for edge cases
   if (Array.isArray(output)) return [...output, link];
-  if (!output || Object.keys(output).length === 0) return [link];
-  return [output, link];
+  return output;
 });
 ```
 

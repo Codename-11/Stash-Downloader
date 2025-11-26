@@ -1,0 +1,130 @@
+/**
+ * StashScraper - Uses Stash's built-in scraping via GraphQL
+ *
+ * This scraper delegates to Stash's server-side scraping, which:
+ * - Bypasses CORS restrictions (requests made from server)
+ * - Leverages community scrapers already installed in Stash
+ * - Provides consistent metadata format
+ *
+ * Falls back to null if Stash scraping fails, allowing other scrapers to try.
+ */
+
+import type { IMetadataScraper, IScrapedMetadata, IStashScrapedScene } from '@/types';
+import { ContentType } from '@/types';
+import { getStashService } from '@/services/stash/StashGraphQLService';
+
+export class StashScraper implements IMetadataScraper {
+  name = 'Stash Built-in';
+  supportedDomains = ['*']; // Can potentially handle any URL if Stash has a scraper
+
+  /**
+   * Check if this scraper can handle the URL
+   * Always returns true - we try Stash first and fall back if it fails
+   */
+  canHandle(_url: string): boolean {
+    // Only works in Stash environment, not test-app
+    try {
+      const stashService = getStashService();
+      return stashService.isStashEnvironment();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Scrape metadata using Stash's built-in scrapers
+   */
+  async scrape(url: string): Promise<IScrapedMetadata> {
+    console.log(`[StashScraper] Attempting Stash built-in scrape for: ${url}`);
+
+    try {
+      const stashService = getStashService();
+
+      // Check if we're in Stash environment
+      if (!stashService.isStashEnvironment()) {
+        console.log('[StashScraper] Not in Stash environment, skipping');
+        throw new Error('Stash scraping only available in Stash environment');
+      }
+
+      // Try scene scraping first (most common use case)
+      const scrapedScene = await stashService.scrapeSceneURL(url);
+
+      if (scrapedScene && this.hasUsefulData(scrapedScene)) {
+        console.log('[StashScraper] Successfully scraped via Stash:', scrapedScene.title);
+        return this.mapSceneToMetadata(scrapedScene, url);
+      }
+
+      // If no scene data, try gallery scraping
+      const scrapedGallery = await stashService.scrapeGalleryURL(url);
+
+      if (scrapedGallery && scrapedGallery.title) {
+        console.log('[StashScraper] Successfully scraped gallery via Stash:', scrapedGallery.title);
+        return {
+          title: scrapedGallery.title,
+          description: scrapedGallery.details,
+          date: scrapedGallery.date,
+          url: scrapedGallery.url || url,
+          performers: scrapedGallery.performers?.map((p) => p.name) || [],
+          tags: scrapedGallery.tags?.map((t) => t.name) || [],
+          studio: scrapedGallery.studio?.name,
+          contentType: ContentType.Gallery,
+        };
+      }
+
+      // No data from Stash scrapers
+      console.log('[StashScraper] No data returned from Stash scrapers');
+      throw new Error('Stash scrapers returned no data for this URL');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn(`[StashScraper] Stash scraping failed: ${errorMsg}`);
+      throw error; // Re-throw to let ScraperRegistry try next scraper
+    }
+  }
+
+  /**
+   * Check if scraped data has useful information
+   */
+  private hasUsefulData(scene: IStashScrapedScene): boolean {
+    return !!(
+      scene.title ||
+      scene.details ||
+      scene.date ||
+      (scene.performers && scene.performers.length > 0) ||
+      (scene.tags && scene.tags.length > 0) ||
+      scene.studio
+    );
+  }
+
+  /**
+   * Map Stash's ScrapedScene to our IScrapedMetadata format
+   */
+  private mapSceneToMetadata(scene: IStashScrapedScene, originalUrl: string): IScrapedMetadata {
+    // Determine quality from file info if available
+    let quality: string | undefined;
+    if (scene.file?.height) {
+      if (scene.file.height >= 2160) quality = '4K';
+      else if (scene.file.height >= 1080) quality = '1080p';
+      else if (scene.file.height >= 720) quality = '720p';
+      else if (scene.file.height >= 480) quality = '480p';
+      else quality = `${scene.file.height}p`;
+    }
+
+    return {
+      title: scene.title || undefined,
+      description: scene.details || undefined,
+      date: scene.date || undefined,
+      url: scene.url || originalUrl,
+      // Note: Stash scrapers typically don't return the actual video URL
+      // That would need to come from yt-dlp or the Python backend
+      videoUrl: undefined,
+      imageUrl: undefined,
+      thumbnailUrl: scene.image || undefined,
+      performers: scene.performers?.map((p) => p.name) || [],
+      tags: scene.tags?.map((t) => t.name) || [],
+      studio: scene.studio?.name,
+      duration: scene.duration || scene.file?.duration,
+      quality,
+      contentType: ContentType.Video,
+    };
+  }
+}
