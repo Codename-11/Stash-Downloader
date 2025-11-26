@@ -76,22 +76,61 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
       }
       
       // Try to get settings from Stash's PluginApi (if available)
+      // Based on bulkImageScrape plugin pattern: PluginApi.getPluginSettings()
       try {
         if (typeof window !== 'undefined' && (window as any).PluginApi) {
           const pluginApi = (window as any).PluginApi;
+          
+          // Method 1: PluginApi.getPluginSettings(pluginId) - may be async
           if (pluginApi.getPluginSettings) {
-            const apiSettings = pluginApi.getPluginSettings(PLUGIN_ID);
-            if (apiSettings) {
-              console.log('[Settings] Found settings from PluginApi:', apiSettings);
-              mergedSettings = { ...mergedSettings, ...apiSettings };
+            try {
+              const apiSettings = await Promise.resolve(pluginApi.getPluginSettings(PLUGIN_ID));
+              if (apiSettings && typeof apiSettings === 'object') {
+                console.log('[Settings] Found settings from PluginApi.getPluginSettings():', apiSettings);
+                mergedSettings = { ...mergedSettings, ...apiSettings };
+              }
+            } catch (apiError) {
+              console.warn('[Settings] PluginApi.getPluginSettings() failed:', apiError);
             }
-          } else if (pluginApi.settings) {
+          }
+          
+          // Method 2: PluginApi.settings (direct property)
+          if (pluginApi.settings && typeof pluginApi.settings === 'object') {
             console.log('[Settings] Found settings from PluginApi.settings:', pluginApi.settings);
             mergedSettings = { ...mergedSettings, ...pluginApi.settings };
           }
+          
+          // Method 3: Check if settings are passed via GQL query helper
+          if (pluginApi.GQL && pluginApi.GQL.query) {
+            try {
+              const gqlSettings = await pluginApi.GQL.query(`
+                query {
+                  plugin(id: "${PLUGIN_ID}") {
+                    settings {
+                      name
+                      value
+                    }
+                  }
+                }
+              `);
+              if (gqlSettings?.data?.plugin?.settings) {
+                const settingsObj: Record<string, any> = {};
+                gqlSettings.data.plugin.settings.forEach((s: any) => {
+                  settingsObj[s.name] = s.value;
+                });
+                if (Object.keys(settingsObj).length > 0) {
+                  console.log('[Settings] Found settings via PluginApi.GQL.query():', settingsObj);
+                  mergedSettings = { ...mergedSettings, ...settingsObj };
+                }
+              }
+            } catch (gqlError) {
+              // GQL query might not be supported or might fail
+              console.warn('[Settings] PluginApi.GQL.query() failed:', gqlError);
+            }
+          }
         }
       } catch (error) {
-        // PluginApi might not have settings method
+        console.warn('[Settings] Error accessing PluginApi:', error);
       }
       
       // Also check if Stash stores settings in a different localStorage key

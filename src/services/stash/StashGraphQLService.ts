@@ -73,6 +73,8 @@ export class StashGraphQLService {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[StashGraphQL] HTTP error response:', errorText);
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
     }
 
@@ -89,12 +91,20 @@ export class StashGraphQLService {
           message: error.message,
           path: error.path,
           extensions: error.extensions,
+          locations: error.locations,
         });
       });
+      
+      // Log the query that failed for debugging
+      console.error('[StashGraphQL] Failed query:', query.substring(0, 500));
+      if (variables) {
+        console.error('[StashGraphQL] Query variables:', JSON.stringify(variables, null, 2));
+      }
     }
     
-    // Log full GraphQL response for debugging
-    console.log('[StashGraphQL] Full GraphQL response:', JSON.stringify(result, null, 2));
+    // Only log full response in debug mode or for specific queries
+    // Log full GraphQL response for debugging (commented out to reduce noise)
+    // console.log('[StashGraphQL] Full GraphQL response:', JSON.stringify(result, null, 2));
 
     return result;
   }
@@ -767,8 +777,9 @@ export class StashGraphQLService {
         console.log('[StashGraphQL] Found settings via findPlugin() query:', settings);
         return settings;
       }
-    } catch (error) {
-      console.warn('[StashGraphQL] findPlugin() query failed, trying alternatives:', error);
+    } catch (error: any) {
+      const errorMsg = error?.message || String(error);
+      console.warn('[StashGraphQL] findPlugin() query failed:', errorMsg);
     }
 
     // Try method 3: configuration.plugins array
@@ -810,11 +821,14 @@ export class StashGraphQLService {
           return settings;
         }
       }
-    } catch (error) {
-      console.warn('[StashGraphQL] configuration.plugins query failed:', error);
+    } catch (error: any) {
+      const errorMsg = error?.message || String(error);
+      console.warn('[StashGraphQL] configuration.plugins query failed:', errorMsg);
     }
 
     console.warn('[StashGraphQL] All plugin settings queries failed - settings may not be accessible via GraphQL');
+    console.warn('[StashGraphQL] Note: Plugin settings may need to be read from localStorage or passed as task arguments');
+    console.warn('[StashGraphQL] Consider syncing settings from Stash Settings UI to localStorage manually');
     return null;
   }
 
