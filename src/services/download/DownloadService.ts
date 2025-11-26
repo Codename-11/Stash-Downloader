@@ -196,21 +196,14 @@ export class DownloadService {
   }
 
   /**
-   * Check if we should use yt-dlp for download
-   * Use yt-dlp for sites that typically require it (adult sites, streaming sites)
-   * Never use yt-dlp for direct image URLs
+   * Check if URL is from a domain that requires yt-dlp (domain-based check only)
+   * This is used for server-side downloads in Stash (doesn't check CORS proxy)
    */
-  private shouldUseYtDlp(url: string): boolean {
-    if (typeof window === 'undefined') return false;
-    
-    const corsEnabled = this.isCorsProxyEnabled();
-    if (!corsEnabled) return false;
-
+  private requiresYtDlpDomain(url: string): boolean {
     // Never use yt-dlp for direct image URLs
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
     const urlLower = url.toLowerCase();
     if (imageExtensions.some(ext => urlLower.includes(ext) && (urlLower.endsWith(ext) || urlLower.includes(ext + '?')))) {
-      console.log('[DownloadService] Skipping yt-dlp for direct image URL:', url);
       return false;
     }
 
@@ -235,6 +228,21 @@ export class DownloadService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Check if we should use yt-dlp for download (client-side check, requires CORS proxy)
+   * Use yt-dlp for sites that typically require it (adult sites, streaming sites)
+   * Never use yt-dlp for direct image URLs
+   */
+  private shouldUseYtDlp(url: string): boolean {
+    if (typeof window === 'undefined') return false;
+    
+    const corsEnabled = this.isCorsProxyEnabled();
+    if (!corsEnabled) return false;
+
+    // Use domain-based check
+    return this.requiresYtDlpDomain(url);
   }
 
   /**
@@ -493,7 +501,8 @@ export class DownloadService {
 
     // PRIORITY 3: In Stash environment, use server-side download for videos that need yt-dlp
     // This bypasses CORS issues and uses server's yt-dlp
-    if (this.isStashEnvironment() && this.shouldUseYtDlp(url)) {
+    // Use requiresYtDlpDomain (not shouldUseYtDlp) because server-side doesn't need CORS proxy
+    if (this.isStashEnvironment() && this.requiresYtDlpDomain(url)) {
       console.log('[DownloadService] Stash environment: using server-side download for yt-dlp');
       try {
         const serverResult = await this.downloadServerSide(url, options);
