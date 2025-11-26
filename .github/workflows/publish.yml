@@ -37,19 +37,19 @@ jobs:
       - name: Create plugin package
         run: |
           mkdir -p _site
-          mkdir -p plugins/stash-downloader
-          cp -r dist plugins/stash-downloader/
-          cp stash-downloader.yml plugins/stash-downloader/
-          cp README.md plugins/stash-downloader/
-          cp LICENSE plugins/stash-downloader/
+          mkdir -p _package
 
-          # Create ZIP file
-          cd plugins
-          zip -r ../stash-downloader.zip stash-downloader
+          # Copy plugin files to package directory (flat structure)
+          cp -r dist _package/
+          cp -r scripts _package/
+          cp stash-downloader.yml _package/
+          cp README.md _package/
+          cp LICENSE _package/
+
+          # Create ZIP file (contents at root, not nested in folder)
+          cd _package
+          zip -r ../stash-downloader.zip .
           cd ..
-
-          # Calculate SHA256
-          SHA256=$(sha256sum stash-downloader.zip | awk '{print $1}')
 
           # Move ZIP to _site directory
           mv stash-downloader.zip _site/
