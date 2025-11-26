@@ -210,6 +210,8 @@ export const createMockPluginApi = () => {
 export function installMockPluginApi() {
   const mockApi = createMockPluginApi();
   (window as any).PluginApi = mockApi;
-  console.log('[Mock] PluginApi installed');
+  // Mark as test app so isStashEnvironment() returns false
+  (window as any).__TEST_APP__ = true;
+  console.log('[Mock] PluginApi installed (test mode)');
   return mockApi;
 }
