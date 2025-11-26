@@ -70,7 +70,3 @@ ui:
 # interface: raw allows Python exec to work as subprocess
 # interface: js is for UI plugins but may break Python exec
 interface: raw
-# Serve results directory as static assets
-# Maps /plugin/stash-downloader/assets/results/ to {pluginDir}/results/
-assets:
-  results: results

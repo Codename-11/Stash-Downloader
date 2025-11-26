@@ -118,20 +118,12 @@ export class YtDlpScraper implements IMetadataScraper {
       });
       console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
 
-      // Fallback to HTTP fetch if runPluginOperation didn't work
+      // Fallback: If runPluginOperation didn't work, log the error
+      // (HTTP fetch via assets not available without assets field in manifest)
       if (!readResult || readResult.error) {
-        console.warn('[YtDlpScraper] runPluginOperation failed, trying HTTP fetch...');
-        // Use /assets/results/ path (configured in manifest assets field)
-        const resultUrl = `/plugin/${PLUGIN_ID}/assets/results/${resultId}.json`;
-        console.log('[YtDlpScraper] Trying to fetch result from:', resultUrl);
-
-        const response = await fetch(resultUrl);
-        if (response.ok) {
-          readResult = await response.json();
-          console.log('[YtDlpScraper] Got result via HTTP:', JSON.stringify(readResult));
-        } else {
-          console.warn('[YtDlpScraper] HTTP fetch also failed, status:', response.status);
-        }
+        console.warn('[YtDlpScraper] runPluginOperation failed or returned error:', readResult?.error);
+        // Note: HTTP fetch fallback would require assets field in manifest
+        // For now, rely on runPluginOperation working correctly with mode key
       }
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);
