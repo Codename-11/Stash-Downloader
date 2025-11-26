@@ -36,53 +36,54 @@ function PluginWrapper(props: any) {
 }
 
 /**
- * Add navigation link using MutationObserver (community plugin pattern)
- * This watches for the navbar to appear and injects our link via DOM
+ * Add navigation button using MutationObserver (community plugin pattern)
+ * This watches for the navbar-buttons to appear and injects our button via DOM
+ * Reference: https://github.com/Serechops/Serechops-Stash/blob/main/plugins/stashUIPluginExample
  */
-function addNavLinkViaMutationObserver() {
-  const NAV_LINK_ID = 'stash-downloader-nav-link';
+function addNavButtonViaMutationObserver() {
+  const NAV_BUTTON_ID = 'stash-downloader-nav-button';
 
-  function injectNavLink() {
+  function injectNavButton() {
     // Check if already added
-    if (document.getElementById(NAV_LINK_ID)) {
+    if (document.getElementById(NAV_BUTTON_ID)) {
       return true;
     }
 
-    // Find the navbar menu items container
-    // Stash uses .navbar-nav for the main menu
-    const navbarNav = document.querySelector('.navbar-nav.me-auto');
-    if (!navbarNav) {
+    // Find the navbar buttons container (used by community plugins)
+    const navbarButtons = document.querySelector('.navbar-buttons');
+    if (!navbarButtons) {
       return false;
     }
 
-    // Create our nav link element
-    const navItem = document.createElement('a');
-    navItem.id = NAV_LINK_ID;
-    navItem.className = 'nav-link';
-    navItem.href = `#${ROUTES.MAIN}`;
-    navItem.textContent = 'Downloader';
+    // Create our nav button element
+    const navButton = document.createElement('button');
+    navButton.id = NAV_BUTTON_ID;
+    navButton.className = 'btn nav-link';
+    navButton.type = 'button';
+    navButton.textContent = 'Downloader';
+    navButton.title = 'Open Stash Downloader';
 
-    // Handle click to use React Router navigation via history API
-    navItem.addEventListener('click', (e) => {
+    // Handle click to navigate via React Router
+    navButton.addEventListener('click', (e) => {
       e.preventDefault();
       window.history.pushState({}, '', ROUTES.MAIN);
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    // Append to navbar
-    navbarNav.appendChild(navItem);
-    console.log(`[${PLUGIN_ID}] Navigation link added to navbar via DOM`);
+    // Insert at the beginning of navbar-buttons
+    navbarButtons.insertBefore(navButton, navbarButtons.firstChild);
+    console.log(`[${PLUGIN_ID}] Navigation button added to navbar via DOM`);
     return true;
   }
 
   // Try to inject immediately
-  if (injectNavLink()) {
+  if (injectNavButton()) {
     return;
   }
 
   // Use MutationObserver to wait for navbar to appear
   const observer = new MutationObserver((_mutations, obs) => {
-    if (injectNavLink()) {
+    if (injectNavButton()) {
       obs.disconnect();
     }
   });
@@ -113,9 +114,9 @@ function initializePlugin() {
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
-    // Add navigation link using MutationObserver (community plugin pattern)
-    // This avoids issues with patch.after receiving empty/null output
-    addNavLinkViaMutationObserver();
+    // Add navigation button using MutationObserver (community plugin pattern)
+    // Uses .navbar-buttons selector like other community plugins
+    addNavButtonViaMutationObserver();
 
   } catch (error) {
     console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);
