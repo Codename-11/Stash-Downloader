@@ -91,7 +91,9 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 - Server-side downloads using yt-dlp
 - Quality selection (best, 1080p, 720p, 480p)
 - Metadata extraction without downloading
-- Invoked via Stash's `runPluginTask` mutation
+- Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
+- **Critical**: Uses `result_error` field instead of `error` to prevent Stash from interpreting Python errors as GraphQL errors
+- File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
 
 ### Data Flow
 ```
