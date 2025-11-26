@@ -38,7 +38,7 @@ settings:
 
 # Python backend for server-side downloads (bypasses CORS)
 exec:
-  - python
+  - python3
   - "{pluginDir}/scripts/download.py"
 
 tasks:

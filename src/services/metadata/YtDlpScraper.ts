@@ -19,7 +19,7 @@ import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 
-// Plugin ID for runPluginTask calls
+// Plugin ID for runPluginTask/runPluginOperation calls
 const PLUGIN_ID = 'stash-downloader';
 
 export class YtDlpScraper implements IMetadataScraper {
