@@ -407,6 +407,10 @@ def task_read_result(args: dict) -> dict:
 
     Returns:
         The saved result data, or error if not found
+        
+    Note: When using runPluginOperation, Stash treats any top-level 'error' field
+    as a GraphQL error. So we wrap errors in 'result_error' instead and always
+    return success: true for the read operation itself.
     """
     result_id = args.get('result_id')
     
@@ -415,12 +419,21 @@ def task_read_result(args: dict) -> dict:
 
     if not result_id:
         log.error("No result_id provided to read_result")
-        return {'error': 'No result_id provided', 'success': False}
+        # Don't use 'error' field - Stash treats it as GraphQL error
+        return {
+            'success': False,
+            'result_error': 'No result_id provided',
+            'retrieved': False
+        }
 
     # Check if result directory exists
     if not os.path.exists(RESULT_DIR):
         log.error(f"Result directory does not exist: {RESULT_DIR}")
-        return {'error': f'Result directory not found: {RESULT_DIR}', 'success': False}
+        return {
+            'success': False,
+            'result_error': f'Result directory not found: {RESULT_DIR}',
+            'retrieved': False
+        }
 
     # List all files in result directory for debugging
     try:
@@ -432,14 +445,27 @@ def task_read_result(args: dict) -> dict:
     data = load_result(result_id)
     if data:
         log.info(f"Successfully loaded result for {result_id}")
-        # Include the loaded data plus success flag
-        return {**data, 'retrieved': True}
+        # Return the data as-is, but ensure we don't have a top-level 'error' field
+        # that Stash will interpret as a GraphQL error
+        result = {**data, 'retrieved': True}
+        
+        # If the saved data has an 'error' field, rename it to 'result_error'
+        # to prevent Stash from treating it as a GraphQL error
+        if 'error' in result:
+            result['result_error'] = result.pop('error')
+            log.info(f"Renamed 'error' to 'result_error' to avoid GraphQL error interpretation")
+        
+        return result
     else:
         log.error(f"Result not found for result_id: {result_id}")
         result_path = get_result_path(result_id)
         log.error(f"Expected result file path: {result_path}")
         log.error(f"File exists: {os.path.exists(result_path)}")
-        return {'error': f'Result not found for result_id: {result_id}', 'success': False}
+        return {
+            'success': False,
+            'result_error': f'Result not found for result_id: {result_id}',
+            'retrieved': False
+        }
 
 
 def task_cleanup_result(args: dict) -> dict:
