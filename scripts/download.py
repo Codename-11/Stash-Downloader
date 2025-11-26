@@ -112,21 +112,39 @@ def read_input() -> dict:
 def write_output(result: dict) -> None:
     """Write JSON output to stdout.
     
-    IMPORTANT: For runPluginOperation, Stash expects ONLY valid JSON on stdout.
-    Any extra output (including newlines before/after) can cause Stash to return null.
-    We use sys.stdout.write() and flush() to ensure clean output.
+    IMPORTANT: Stash expects output in PluginOutput format:
+    {
+        "error": "optional error string",
+        "output": { ... actual result data ... }
+    }
     
-    Based on Stash documentation:
-    - Output must be valid JSON that can be decoded
-    - If JSON decoding fails, Stash treats entire stdout as string (may cause null)
-    - Use ensure_ascii=True to avoid Unicode encoding issues in some Stash versions
+    If the result has a 'result_error' field, we put it in 'error'.
+    Otherwise, we wrap the entire result in 'output'.
+    
+    Based on Stash source code (pkg/plugin/common/msg.go):
+    - PluginOutput struct has Error (*string) and Output (interface{})
+    - If JSON doesn't match this structure, Stash may return null
+    - Use ensure_ascii=True to avoid Unicode encoding issues
     - Compact JSON (no pretty printing) is recommended
-    - Validate JSON can be parsed before outputting
     """
     try:
+        # Wrap result in Stash's PluginOutput format
+        plugin_output = {}
+        
+        # If there's a result_error, put it in the 'error' field
+        if 'result_error' in result:
+            plugin_output['error'] = result['result_error']
+            # Still include the rest of the result in 'output' for context
+            result_without_error = {k: v for k, v in result.items() if k != 'result_error'}
+            if result_without_error:
+                plugin_output['output'] = result_without_error
+        else:
+            # No error, wrap entire result in 'output' field
+            plugin_output['output'] = result
+        
         # Use ensure_ascii=True to avoid potential Unicode encoding issues
         # Compact JSON (no separators) for maximum compatibility
-        output = json.dumps(result, ensure_ascii=True, separators=(',', ':'))
+        output = json.dumps(plugin_output, ensure_ascii=True, separators=(',', ':'))
         
         # Validate the JSON can be parsed (catches serialization issues)
         try:
@@ -136,7 +154,7 @@ def write_output(result: dict) -> None:
             log.error(f"Output that failed: {output[:500]}")
             raise
         
-        log.info(f"Writing output to stdout: {output[:200]}...")  # Log first 200 chars
+        log.info(f"Writing PluginOutput to stdout: {output[:200]}...")  # Log first 200 chars
         log.info(f"Output length: {len(output)} characters")
         
         # Write directly to stdout and flush to ensure it's sent immediately
@@ -148,15 +166,18 @@ def write_output(result: dict) -> None:
         log.info("Output written and flushed to stdout")
     except Exception as e:
         log.error(f"Failed to serialize output: {e}", exc_info=True)
-        # Fallback: write error as JSON (using result_error to avoid GraphQL error interpretation)
+        # Fallback: write error in PluginOutput format
         try:
-            error_output = json.dumps({'result_error': f'Failed to serialize output: {str(e)}', 'success': False}, ensure_ascii=True, separators=(',', ':'))
+            error_output = json.dumps({
+                'error': f'Failed to serialize output: {str(e)}',
+                'output': {'success': False}
+            }, ensure_ascii=True, separators=(',', ':'))
             sys.stdout.write(error_output)
             sys.stdout.flush()
         except Exception as fallback_error:
-            # Last resort: write minimal error
+            # Last resort: write minimal error in PluginOutput format
             log.error(f"Even fallback JSON serialization failed: {fallback_error}")
-            sys.stdout.write('{"result_error":"Serialization failed","success":false}')
+            sys.stdout.write('{"error":"Serialization failed","output":{"success":false}}')
             sys.stdout.flush()
 
 
