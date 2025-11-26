@@ -273,6 +273,9 @@ export function corsProxyPlugin(): Plugin {
         // Add proxy if configured (yt-dlp supports http://, https://, socks4://, socks5://, socks5h://)
         if (proxyUrl) {
           ytDlpArgs.push('--proxy', proxyUrl);
+          // Disable certificate verification when using proxy (many proxies use self-signed certs)
+          ytDlpArgs.push('--no-check-certificate');
+          console.log(`[yt-dlp] Certificate verification disabled (proxy may use self-signed certs)`);
         }
 
         ytDlpArgs.push(validatedUrl);
@@ -399,6 +402,9 @@ export function corsProxyPlugin(): Plugin {
         // Add proxy if configured (yt-dlp supports http://, https://, socks4://, socks5://, socks5h://)
         if (proxyUrl) {
           ytDlpArgs.push('--proxy', proxyUrl);
+          // Disable certificate verification when using proxy (many proxies use self-signed certs)
+          ytDlpArgs.push('--no-check-certificate');
+          console.log(`[yt-dlp] Certificate verification disabled (proxy may use self-signed certs)`);
         }
 
         ytDlpArgs.push(validatedUrl);
