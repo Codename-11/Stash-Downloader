@@ -28,6 +28,7 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 **Prerequisites:**
 - Stash v0.20 or later
 - Internet connection for downloading content
+- Python 3.7+ with yt-dlp (`pip install yt-dlp`) for server-side video downloads
 
 ### ⭐ Recommended: Install from Custom Plugin Source
 
@@ -485,6 +486,13 @@ That's it! The content is now in your Stash library with all metadata.
 3. Check available disk space
 4. Look for GraphQL errors in browser console
 5. Ensure Stash isn't in read-only mode
+
+**Python/yt-dlp errors:**
+1. Ensure Python 3.7+ is installed: `python3 --version`
+2. Install yt-dlp: `pip install yt-dlp`
+3. Verify yt-dlp works: `yt-dlp --version`
+4. For Docker: Python should be at `/usr/bin/python3`
+5. Check Stash logs for "no such file or directory" errors
 
 **Performance issues:**
 1. Reduce concurrent downloads in settings

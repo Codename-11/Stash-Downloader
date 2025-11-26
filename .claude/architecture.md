@@ -314,6 +314,7 @@ If a scraper throws an error, the registry tries the next one.
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
 | CORS errors (scraping) | Browser security restrictions | Use `StashScraper` (server-side) or CORS proxy |
+| Python "no such file" | Stash checks plugin dir first | Use absolute path `/usr/bin/python3` in exec |
 
 ## Performance Optimizations
 
@@ -373,8 +374,9 @@ version: 0.1.0
 url: https://github.com/user/repo
 
 # Python backend for server-side downloads
+# IMPORTANT: Use absolute path - Stash checks plugin dir first before PATH
 exec:
-  - python
+  - /usr/bin/python3
   - "{pluginDir}/scripts/download.py"
 
 # Plugin tasks (invoked via runPluginTask mutation)
