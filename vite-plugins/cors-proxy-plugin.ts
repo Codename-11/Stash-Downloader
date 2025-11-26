@@ -10,8 +10,12 @@ import http from 'http';
 import https from 'https';
 import { spawn } from 'child_process';
 import { URL as URLParser } from 'url';
-import { HttpProxyAgent } from 'https-proxy-agent';
-import { SocksProxyAgent } from 'socks-proxy-agent';
+import { createRequire } from 'module';
+
+// Use createRequire for CommonJS interop in ESM
+const require = createRequire(import.meta.url);
+const { HttpsProxyAgent } = require('https-proxy-agent');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
 export function corsProxyPlugin(): Plugin {
   let proxyServer: http.Server | null = null;
@@ -140,11 +144,11 @@ export function corsProxyPlugin(): Plugin {
               options.agent = new SocksProxyAgent(httpProxyUrl);
               console.log(`[CORS Proxy] ✓ Using SOCKS5 proxy agent`);
             } else if (httpProxyUrl.startsWith('http://') || httpProxyUrl.startsWith('https://')) {
-              options.agent = new HttpProxyAgent(httpProxyUrl);
+              options.agent = new HttpsProxyAgent(httpProxyUrl);
               console.log(`[CORS Proxy] ✓ Using HTTP proxy agent`);
             } else {
               // Assume HTTP if no scheme
-              options.agent = new HttpProxyAgent(`http://${httpProxyUrl}`);
+              options.agent = new HttpsProxyAgent(`http://${httpProxyUrl}`);
               console.log(`[CORS Proxy] ✓ Using HTTP proxy agent (assumed http://)`);
             }
           } catch (error: any) {
