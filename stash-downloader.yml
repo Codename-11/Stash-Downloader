@@ -37,10 +37,10 @@ settings:
     type: BOOLEAN
 
 # Python backend for server-side downloads (bypasses CORS)
-# Note: Stash prepends plugin dir to exec paths, so we use a wrapper script
+# Note: Stash prepends plugin dir to exec paths automatically
 exec:
-  - "{pluginDir}/scripts/python-wrapper.sh"
-  - "{pluginDir}/scripts/download.py"
+  - scripts/python-wrapper.sh
+  - scripts/download.py
 
 tasks:
   - name: Download Video
