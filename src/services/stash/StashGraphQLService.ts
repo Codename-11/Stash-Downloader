@@ -634,9 +634,23 @@ export class StashGraphQLService {
         plugin_id: pluginId,
         args: args || {},
       });
+      
+      // Log the full response for debugging
+      console.log('[StashGraphQL] runPluginOperation full response:', JSON.stringify(result));
+      
+      // If there are GraphQL errors, the data might be null/undefined
+      if (result.errors && result.errors.length > 0) {
+        console.error('[StashGraphQL] runPluginOperation has GraphQL errors, data may be null');
+        // Still try to return data if it exists
+        if (result.data?.runPluginOperation) {
+          return result.data.runPluginOperation;
+        }
+        return null;
+      }
+      
       return result.data?.runPluginOperation || null;
     } catch (error) {
-      console.error('[StashGraphQL] runPluginOperation failed:', error);
+      console.error('[StashGraphQL] runPluginOperation exception:', error);
       return null;
     }
   }

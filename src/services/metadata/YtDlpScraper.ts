@@ -116,17 +116,29 @@ export class YtDlpScraper implements IMetadataScraper {
         mode: 'read_result',
         result_id: resultId,
       });
-      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult));
+      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
+      console.log('[YtDlpScraper] operationResult type:', typeof operationResult);
+      console.log('[YtDlpScraper] operationResult is null?', operationResult === null);
+      console.log('[YtDlpScraper] operationResult is undefined?', operationResult === undefined);
 
       // runPluginOperation returns IPluginTaskResult with {data?, error?}
       // The actual result data is in the 'data' field
       if (operationResult) {
+        console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
+        console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
+        
+        // If Stash returned a GraphQL error, operationResult.error will be set
         if (operationResult.error) {
-          console.error('[YtDlpScraper] runPluginOperation returned error:', operationResult.error);
-          throw new Error(`runPluginOperation error: ${operationResult.error}`);
+          console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
+          throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
         }
         // The data field contains the actual result from the Python script
-        readResult = operationResult.data || operationResult;
+        // If data is not present, use operationResult itself (might be the data directly)
+        readResult = operationResult.data !== undefined ? operationResult.data : operationResult;
+        console.log('[YtDlpScraper] Extracted readResult:', JSON.stringify(readResult, null, 2));
+      } else {
+        console.error('[YtDlpScraper] runPluginOperation returned null/undefined');
+        console.error('[YtDlpScraper] This usually means GraphQL errors occurred - check browser console for GraphQL error details');
       }
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);
@@ -150,7 +162,12 @@ export class YtDlpScraper implements IMetadataScraper {
     console.log('[YtDlpScraper] Parsing result data...');
     console.log('[YtDlpScraper] Result structure:', JSON.stringify(readResult));
 
-    // Check for error in result
+    // Check for error in result (Python script uses 'result_error' to avoid GraphQL error interpretation)
+    if (readResult.result_error) {
+      throw new Error(`yt-dlp extraction failed: ${readResult.result_error}`);
+    }
+    
+    // Also check legacy 'error' field for backwards compatibility
     if (readResult.error) {
       throw new Error(`yt-dlp extraction failed: ${readResult.error}`);
     }
@@ -158,7 +175,8 @@ export class YtDlpScraper implements IMetadataScraper {
     // Check success flag
     if (readResult.success === false || (readResult.success === undefined && !readResult.title)) {
       console.error('[YtDlpScraper] Result missing success flag or failed:', readResult);
-      throw new Error(`yt-dlp extraction did not succeed: ${readResult.error || 'Unknown error'}`);
+      const errorMsg = readResult.result_error || readResult.error || 'Unknown error';
+      throw new Error(`yt-dlp extraction did not succeed: ${errorMsg}`);
     }
 
     console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', readResult.title);

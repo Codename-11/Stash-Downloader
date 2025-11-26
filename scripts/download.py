@@ -111,7 +111,15 @@ def read_input() -> dict:
 
 def write_output(result: dict) -> None:
     """Write JSON output to stdout."""
-    print(json.dumps(result))
+    try:
+        output = json.dumps(result)
+        log.info(f"Writing output to stdout: {output[:200]}...")  # Log first 200 chars
+        print(output)
+    except Exception as e:
+        log.error(f"Failed to serialize output: {e}")
+        # Fallback: write error as JSON
+        error_output = json.dumps({'error': f'Failed to serialize output: {str(e)}', 'success': False})
+        print(error_output)
 
 
 def sanitize_filename(filename: str) -> str:
@@ -445,6 +453,9 @@ def task_read_result(args: dict) -> dict:
     data = load_result(result_id)
     if data:
         log.info(f"Successfully loaded result for {result_id}")
+        log.info(f"Loaded data keys: {list(data.keys())}")
+        log.info(f"Loaded data (first 500 chars): {json.dumps(data, default=str)[:500]}")
+        
         # Return the data as-is, but ensure we don't have a top-level 'error' field
         # that Stash will interpret as a GraphQL error
         result = {**data, 'retrieved': True}
@@ -454,6 +465,14 @@ def task_read_result(args: dict) -> dict:
         if 'error' in result:
             result['result_error'] = result.pop('error')
             log.info(f"Renamed 'error' to 'result_error' to avoid GraphQL error interpretation")
+        
+        # Ensure we always have a 'success' field for consistency
+        if 'success' not in result:
+            # If there's a result_error, success should be False, otherwise True
+            result['success'] = 'result_error' not in result
+        
+        log.info(f"Final result keys: {list(result.keys())}")
+        log.info(f"Final result (first 500 chars): {json.dumps(result, default=str)[:500]}")
         
         return result
     else:
