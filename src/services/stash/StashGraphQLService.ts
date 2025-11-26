@@ -678,6 +678,60 @@ export class StashGraphQLService {
   }
 
   /**
+   * Get plugin settings from Stash
+   * Plugin settings are stored server-side and accessed via GraphQL
+   */
+  async getPluginSettings(pluginId: string): Promise<Record<string, any> | null> {
+    const query = `
+      query FindPlugin($plugin_id: ID!) {
+        findPlugin(id: $plugin_id) {
+          id
+          name
+          config {
+            ... on PluginConfig {
+              settings {
+                ... on PluginSetting {
+                  key
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ 
+        findPlugin: { 
+          id: string;
+          name: string;
+          config?: {
+            settings?: Array<{ key: string; value: any }>;
+          };
+        } | null;
+      }>(query, {
+        plugin_id: pluginId,
+      });
+
+      if (!result.data?.findPlugin?.config?.settings) {
+        return null;
+      }
+
+      // Convert array of {key, value} to object
+      const settings: Record<string, any> = {};
+      result.data.findPlugin.config.settings.forEach((setting) => {
+        settings[setting.key] = setting.value;
+      });
+
+      return settings;
+    } catch (error) {
+      console.error('[StashGraphQL] getPluginSettings exception:', error);
+      return null;
+    }
+  }
+
+  /**
    * Find a job by ID to check its status
    */
   async findJob(jobId: string): Promise<{

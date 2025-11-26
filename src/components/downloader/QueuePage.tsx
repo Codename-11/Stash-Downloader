@@ -52,38 +52,56 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   useEffect(() => {
     if (!isStashEnvironment) return;
     
+    let stashService: ReturnType<typeof getStashService> | null = null;
+    
     // Function to read settings from multiple sources
-    const readSettings = (): IPluginSettings => {
-      // Try to get settings from Stash's PluginApi first (if available)
-      let stashSettings: any = null;
+    const readSettings = async (): Promise<IPluginSettings> => {
+      // Start with localStorage as base
+      const localSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+      let mergedSettings = { ...localSettings };
+      
+      // Try to get settings from Stash GraphQL API (server-side settings)
+      try {
+        if (!stashService) {
+          stashService = getStashService();
+        }
+        const graphqlSettings = await stashService.getPluginSettings(PLUGIN_ID);
+        if (graphqlSettings && Object.keys(graphqlSettings).length > 0) {
+          console.log('[Settings] Found settings from Stash GraphQL:', graphqlSettings);
+          // Merge GraphQL settings (server-side) override localStorage
+          mergedSettings = { ...mergedSettings, ...graphqlSettings };
+        }
+      } catch (error) {
+        console.warn('[Settings] Could not fetch settings from GraphQL:', error);
+      }
+      
+      // Try to get settings from Stash's PluginApi (if available)
       try {
         if (typeof window !== 'undefined' && (window as any).PluginApi) {
-          // Stash may provide settings through PluginApi
           const pluginApi = (window as any).PluginApi;
           if (pluginApi.getPluginSettings) {
-            stashSettings = pluginApi.getPluginSettings(PLUGIN_ID);
+            const apiSettings = pluginApi.getPluginSettings(PLUGIN_ID);
+            if (apiSettings) {
+              console.log('[Settings] Found settings from PluginApi:', apiSettings);
+              mergedSettings = { ...mergedSettings, ...apiSettings };
+            }
           } else if (pluginApi.settings) {
-            stashSettings = pluginApi.settings;
+            console.log('[Settings] Found settings from PluginApi.settings:', pluginApi.settings);
+            mergedSettings = { ...mergedSettings, ...pluginApi.settings };
           }
         }
       } catch (error) {
         // PluginApi might not have settings method
       }
       
-      // Fallback to localStorage
-      const localSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-      
-      // Merge: Stash settings override localStorage
-      const mergedSettings = { ...localSettings, ...(stashSettings || {}) };
-      
       // Also check if Stash stores settings in a different localStorage key
-      // Stash might use a key like 'plugin:stash-downloader:settings' or similar
       const stashStorageKey = `plugin:${PLUGIN_ID}:settings`;
       const stashStorageSettings = localStorage.getItem(stashStorageKey);
       if (stashStorageSettings) {
         try {
           const parsed = JSON.parse(stashStorageSettings);
-          Object.assign(mergedSettings, parsed);
+          console.log('[Settings] Found settings in alternative localStorage key:', parsed);
+          mergedSettings = { ...mergedSettings, ...parsed };
         } catch {
           // Ignore parse errors
         }
@@ -93,7 +111,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
     };
     
     // Check settings on mount and log current proxy status
-    const logCurrentSettings = () => {
+    const logCurrentSettings = async () => {
       // First, log all localStorage keys that might contain settings
       const allKeys = Object.keys(localStorage);
       const relevantKeys = allKeys.filter(key => 
@@ -116,7 +134,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         }
       });
       
-      const currentSettings = readSettings();
+      const currentSettings = await readSettings();
       console.log('[Settings] Final merged settings:', {
         localStorage: getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS),
         merged: currentSettings,
@@ -171,10 +189,10 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
       }
     };
     
-    // Check periodically for same-tab changes (Stash may update localStorage directly)
+    // Also check periodically for same-tab changes (Stash may update settings via GraphQL)
     let lastProxy = httpProxy;
-    const checkInterval = setInterval(() => {
-      const latestSettings = readSettings();
+    const checkInterval = setInterval(async () => {
+      const latestSettings = await readSettings();
       if (latestSettings.httpProxy !== lastProxy) {
         lastProxy = latestSettings.httpProxy;
         if (latestSettings.httpProxy) {
