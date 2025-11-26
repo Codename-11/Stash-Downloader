@@ -314,7 +314,7 @@ If a scraper throws an error, the registry tries the next one.
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
 | CORS errors (scraping) | Browser security restrictions | Use `StashScraper` (server-side) or CORS proxy |
-| Python "no such file" | Stash checks plugin dir first | Use absolute path `/usr/bin/python3` in exec |
+| Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
 
 ## Performance Optimizations
 
@@ -374,38 +374,24 @@ version: 0.1.0
 url: https://github.com/user/repo
 
 # Python backend for server-side downloads
-# IMPORTANT: Use absolute path - Stash checks plugin dir first before PATH
+# Pattern from PythonDepManager: interface: raw + {pluginDir}
 exec:
-  - /usr/bin/python3
+  - python
   - "{pluginDir}/scripts/download.py"
 
-# Plugin tasks (invoked via runPluginTask mutation)
 tasks:
-  - name: Download Video
-    description: Download video using yt-dlp
-    defaultArgs:
-      task: download
   - name: Extract Metadata
     description: Extract metadata without downloading
     defaultArgs:
       task: extract_metadata
-  - name: Check yt-dlp
-    description: Verify yt-dlp is installed
-    defaultArgs:
-      task: check_ytdlp
-
-# Settings - only STRING, NUMBER, BOOLEAN supported
-settings:
-  downloadPath:
-    displayName: Download Path
-    description: Where to save downloaded files
-    type: STRING
 
 ui:
   javascript:
     - dist/stash-downloader.js
 
-interface: js  # Must be "js" for JavaScript plugins
+# IMPORTANT: Use "raw" not "js" for Python subprocess execution
+# "raw" still works with ui.javascript for UI plugins
+interface: raw
 ```
 
 **Manifest Gotchas:**

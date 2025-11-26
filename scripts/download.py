@@ -114,8 +114,29 @@ def sanitize_filename(filename: str) -> str:
     return sanitized[:200] if len(sanitized) > 200 else sanitized
 
 
+def install_ytdlp() -> bool:
+    """Attempt to install yt-dlp using pip."""
+    log.info("Attempting to install yt-dlp...")
+    try:
+        result = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', 'yt-dlp'],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if result.returncode == 0:
+            log.info("yt-dlp installed successfully")
+            return True
+        else:
+            log.error(f"Failed to install yt-dlp: {result.stderr}")
+            return False
+    except Exception as e:
+        log.error(f"Error installing yt-dlp: {e}")
+        return False
+
+
 def check_ytdlp() -> bool:
-    """Check if yt-dlp is installed and accessible."""
+    """Check if yt-dlp is installed, auto-install if missing."""
     try:
         result = subprocess.run(
             ['yt-dlp', '--version'],
@@ -126,7 +147,22 @@ def check_ytdlp() -> bool:
         log.info(f"yt-dlp version: {result.stdout.strip()}")
         return result.returncode == 0
     except FileNotFoundError:
-        log.error("yt-dlp not found. Please install it: pip install yt-dlp")
+        log.warning("yt-dlp not found, attempting auto-install...")
+        if install_ytdlp():
+            # Verify installation worked
+            try:
+                result = subprocess.run(
+                    ['yt-dlp', '--version'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    log.info(f"yt-dlp now available: {result.stdout.strip()}")
+                    return True
+            except Exception:
+                pass
+        log.error("yt-dlp installation failed")
         return False
     except subprocess.TimeoutExpired:
         log.error("yt-dlp version check timed out")
