@@ -81,7 +81,9 @@ const TestApp: React.FC = () => {
       const settings = localStorage.getItem('stash-downloader:settings');
       if (settings) {
         const parsed = JSON.parse(settings);
-        return parsed.httpProxy || '';
+        const proxy = parsed.httpProxy || '';
+        // Sanitize proxy URL: remove quotes, trim whitespace
+        return proxy.trim().replace(/^["']|["']$/g, '').trim();
       }
     } catch {
       // Ignore parse errors
@@ -120,13 +122,15 @@ const TestApp: React.FC = () => {
 
   // Handle HTTP proxy change (for server-side downloads)
   const handleHttpProxyChange = (proxy: string) => {
-    setHttpProxy(proxy);
+    // Sanitize proxy URL: remove quotes, trim whitespace
+    const sanitized = proxy.trim().replace(/^["']|["']$/g, '').trim();
+    setHttpProxy(sanitized);
     try {
       const settingsKey = 'stash-downloader:settings';
       const existing = localStorage.getItem(settingsKey);
       const settings = existing ? JSON.parse(existing) : {};
-      if (proxy) {
-        settings.httpProxy = proxy;
+      if (sanitized) {
+        settings.httpProxy = sanitized;
       } else {
         delete settings.httpProxy;
       }

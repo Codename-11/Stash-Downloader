@@ -98,6 +98,14 @@ export class HTMLScraper implements IMetadataScraper {
       if (settings) {
         const parsed = JSON.parse(settings);
         httpProxyUrl = parsed.httpProxy;
+        // Sanitize proxy URL: remove quotes, trim whitespace
+        if (httpProxyUrl) {
+          httpProxyUrl = httpProxyUrl.trim().replace(/^["']|["']$/g, '').trim();
+          // Remove empty strings
+          if (!httpProxyUrl) {
+            httpProxyUrl = undefined;
+          }
+        }
       }
     } catch {
       // Ignore parse errors
