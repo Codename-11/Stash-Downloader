@@ -53,6 +53,8 @@ JavaScript Extension / Web-UI Plugin for Stash
 5. **Dual-Mode Architecture**
    - **Production (Stash)**: Server-side scraping/downloading, no CORS issues
    - **Development (test-app)**: Client-side with CORS proxy fallback
+   - **Proxy Support**: HTTP/SOCKS proxy support in both modes (for bypassing geo-restrictions, IP blocks)
+   - **SSL Handling**: Certificate verification automatically disabled when using proxy (handles self-signed certs)
 
 ## External Dependencies (NOT Bundled)
 These are provided by Stash via PluginApi and marked as external in build config:

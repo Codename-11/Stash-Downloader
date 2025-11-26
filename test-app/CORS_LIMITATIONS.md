@@ -54,6 +54,9 @@ See [TEST_URLS.md](TEST_URLS.md) for a list of working test URLs.
    - In the test app, look for the "CORS Proxy Settings" card at the top
    - Toggle "Enable CORS Proxy" to ON ✅
    - The proxy URL should be `http://localhost:8080` (default)
+   - **Optional**: Configure HTTP/SOCKS proxy in "HTTP Proxy Settings" for routing through external proxy
+     - Format: `socks5://user:pass@host:port` or `http://user:pass@host:port`
+     - This routes CORS proxy requests through your external proxy (useful for geo-restrictions, IP blocks)
 
 3. **Test with any URL:**
    - Paste a URL from pornhub, onlyfans, or any site
@@ -66,6 +69,8 @@ See [TEST_URLS.md](TEST_URLS.md) for a list of working test URLs.
 - Forwards them to the target site
 - Adds CORS headers to the response
 - Returns the file to your browser
+- Can route through HTTP/SOCKS proxy if configured (for bypassing geo-restrictions, IP blocks)
+- Supports yt-dlp extraction and downloads via `/api/extract` and `/api/download` endpoints
 
 **Advantages:**
 - ✅ No browser extensions needed
@@ -73,11 +78,14 @@ See [TEST_URLS.md](TEST_URLS.md) for a list of working test URLs.
 - ✅ Easy toggle on/off
 - ✅ Runs locally (private and secure)
 - ✅ No rate limits
+- ✅ Supports HTTP/SOCKS proxy chaining (CORS proxy → HTTP proxy → target site)
+- ✅ yt-dlp integration with proxy support and SSL certificate handling
 
 **Limitations:**
 - ⚠️ Proxy must be running alongside test app
 - ⚠️ Only works in test mode (production doesn't need it)
 - ⚠️ Sites with advanced bot detection may still block requests
+- ⚠️ When using HTTP/SOCKS proxy, SSL certificate verification is disabled (proxy may use self-signed certs)
 
 ### Option 2: Use in Production (Recommended for Real Usage)
 

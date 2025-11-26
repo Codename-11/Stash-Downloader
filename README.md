@@ -233,7 +233,7 @@ Settings are configurable in Stash at Settings > Plugins > Stash Downloader:
 
 - **Default Download Path**: Where to save downloaded files (browser downloads)
 - **Server Download Path**: Directory for server-side downloads (default: `/data/StashDownloader`, absolute path)
-- **HTTP Proxy**: HTTP/HTTPS/SOCKS proxy for server-side downloads (e.g., `http://proxy.example.com:8080` or `socks5://proxy.example.com:1080`) - Useful for bypassing geo-restrictions, IP blocks, or network restrictions
+- **HTTP Proxy**: HTTP/HTTPS/SOCKS proxy for server-side downloads (e.g., `http://proxy.example.com:8080` or `socks5://proxy.example.com:1080`) - Useful for bypassing geo-restrictions, IP blocks, or network restrictions. Supports formats: `http://`, `https://`, `socks5://`, `socks5h://`. SSL certificate verification is automatically disabled when using proxy (many proxies use self-signed certificates)
 - **Concurrent Downloads**: Maximum simultaneous downloads (default: 3)
 - **Auto-Create Performers/Tags/Studios**: Automatically create missing entities
 - **Download Quality**: Preferred video quality
@@ -495,6 +495,12 @@ That's it! The content is now in your Stash library with all metadata.
 3. Verify yt-dlp works: `yt-dlp --version`
 4. For Docker: Python should be at `/usr/bin/python3`
 5. Check Stash logs for "no such file or directory" errors
+
+**Proxy/SSL errors:**
+1. **SSL certificate errors**: If using a proxy, SSL verification is automatically disabled. If you see certificate errors without a proxy, check your system's certificate store.
+2. **Proxy connection errors**: Verify your proxy URL format is correct (`socks5://user:pass@host:port`). Check that the proxy server is accessible from your Stash server.
+3. **Proxy authentication**: Ensure credentials are included in the proxy URL if required (e.g., `socks5://username:password@host:port`).
+4. **Port parsing errors**: Remove any quotes or extra characters from the proxy URL. The plugin automatically sanitizes proxy URLs, but ensure the URL is valid.
 
 **Performance issues:**
 1. Reduce concurrent downloads in settings

@@ -66,7 +66,7 @@ npm install && npm run build
 |---------|---------|-------------|
 | Download Path | - | Where files are saved (browser downloads) |
 | Server Download Path | /data/StashDownloader | Directory for server-side downloads (absolute path) |
-| HTTP Proxy | - | HTTP/HTTPS/SOCKS proxy for bypassing restrictions (e.g., http://proxy.example.com:8080) |
+| HTTP Proxy | - | HTTP/HTTPS/SOCKS proxy for bypassing restrictions (e.g., `socks5://user:pass@host:1080` or `http://proxy.example.com:8080`). Supports `http://`, `https://`, `socks5://`, `socks5h://` formats. SSL verification disabled when using proxy. |
 | Concurrent Downloads | 3 | Max simultaneous downloads |
 | Auto-Create Performers | On | Create performers automatically |
 | Auto-Create Tags | On | Create tags automatically |

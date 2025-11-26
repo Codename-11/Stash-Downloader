@@ -95,6 +95,8 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
 - Configurable download directory via `serverDownloadPath` setting (default: `/data/StashDownloader`)
 - HTTP/HTTPS/SOCKS proxy support via `httpProxy` setting (for bypassing geo-restrictions, IP blocks, rate limits)
+- SSL certificate verification disabled when using proxy (many proxies use self-signed certs or do SSL interception)
+- Proxy URL format: `http://user:pass@host:port`, `https://user:pass@host:port`, `socks5://user:pass@host:port`, `socks5h://user:pass@host:port`
 
 ### PluginOutput Format (Critical for `runPluginOperation`)
 
@@ -313,6 +315,11 @@ class ScraperRegistry {
 
 ### Scraper Fallback Chain
 1. **YtDlpScraper** - PRIMARY: Always extracts video URLs via yt-dlp (server-side in Stash, CORS proxy in test-app)
+   - Server-side: Uses `runPluginTask` + `runPluginOperation` to call Python backend
+   - Client-side (test-app): Uses CORS proxy's `/api/extract` endpoint
+   - Supports HTTP/SOCKS proxy via `httpProxy` setting (passed to yt-dlp via `--proxy` flag)
+   - SSL certificate verification disabled when proxy is used (`--no-check-certificate`)
+   - Extracts best quality video URL from formats array or top-level URL
 2. **StashScraper** - FALLBACK: Kept in code but only used if yt-dlp fails (server-side, no CORS)
 3. **Site-Specific** - Custom scrapers for known sites
 4. **HTMLScraper** - Parses Open Graph meta tags
@@ -416,7 +423,7 @@ tasks:
   - name: Extract Metadata
     description: Extract metadata without downloading
     defaultArgs:
-      task: extract_metadata
+      mode: extract_metadata  # Note: Use 'mode' not 'task' (community plugin pattern)
 
 ui:
   javascript:
