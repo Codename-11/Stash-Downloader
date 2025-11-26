@@ -115,21 +115,49 @@ def write_output(result: dict) -> None:
     IMPORTANT: For runPluginOperation, Stash expects ONLY valid JSON on stdout.
     Any extra output (including newlines before/after) can cause Stash to return null.
     We use sys.stdout.write() and flush() to ensure clean output.
+    
+    Based on Stash documentation:
+    - Output must be valid JSON that can be decoded
+    - If JSON decoding fails, Stash treats entire stdout as string (may cause null)
+    - Use ensure_ascii=True to avoid Unicode encoding issues in some Stash versions
+    - Compact JSON (no pretty printing) is recommended
+    - Validate JSON can be parsed before outputting
     """
     try:
-        output = json.dumps(result, ensure_ascii=False)
+        # Use ensure_ascii=True to avoid potential Unicode encoding issues
+        # Compact JSON (no separators) for maximum compatibility
+        output = json.dumps(result, ensure_ascii=True, separators=(',', ':'))
+        
+        # Validate the JSON can be parsed (catches serialization issues)
+        try:
+            json.loads(output)
+        except json.JSONDecodeError as e:
+            log.error(f"Generated invalid JSON: {e}")
+            log.error(f"Output that failed: {output[:500]}")
+            raise
+        
         log.info(f"Writing output to stdout: {output[:200]}...")  # Log first 200 chars
+        log.info(f"Output length: {len(output)} characters")
         
         # Write directly to stdout and flush to ensure it's sent immediately
         # Don't use print() as it adds a newline which might confuse Stash
         sys.stdout.write(output)
         sys.stdout.flush()
+        
+        # Verify output was written (debugging)
+        log.info("Output written and flushed to stdout")
     except Exception as e:
-        log.error(f"Failed to serialize output: {e}")
+        log.error(f"Failed to serialize output: {e}", exc_info=True)
         # Fallback: write error as JSON (using result_error to avoid GraphQL error interpretation)
-        error_output = json.dumps({'result_error': f'Failed to serialize output: {str(e)}', 'success': False}, ensure_ascii=False)
-        sys.stdout.write(error_output)
-        sys.stdout.flush()
+        try:
+            error_output = json.dumps({'result_error': f'Failed to serialize output: {str(e)}', 'success': False}, ensure_ascii=True, separators=(',', ':'))
+            sys.stdout.write(error_output)
+            sys.stdout.flush()
+        except Exception as fallback_error:
+            # Last resort: write minimal error
+            log.error(f"Even fallback JSON serialization failed: {fallback_error}")
+            sys.stdout.write('{"result_error":"Serialization failed","success":false}')
+            sys.stdout.flush()
 
 
 def sanitize_filename(filename: str) -> str:
