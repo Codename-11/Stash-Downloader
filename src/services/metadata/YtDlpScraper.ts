@@ -193,19 +193,23 @@ export class YtDlpScraper implements IMetadataScraper {
 
     console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', readResult.title);
 
-    // Convert to our metadata format
-    return {
-      url: url,
-      title: readResult.title || undefined,
-      description: readResult.description || undefined,
-      date: readResult.upload_date ? this.formatDate(readResult.upload_date) : undefined,
-      duration: readResult.duration || undefined,
-      thumbnailUrl: readResult.thumbnail || undefined,
-      performers: readResult.uploader ? [readResult.uploader] : [],
-      tags: [],
-      studio: readResult.uploader || undefined,
-      contentType: 'video' as ContentType,
+    // Convert server-side result to yt-dlp-like format for convertYtDlpToMetadata
+    // This allows us to reuse the same conversion logic
+    const ytdlpFormat = {
+      title: readResult.title,
+      description: readResult.description,
+      duration: readResult.duration,
+      uploader: readResult.uploader,
+      upload_date: readResult.upload_date,
+      thumbnail: readResult.thumbnail,
+      url: readResult.url,  // Direct video URL (if available)
+      webpage_url: readResult.webpage_url || url,  // Original page URL
+      original_url: readResult.original_url || url,  // Fallback URL
+      formats: readResult.formats || [],  // Format list with URLs
     };
+
+    // Use the same conversion logic as client-side
+    return this.convertYtDlpToMetadata(ytdlpFormat, url);
   }
 
   /**
@@ -292,45 +296,75 @@ export class YtDlpScraper implements IMetadataScraper {
    * Returns both the video URL and quality
    */
   private selectBestVideoFormat(ytdlp: any): { videoUrl: string | undefined; quality: string | undefined } {
-    // If there's a direct URL field, use it
+    // First, try to find best quality from formats array (preferred for HLS streams)
+    if (ytdlp.formats && Array.isArray(ytdlp.formats) && ytdlp.formats.length > 0) {
+      console.log(`[YtDlpScraper] Found ${ytdlp.formats.length} formats, selecting best quality...`);
+
+      // Filter for video formats (not audio-only)
+      // For HLS streams, formats may have url, manifest_url, or need to be constructed
+      const videoFormats = ytdlp.formats.filter((f: any) => {
+        const hasVideoCodec = f.vcodec && f.vcodec !== 'none';
+        const hasUrl = f.url || f.manifest_url;  // Check both url and manifest_url
+        const hasHeight = f.height;  // Has height = likely video
+        const isVideoFormat = f.format_id && (
+          f.format_id.toLowerCase().includes('hls') || 
+          f.format_id.toLowerCase().includes('mp4') || 
+          f.format_id.toLowerCase().includes('video') ||
+          f.format_id.toLowerCase().includes('dash')
+        );
+        // Include if it has video codec OR (has URL/manifest and is video format) OR has height
+        return (hasVideoCodec || (hasUrl && isVideoFormat) || (hasHeight && hasUrl));
+      });
+
+      if (videoFormats.length > 0) {
+        // Sort by quality (height * width, or just height if width not available)
+        // Higher quality first
+        videoFormats.sort((a: any, b: any) => {
+          const qualityA = (a.height || 0) * (a.width || a.height || 0);
+          const qualityB = (b.height || 0) * (b.width || b.height || 0);
+          return qualityB - qualityA;
+        });
+
+        // Try formats in order of quality
+        for (const format of videoFormats) {
+          const videoUrl = format.url || format.manifest_url;
+          if (videoUrl) {
+            const quality = format.height ? `${format.height}p` : undefined;
+            console.log(`[YtDlpScraper] ✓ Selected format: ${quality || 'unknown'} (${format.format_id})`);
+            console.log(`[YtDlpScraper] Video URL: ${videoUrl.substring(0, 100)}...`);
+            return { videoUrl: videoUrl, quality };
+          }
+        }
+        
+        // If no format has URL, but we have formats, use top-level URL if available
+        if (ytdlp.url) {
+          const bestFormat = videoFormats[0];
+          const quality = bestFormat.height ? `${bestFormat.height}p` : undefined;
+          console.log(`[YtDlpScraper] Formats have no URLs, using top-level URL with best quality: ${quality || 'unknown'}`);
+          return { videoUrl: ytdlp.url, quality };
+        }
+      }
+    }
+
+    // Fallback: If there's a direct URL field at top level, use it (for HLS, this is often the best quality manifest)
     if (ytdlp.url) {
-      console.log('[YtDlpScraper] Using direct URL from yt-dlp');
-      // Try to extract quality from ytdlp data
-      const quality = ytdlp.height ? `${ytdlp.height}p` : undefined;
+      console.log('[YtDlpScraper] Using top-level URL from yt-dlp (no formats with URLs found)');
+      // Try to extract quality from ytdlp data or find best quality from formats
+      let quality: string | undefined;
+      if (ytdlp.height) {
+        quality = `${ytdlp.height}p`;
+      } else if (ytdlp.formats && Array.isArray(ytdlp.formats)) {
+        // Find highest quality format to determine quality
+        const formatsWithHeight = ytdlp.formats.filter((f: any) => f.height).sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+        if (formatsWithHeight.length > 0) {
+          quality = `${formatsWithHeight[0].height}p`;
+        }
+      }
       return { videoUrl: ytdlp.url, quality };
     }
 
-    // Otherwise, look through formats for best video
-    if (ytdlp.formats && Array.isArray(ytdlp.formats)) {
-      console.log(`[YtDlpScraper] Found ${ytdlp.formats.length} formats, selecting best...`);
-
-      // Filter for video formats (not audio-only)
-      const videoFormats = ytdlp.formats.filter((f: any) =>
-        f.vcodec && f.vcodec !== 'none' && f.url
-      );
-
-      if (videoFormats.length === 0) {
-        console.warn('[YtDlpScraper] No video formats found');
-        return { videoUrl: ytdlp.webpage_url || ytdlp.original_url, quality: undefined };
-      }
-
-      // Sort by quality (height * width, or just height if width not available)
-      videoFormats.sort((a: any, b: any) => {
-        const qualityA = (a.height || 0) * (a.width || a.height || 0);
-        const qualityB = (b.height || 0) * (b.width || b.height || 0);
-        return qualityB - qualityA;
-      });
-
-      const best = videoFormats[0];
-      const quality = best.height ? `${best.height}p` : undefined;
-      console.log(`[YtDlpScraper] Selected format: ${quality || 'unknown'} (${best.format_id})`);
-      console.log(`[YtDlpScraper] Video URL: ${best.url.substring(0, 100)}...`);
-
-      return { videoUrl: best.url, quality };
-    }
-
-    // Fallback to page URL
-    console.warn('[YtDlpScraper] No formats available, using page URL');
+    // Last resort: use webpage URL
+    console.warn('[YtDlpScraper] No video URL found, using page URL');
     return { videoUrl: ytdlp.webpage_url || ytdlp.original_url, quality: undefined };
   }
 

@@ -524,6 +524,39 @@ def task_extract_metadata(args: dict) -> dict:
     metadata = extract_metadata(url, proxy=proxy)
 
     if metadata:
+        # Extract all formats with their URLs (important for HLS streams)
+        # For HLS, yt-dlp may include URLs in formats or only at top level
+        formats_list = []
+        for f in metadata.get('formats', []):
+            # Include format if it has video characteristics or is explicitly a video format
+            # Don't filter too aggressively - include all formats that might be video
+            is_video_format = (
+                f.get('height') or  # Has height = likely video
+                (f.get('vcodec') and f.get('vcodec') != 'none') or  # Has video codec
+                (f.get('format_id') and any(keyword in f.get('format_id', '').lower() 
+                                           for keyword in ['hls', 'mp4', 'video', 'dash', 'http']))  # Format ID suggests video
+            )
+            
+            if is_video_format:
+                format_data = {
+                    'format_id': f.get('format_id'),
+                    'ext': f.get('ext'),
+                    'height': f.get('height'),
+                    'width': f.get('width'),
+                    'filesize': f.get('filesize'),
+                    'vcodec': f.get('vcodec'),
+                    'acodec': f.get('acodec'),
+                }
+                # Include URL if available (for HLS, this might be manifest_url or url)
+                # yt-dlp may provide URLs in various fields for HLS streams
+                if f.get('url'):
+                    format_data['url'] = f.get('url')
+                if f.get('manifest_url'):
+                    format_data['manifest_url'] = f.get('manifest_url')
+                if f.get('fragment_base_url'):
+                    format_data['fragment_base_url'] = f.get('fragment_base_url')
+                formats_list.append(format_data)
+        
         result = {
             'success': True,
             'title': metadata.get('title'),
@@ -532,18 +565,22 @@ def task_extract_metadata(args: dict) -> dict:
             'uploader': metadata.get('uploader'),
             'upload_date': metadata.get('upload_date'),
             'thumbnail': metadata.get('thumbnail'),
-            'formats': [
-                {
-                    'format_id': f.get('format_id'),
-                    'ext': f.get('ext'),
-                    'height': f.get('height'),
-                    'width': f.get('width'),
-                    'filesize': f.get('filesize'),
-                }
-                for f in metadata.get('formats', [])
-                if f.get('height')
-            ][:5]  # Limit to top 5 formats
+            # Include direct video URL (important for download service)
+            # For HLS streams, this is typically the best quality manifest URL
+            # yt-dlp's top-level 'url' is usually the best quality available
+            'url': metadata.get('url'),  # Direct video URL from yt-dlp (best quality for HLS)
+            'webpage_url': metadata.get('webpage_url'),  # Original page URL
+            'original_url': metadata.get('original_url'),  # Fallback URL
+            'height': metadata.get('height'),  # Best quality height (if available)
+            'width': metadata.get('width'),  # Best quality width (if available)
+            'formats': formats_list,  # All video formats with URLs
         }
+        
+        log.info(f"Extracted {len(formats_list)} video formats from yt-dlp output")
+        if result.get('url'):
+            log.info(f"Top-level URL available: {result['url'][:100]}...")
+        else:
+            log.warning("No top-level URL found in yt-dlp output")
     else:
         result = {'result_error': 'Failed to extract metadata', 'success': False}
 
