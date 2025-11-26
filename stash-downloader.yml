@@ -37,9 +37,9 @@ settings:
     type: BOOLEAN
 
 # Python backend for server-side downloads (bypasses CORS)
-# Note: Stash prepends plugin dir to exec paths automatically
+# Bare command name (no /) should search PATH per Stash docs
 exec:
-  - scripts/python-wrapper.sh
+  - python
   - scripts/download.py
 
 tasks:
