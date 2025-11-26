@@ -36,6 +36,69 @@ function PluginWrapper(props: any) {
 }
 
 /**
+ * Add navigation link using MutationObserver (community plugin pattern)
+ * This watches for the navbar to appear and injects our link via DOM
+ */
+function addNavLinkViaMutationObserver() {
+  const NAV_LINK_ID = 'stash-downloader-nav-link';
+
+  function injectNavLink() {
+    // Check if already added
+    if (document.getElementById(NAV_LINK_ID)) {
+      return true;
+    }
+
+    // Find the navbar menu items container
+    // Stash uses .navbar-nav for the main menu
+    const navbarNav = document.querySelector('.navbar-nav.me-auto');
+    if (!navbarNav) {
+      return false;
+    }
+
+    // Create our nav link element
+    const navItem = document.createElement('a');
+    navItem.id = NAV_LINK_ID;
+    navItem.className = 'nav-link';
+    navItem.href = `#${ROUTES.MAIN}`;
+    navItem.textContent = 'Downloader';
+
+    // Handle click to use React Router navigation via history API
+    navItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.history.pushState({}, '', ROUTES.MAIN);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    // Append to navbar
+    navbarNav.appendChild(navItem);
+    console.log(`[${PLUGIN_ID}] Navigation link added to navbar via DOM`);
+    return true;
+  }
+
+  // Try to inject immediately
+  if (injectNavLink()) {
+    return;
+  }
+
+  // Use MutationObserver to wait for navbar to appear
+  const observer = new MutationObserver((_mutations, obs) => {
+    if (injectNavLink()) {
+      obs.disconnect();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Cleanup after 30 seconds if navbar never appears
+  setTimeout(() => {
+    observer.disconnect();
+  }, 30000);
+}
+
+/**
  * Initialize and register the plugin
  */
 function initializePlugin() {
@@ -50,72 +113,9 @@ function initializePlugin() {
 
     console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
 
-    // Add navigation link to Stash's main navbar
-    // The MainNavBar.MenuItems component renders a <Nav> element with children
-    // We need to clone it and add our link to its children
-    window.PluginApi.patch.after('MainNavBar.MenuItems', (_props: any, output: any) => {
-      try {
-        const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
-
-        if (!NavLink) {
-          console.warn(`[${PLUGIN_ID}] NavLink not available`);
-          return output;
-        }
-
-        const downloaderLink = React.createElement(
-          NavLink,
-          {
-            to: ROUTES.MAIN,
-            className: 'nav-link',
-            key: 'stash-downloader-nav-link',
-          },
-          'Downloader'
-        );
-
-        // If output is a valid React element with props, clone it and add our link to children
-        if (output && typeof output === 'object' && output.props !== undefined) {
-          // Get existing children and convert to array
-          const existingChildren = React.Children.toArray(output.props.children || []);
-
-          // Check if our link is already added (avoid duplicates)
-          const alreadyAdded = existingChildren.some(
-            (child: any) => child?.key === 'stash-downloader-nav-link'
-          );
-
-          if (alreadyAdded) {
-            return output;
-          }
-
-          // Clone the element with our link added to children
-          return React.cloneElement(output, {}, ...existingChildren, downloaderLink);
-        }
-
-        // If output is an array (unlikely but possible), add to it
-        if (Array.isArray(output)) {
-          const alreadyAdded = output.some(
-            (child: any) => child?.key === 'stash-downloader-nav-link'
-          );
-          if (alreadyAdded) return output;
-          return [...output, downloaderLink];
-        }
-
-        // If output is null/undefined or empty, return unchanged
-        // This prevents breaking the navbar if something unexpected happens
-        if (output == null || (typeof output === 'object' && Object.keys(output).length === 0)) {
-          console.warn(`[${PLUGIN_ID}] MainNavBar output was empty/null, cannot add link safely`);
-          return output;
-        }
-
-        // Unknown output type - return as-is to avoid breaking navbar
-        console.warn(`[${PLUGIN_ID}] Unexpected MainNavBar output type:`, typeof output);
-        return output;
-      } catch (patchError) {
-        console.error(`[${PLUGIN_ID}] Error in MainNavBar patch:`, patchError);
-        return output;
-      }
-    });
-
-    console.log(`[${PLUGIN_ID}] Navigation link patched to MainNavBar`);
+    // Add navigation link using MutationObserver (community plugin pattern)
+    // This avoids issues with patch.after receiving empty/null output
+    addNavLinkViaMutationObserver();
 
   } catch (error) {
     console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);

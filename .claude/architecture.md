@@ -35,39 +35,9 @@ window.PluginApi.register.route('/downloader', (props) => {
   return React.createElement(DownloaderMain, props);
 });
 
-// Patch navbar - use React.cloneElement to preserve existing children
-window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
-  const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
-  if (!NavLink) return output;
-
-  const link = React.createElement(NavLink, {
-    to: '/downloader',
-    className: 'nav-link',
-    key: 'stash-downloader-nav-link'
-  }, 'Downloader');
-
-  // If output is a React element with children, clone it and append our link
-  if (output && typeof output === 'object' && output.props !== undefined) {
-    const existingChildren = React.Children.toArray(output.props.children || []);
-    const alreadyAdded = existingChildren.some(
-      (child) => child?.key === 'stash-downloader-nav-link'
-    );
-    if (alreadyAdded) return output;
-    return React.cloneElement(output, {}, ...existingChildren, link);
-  }
-
-  // Handle array output (rare)
-  if (Array.isArray(output)) {
-    return [...output, link];
-  }
-
-  // Return unchanged if empty/null to avoid breaking navbar
-  if (output == null || Object.keys(output).length === 0) {
-    console.warn('MainNavBar output was empty, cannot add link safely');
-    return output;
-  }
-  return output;
-});
+// Add navbar link via MutationObserver (NOT patch.after - that's unreliable)
+// See "Navigation Integration" section for the MutationObserver implementation
+addNavLinkViaMutationObserver();
 ```
 
 ## Module System
@@ -320,8 +290,8 @@ If a scraper throws an error, the registry tries the next one.
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| Navbar items disappear | Replacing output instead of appending | Use `React.cloneElement` to preserve children |
-| React Error #31 | Returning `{}` from patch | Check for empty object, return unchanged |
+| Navbar items disappear | patch.after receives empty/null output | Use MutationObserver pattern instead |
+| React Error #31 | patch.after returns `{}` | Avoid patch.after for navbar; use DOM injection |
 | IntlProvider error | Stash internal code | Ignore - not plugin's fault |
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
@@ -543,37 +513,46 @@ permissions:
 
 ## Navigation Integration
 
-### Adding Nav Link (React.cloneElement Pattern)
-The MainNavBar.MenuItems patch receives a React element, not an array. Use `React.cloneElement` to append our link to the existing children without losing default menu items:
+### Adding Nav Link (MutationObserver Pattern)
+The `patch.after('MainNavBar.MenuItems')` approach is unreliable - it often receives empty/null output causing React Error #31. Use MutationObserver to inject the link via DOM instead:
 
 ```typescript
-window.PluginApi.patch.after('MainNavBar.MenuItems', (_props, output) => {
-  const { NavLink } = window.PluginApi.libraries.ReactRouterDOM || {};
-  if (!NavLink) return output;
+function addNavLinkViaMutationObserver() {
+  const NAV_LINK_ID = 'stash-downloader-nav-link';
 
-  const link = React.createElement(NavLink, {
-    to: '/downloader',
-    className: 'nav-link',
-    key: 'stash-downloader-nav-link'
-  }, 'Downloader');
+  function injectNavLink() {
+    if (document.getElementById(NAV_LINK_ID)) return true;
 
-  // Clone the React element and append our link to its children
-  if (output && typeof output === 'object' && output.props !== undefined) {
-    const existingChildren = React.Children.toArray(output.props.children || []);
+    const navbarNav = document.querySelector('.navbar-nav.me-auto');
+    if (!navbarNav) return false;
 
-    // Prevent duplicate additions
-    const alreadyAdded = existingChildren.some(
-      (child) => child?.key === 'stash-downloader-nav-link'
-    );
-    if (alreadyAdded) return output;
+    const navItem = document.createElement('a');
+    navItem.id = NAV_LINK_ID;
+    navItem.className = 'nav-link';
+    navItem.href = '#/plugin/stash-downloader';
+    navItem.textContent = 'Downloader';
 
-    return React.cloneElement(output, {}, ...existingChildren, link);
+    // Use history API for React Router navigation
+    navItem.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.history.pushState({}, '', '/plugin/stash-downloader');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    navbarNav.appendChild(navItem);
+    return true;
   }
 
-  // Fallback for edge cases
-  if (Array.isArray(output)) return [...output, link];
-  return output;
-});
+  if (injectNavLink()) return;
+
+  // Wait for navbar to appear
+  const observer = new MutationObserver((_mutations, obs) => {
+    if (injectNavLink()) obs.disconnect();
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 30000);
+}
 ```
 
 ### Route Registration

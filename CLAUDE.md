@@ -46,7 +46,7 @@ Muted text: #8b9fad
 
 ## Plugin Entry Pattern
 
-The plugin registers via `PluginApi.register.route()` and patches navbar via `PluginApi.patch.after()`. Use `React.cloneElement` to append nav link without removing existing menu items.
+The plugin registers via `PluginApi.register.route()` and adds navbar link via MutationObserver (community plugin pattern). This avoids issues with `patch.after` receiving empty/null output.
 
 ## Scraper Priority
 
@@ -55,3 +55,7 @@ The plugin registers via `PluginApi.register.route()` and patches navbar via `Pl
 3. **Site-specific** - PornhubScraper, YouPornScraper
 4. **HTMLScraper** - Generic Open Graph tags
 5. **GenericScraper** - Fallback URL parsing
+
+# Documentation Instructions
+Keep the documentation concise and to the point. Use markdown formatting for the documentation.
+Update relevant files with the new information and remove any outdated information when necessary.

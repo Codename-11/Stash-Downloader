@@ -90,13 +90,12 @@ Stash provides these libraries through `window.PluginApi.libraries`:
 ## Plugin Entry Point (src/index.tsx)
 The plugin must:
 1. Register routes via `PluginApi.register.route()`
-2. Patch navbar via `PluginApi.patch.after('MainNavBar.MenuItems', ...)`
-3. Handle edge cases (empty output, missing libraries)
-4. NOT use contexts that require providers (ThemeProvider, etc.)
+2. Add navbar link via MutationObserver (NOT patch.after - it's unreliable)
+3. NOT use contexts that require providers (ThemeProvider, etc.)
 
 ## Common Integration Issues
-- **Navbar items disappear**: Use `React.cloneElement` to append link - don't replace the entire output
-- **React Error #31**: MainNavBar patch receives empty object `{}` - return unchanged to avoid breaking
+- **Navbar issues with patch.after**: Use MutationObserver pattern instead - injects link via DOM
+- **React Error #31**: MainNavBar patch receives empty object `{}` - avoid using patch.after for navbar
 - **IntlProvider errors**: Stash's own code may log these - not plugin's fault
 - **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
 - **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
