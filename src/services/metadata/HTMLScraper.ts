@@ -91,8 +91,27 @@ export class HTMLScraper implements IMetadataScraper {
       return url;
     }
 
+    // Get HTTP proxy setting if enabled (for routing CORS proxy through HTTP/SOCKS proxy)
+    let httpProxyUrl: string | undefined;
+    try {
+      const settings = localStorage.getItem('stash-downloader:settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        httpProxyUrl = parsed.httpProxy;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
     // Use query parameter instead of path to avoid URL encoding issues
-    const proxiedUrl = `${corsProxyUrl}/?url=${encodeURIComponent(url)}`;
+    let proxiedUrl = `${corsProxyUrl}/?url=${encodeURIComponent(url)}`;
+    
+    // Add HTTP proxy parameter if configured (CORS proxy will route through it)
+    if (httpProxyUrl) {
+      proxiedUrl += `&proxy=${encodeURIComponent(httpProxyUrl)}`;
+      console.log('[HTMLScraper] ✓ CORS proxy will route through HTTP proxy');
+    }
+    
     console.log('[HTMLScraper] ✓ Using CORS proxy:', proxiedUrl);
     return proxiedUrl;
   }

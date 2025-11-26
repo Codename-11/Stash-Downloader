@@ -14,6 +14,8 @@ import http from 'http';
 import https from 'https';
 import { spawn } from 'child_process';
 import { URL as URLParser } from 'url';
+import { HttpProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const PORT = process.env.PORT || 8080;
 const HOST = 'localhost';
@@ -45,19 +47,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Extract target URL from query parameter or path
-  // New format: http://localhost:8080/?url=https://example.com/video.mp4
+  // Extract target URL and HTTP proxy from query parameters
+  // New format: http://localhost:8080/?url=https://example.com/video.mp4&proxy=socks5://user:pass@host:port
   // Legacy format: http://localhost:8080/https://example.com/video.mp4
   let targetUrl = null;
+  let httpProxyUrl = null;
   
   // Try query parameter first (new format)
   const urlParams = new URLParser(req.url, `http://${req.headers.host}`);
   if (urlParams.searchParams.has('url')) {
     targetUrl = urlParams.searchParams.get('url');
+    httpProxyUrl = urlParams.searchParams.get('proxy') || process.env.HTTP_PROXY || process.env.http_proxy;
     console.log(`[CORS Proxy] Using URL from query parameter: ${targetUrl}`);
+    if (httpProxyUrl) {
+      console.log(`[CORS Proxy] Using HTTP proxy: ${httpProxyUrl.replace(/:[^:@]*@/, ':****@')}`); // Hide password in logs
+    }
   } else {
     // Fallback to path format (legacy)
     targetUrl = req.url.substring(1); // Remove leading slash
+    httpProxyUrl = process.env.HTTP_PROXY || process.env.http_proxy;
     console.log(`[CORS Proxy] Using URL from path: ${targetUrl}`);
     
     // Try decoding if needed
@@ -122,49 +130,35 @@ const server = http.createServer((req, res) => {
   delete options.headers.origin;
   delete options.headers.referer;
 
+  // Use HTTP/SOCKS proxy if configured
+  if (httpProxyUrl) {
+    try {
+      if (httpProxyUrl.startsWith('socks5://') || httpProxyUrl.startsWith('socks5h://')) {
+        options.agent = new SocksProxyAgent(httpProxyUrl);
+        console.log(`[CORS Proxy] ✓ Using SOCKS5 proxy agent`);
+      } else if (httpProxyUrl.startsWith('http://') || httpProxyUrl.startsWith('https://')) {
+        options.agent = new HttpProxyAgent(httpProxyUrl);
+        console.log(`[CORS Proxy] ✓ Using HTTP proxy agent`);
+      } else {
+        // Assume HTTP if no scheme
+        options.agent = new HttpProxyAgent(`http://${httpProxyUrl}`);
+        console.log(`[CORS Proxy] ✓ Using HTTP proxy agent (assumed http://)`);
+      }
+    } catch (error) {
+      console.error(`[CORS Proxy] Failed to create proxy agent: ${error.message}`);
+      // Continue without proxy
+    }
+  }
+
   const proxyReq = protocol.request(options, (proxyRes) => {
     console.log(`[CORS Proxy] Response ${proxyRes.statusCode} from ${targetUrl}`);
 
-    // Handle redirects (3xx) - don't follow, just proxy with CORS headers
-    if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400) {
-      const location = proxyRes.headers.location;
-      console.log(`[CORS Proxy] Redirect detected: ${location}`);
-      // Keep the redirect but add CORS headers
-      const responseHeaders = {
-        ...proxyRes.headers,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Range, User-Agent, Accept, Accept-Language, Accept-Encoding, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests, Origin',
-        'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
-      };
-      res.writeHead(proxyRes.statusCode || 200, responseHeaders);
-      proxyRes.pipe(res);
-      return;
-    }
-
-    // Build response headers - ensure CORS headers are set and not overridden
-    const responseHeaders = {
+    // Forward status code
+    res.writeHead(proxyRes.statusCode, {
       ...proxyRes.headers,
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Range, User-Agent, Accept, Accept-Language, Accept-Encoding, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests, Origin',
       'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
-    };
-    
-    // Remove any conflicting CORS headers from upstream (case-insensitive)
-    Object.keys(responseHeaders).forEach(key => {
-      const lowerKey = key.toLowerCase();
-      if (lowerKey.startsWith('access-control-') && 
-          lowerKey !== 'access-control-allow-origin' && 
-          lowerKey !== 'access-control-allow-methods' && 
-          lowerKey !== 'access-control-allow-headers' &&
-          lowerKey !== 'access-control-expose-headers') {
-        delete responseHeaders[key];
-      }
     });
-
-    // Forward status code with CORS headers (must be called before piping)
-    res.writeHead(proxyRes.statusCode || 200, responseHeaders);
 
     // Pipe response
     proxyRes.pipe(res);
@@ -172,11 +166,7 @@ const server = http.createServer((req, res) => {
 
   proxyReq.on('error', (error) => {
     console.error(`[CORS Proxy] Error: ${error.message}`);
-    res.writeHead(502, {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    });
+    res.writeHead(502);
     res.end(JSON.stringify({
       error: 'Proxy error',
       message: error.message,

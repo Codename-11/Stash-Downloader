@@ -74,9 +74,9 @@ export class YtDlpScraper implements IMetadataScraper {
 
     let taskResult: { success: boolean; error?: string; jobId?: string };
 
-        // Step 1: Run extract_metadata task (saves result to temp file)
-        try {
-          console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
+    // Step 1: Run extract_metadata task (saves result to temp file)
+    try {
+      console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
           
           // Get proxy setting from localStorage if available
           let proxy: string | undefined;
@@ -99,15 +99,15 @@ export class YtDlpScraper implements IMetadataScraper {
             console.log('[YtDlpScraper] No HTTP proxy configured - using direct connection');
           }
           
-          taskResult = await stashService.runPluginTaskAndWait(
-            PLUGIN_ID,
-            'Extract Metadata',
-            {
-              mode: 'extract_metadata',
-              url: url,
-              result_id: resultId,
+      taskResult = await stashService.runPluginTaskAndWait(
+        PLUGIN_ID,
+        'Extract Metadata',
+        {
+          mode: 'extract_metadata',
+          url: url,
+          result_id: resultId,
               proxy: proxy, // Pass proxy if configured
-            },
+        },
         {
           maxWaitMs: this.timeoutMs,
           onProgress: (progress) => {
@@ -130,9 +130,9 @@ export class YtDlpScraper implements IMetadataScraper {
     let readResult: any;
     try {
       const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
-        mode: 'read_result',
-        result_id: resultId,
-      });
+          mode: 'read_result',
+          result_id: resultId,
+        });
       console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
 
       // runPluginOperation returns the actual data directly
@@ -317,13 +317,13 @@ export class YtDlpScraper implements IMetadataScraper {
       });
 
       if (videoFormats.length > 0) {
-        // Sort by quality (height * width, or just height if width not available)
+      // Sort by quality (height * width, or just height if width not available)
         // Higher quality first
-        videoFormats.sort((a: any, b: any) => {
-          const qualityA = (a.height || 0) * (a.width || a.height || 0);
-          const qualityB = (b.height || 0) * (b.width || b.height || 0);
-          return qualityB - qualityA;
-        });
+      videoFormats.sort((a: any, b: any) => {
+        const qualityA = (a.height || 0) * (a.width || a.height || 0);
+        const qualityB = (b.height || 0) * (b.width || b.height || 0);
+        return qualityB - qualityA;
+      });
 
         // Try formats in order of quality
         for (const format of videoFormats) {

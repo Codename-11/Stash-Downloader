@@ -10,6 +10,8 @@ import http from 'http';
 import https from 'https';
 import { spawn } from 'child_process';
 import { URL as URLParser } from 'url';
+import { HttpProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export function corsProxyPlugin(): Plugin {
   let proxyServer: http.Server | null = null;
@@ -48,19 +50,25 @@ export function corsProxyPlugin(): Plugin {
           return;
         }
 
-        // Extract target URL from query parameter or path
-        // New format: http://localhost:8080/?url=https://example.com/video.mp4
+        // Extract target URL and HTTP proxy from query parameters
+        // New format: http://localhost:8080/?url=https://example.com/video.mp4&proxy=socks5://user:pass@host:port
         // Legacy format: http://localhost:8080/https://example.com/video.mp4
         let targetUrl: string | null = null;
+        let httpProxyUrl: string | null = null;
 
         // Try query parameter first (new format)
         const urlParams = new URLParser(req.url || '', `http://${req.headers.host}`);
         if (urlParams.searchParams.has('url')) {
           targetUrl = urlParams.searchParams.get('url');
+          httpProxyUrl = urlParams.searchParams.get('proxy') || process.env.HTTP_PROXY || process.env.http_proxy || null;
           console.log(`[CORS Proxy] Using URL from query parameter: ${targetUrl}`);
+          if (httpProxyUrl) {
+            console.log(`[CORS Proxy] Using HTTP proxy: ${httpProxyUrl.replace(/:[^:@]*@/, ':****@')}`); // Hide password in logs
+          }
         } else {
           // Fallback to path format (legacy)
           targetUrl = req.url?.substring(1) || null; // Remove leading slash
+          httpProxyUrl = process.env.HTTP_PROXY || process.env.http_proxy || null;
           console.log(`[CORS Proxy] Using URL from path: ${targetUrl}`);
 
           // Try decoding if needed
@@ -110,7 +118,7 @@ export function corsProxyPlugin(): Plugin {
 
         const protocol = parsedUrl.protocol === 'https:' ? https : http;
 
-        const options = {
+        const options: any = {
           hostname: parsedUrl.hostname,
           port: parsedUrl.port,
           path: parsedUrl.pathname + parsedUrl.search,
@@ -124,6 +132,26 @@ export function corsProxyPlugin(): Plugin {
         // Remove origin/referer to avoid detection
         delete options.headers.origin;
         delete options.headers.referer;
+
+        // Use HTTP/SOCKS proxy if configured
+        if (httpProxyUrl) {
+          try {
+            if (httpProxyUrl.startsWith('socks5://') || httpProxyUrl.startsWith('socks5h://')) {
+              options.agent = new SocksProxyAgent(httpProxyUrl);
+              console.log(`[CORS Proxy] ✓ Using SOCKS5 proxy agent`);
+            } else if (httpProxyUrl.startsWith('http://') || httpProxyUrl.startsWith('https://')) {
+              options.agent = new HttpProxyAgent(httpProxyUrl);
+              console.log(`[CORS Proxy] ✓ Using HTTP proxy agent`);
+            } else {
+              // Assume HTTP if no scheme
+              options.agent = new HttpProxyAgent(`http://${httpProxyUrl}`);
+              console.log(`[CORS Proxy] ✓ Using HTTP proxy agent (assumed http://)`);
+            }
+          } catch (error: any) {
+            console.error(`[CORS Proxy] Failed to create proxy agent: ${error.message}`);
+            // Continue without proxy
+          }
+        }
 
         const proxyReq = protocol.request(options, (proxyRes) => {
           console.log(`[CORS Proxy] Response ${proxyRes.statusCode} from ${targetUrl}`);

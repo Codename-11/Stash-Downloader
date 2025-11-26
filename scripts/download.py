@@ -253,10 +253,10 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
     """
     cmd = [
-        'yt-dlp',
-        '--dump-json',
-        '--no-download',
-        '--no-playlist',
+                'yt-dlp',
+                '--dump-json',
+                '--no-download',
+                '--no-playlist',
     ]
     
     # Add proxy if provided
@@ -706,45 +706,45 @@ def task_check_ytdlp(args: dict) -> dict:
 def main():
     """Main entry point."""
     try:
-        input_data = read_input()
+    input_data = read_input()
 
-        # Debug: log the raw input received
-        log.info(f"Raw input received: {json.dumps(input_data, default=str)[:500]}")
+    # Debug: log the raw input received
+    log.info(f"Raw input received: {json.dumps(input_data, default=str)[:500]}")
 
-        # Get task name and arguments
-        # Stash sends JSON to stdin: {"args": {"mode": "...", ...}, "server_connection": {...}}
-        # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
+    # Get task name and arguments
+    # Stash sends JSON to stdin: {"args": {"mode": "...", ...}, "server_connection": {...}}
+    # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
 
-        # Check for nested args first (standard Stash format)
-        if 'args' in input_data and isinstance(input_data.get('args'), dict):
-            args = input_data['args']
-            # Try 'mode' first (community pattern), then 'task' for backwards compat
-            task_name = args.get('mode') or args.get('task', 'download')
-        else:
-            # Direct format (runPluginOperation or direct call)
-            args = input_data
-            task_name = input_data.get('mode') or input_data.get('task', 'download')
+    # Check for nested args first (standard Stash format)
+    if 'args' in input_data and isinstance(input_data.get('args'), dict):
+        args = input_data['args']
+        # Try 'mode' first (community pattern), then 'task' for backwards compat
+        task_name = args.get('mode') or args.get('task', 'download')
+    else:
+        # Direct format (runPluginOperation or direct call)
+        args = input_data
+        task_name = input_data.get('mode') or input_data.get('task', 'download')
 
-        log.info(f"Detected task: {task_name}")
-        log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")
+    log.info(f"Detected task: {task_name}")
+    log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")
 
-        # Route to appropriate task handler
-        tasks = {
-            'download': task_download,
-            'extract_metadata': task_extract_metadata,
-            'read_result': task_read_result,
-            'cleanup_result': task_cleanup_result,
-            'check_ytdlp': task_check_ytdlp,
-        }
+    # Route to appropriate task handler
+    tasks = {
+        'download': task_download,
+        'extract_metadata': task_extract_metadata,
+        'read_result': task_read_result,
+        'cleanup_result': task_cleanup_result,
+        'check_ytdlp': task_check_ytdlp,
+    }
 
-        handler = tasks.get(task_name)
-        if handler:
-            result = handler(args)
-        else:
+    handler = tasks.get(task_name)
+    if handler:
+        result = handler(args)
+    else:
             # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
             result = {'result_error': f'Unknown task: {task_name}', 'success': False}
 
-        write_output(result)
+    write_output(result)
     except Exception as e:
         log.error(f"Unhandled exception in main: {e}", exc_info=True)
         # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
