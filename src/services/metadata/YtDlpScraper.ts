@@ -1,16 +1,19 @@
 /**
  * YtDlpScraper - Uses yt-dlp for video URL extraction
  *
- * This scraper delegates to yt-dlp running in the CORS proxy backend,
- * avoiding the need to reimplement scraping logic for every site.
+ * Supports two modes:
+ * 1. Server-side (Stash): Uses Python backend via runPluginTask (NO CORS)
+ * 2. Client-side (test-app): Uses CORS proxy
  *
- * Requires:
- * - CORS proxy running with yt-dlp installed
- * - Endpoint: http://localhost:8080/api/extract?url=<video_url>
+ * Server-side mode is preferred as it bypasses CORS restrictions entirely.
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
+import { getStashService } from '@/services/stash/StashGraphQLService';
+
+// Plugin ID for runPluginTask calls
+const PLUGIN_ID = 'stash-downloader';
 
 export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
@@ -30,17 +33,81 @@ export class YtDlpScraper implements IMetadataScraper {
   async scrape(url: string): Promise<IScrapedMetadata> {
     console.log('[YtDlpScraper] Using yt-dlp to extract:', url);
 
+    const stashService = getStashService();
+
+    // Use server-side extraction in Stash (bypasses CORS)
+    if (stashService.isStashEnvironment()) {
+      console.log('[YtDlpScraper] Using server-side extraction (no CORS)');
+      return this.scrapeServerSide(url);
+    }
+
+    // Fall back to CORS proxy in test-app
+    console.log('[YtDlpScraper] Using client-side extraction via CORS proxy');
+    return this.scrapeClientSide(url);
+  }
+
+  /**
+   * Server-side extraction using Python backend (NO CORS)
+   * Uses runPluginOperation for synchronous execution with direct result
+   */
+  private async scrapeServerSide(url: string): Promise<IScrapedMetadata> {
+    const stashService = getStashService();
+
+    console.log('[YtDlpScraper] Calling runPluginOperation for metadata extraction...');
+
+    // Use runPluginOperation for synchronous execution
+    // This calls the Python script and returns the JSON result directly
+    const result = await stashService.runPluginOperation(PLUGIN_ID, {
+      task: 'extract_metadata',
+      url: url,
+    });
+
+    console.log('[YtDlpScraper] runPluginOperation result:', result);
+
+    // Check if result indicates success
+    if (!result) {
+      throw new Error('No response from yt-dlp extraction task');
+    }
+
+    // The result is parsed from Python script's JSON output
+    const data = result as any;
+
+    if (data.error) {
+      throw new Error(`yt-dlp extraction failed: ${data.error}`);
+    }
+
+    if (!data.success) {
+      throw new Error('yt-dlp extraction did not succeed');
+    }
+
+    console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', data.title);
+
+    // Convert to our metadata format
+    return {
+      url: url,
+      title: data.title || undefined,
+      description: data.description || undefined,
+      date: data.upload_date ? this.formatDate(data.upload_date) : undefined,
+      duration: data.duration || undefined,
+      thumbnailUrl: data.thumbnail || undefined,
+      performers: data.uploader ? [data.uploader] : [],
+      tags: [],
+      studio: data.uploader || undefined,
+      contentType: 'video' as ContentType,
+    };
+  }
+
+  /**
+   * Client-side extraction using CORS proxy
+   */
+  private async scrapeClientSide(url: string): Promise<IScrapedMetadata> {
     try {
       const proxyUrl = this.getProxyUrl();
       const extractUrl = `${proxyUrl}/api/extract?url=${encodeURIComponent(url)}`;
 
       console.log('[YtDlpScraper] Calling yt-dlp API:', extractUrl);
 
-      const response = await fetchWithTimeout(
-        extractUrl,
-        {},
-        this.timeoutMs
-      );
+      const response = await fetchWithTimeout(extractUrl, {}, this.timeoutMs);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: response.statusText }));

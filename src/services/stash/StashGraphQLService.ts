@@ -78,9 +78,19 @@ export class StashGraphQLService {
 
     const result = await response.json();
 
-    // Check for GraphQL errors
+    // Check for GraphQL errors and log detailed information
     if (result.errors && result.errors.length > 0) {
-      console.error('[StashGraphQL] GraphQL errors:', result.errors);
+      const errorMessages = result.errors.map((e: any) => e.message || JSON.stringify(e));
+      console.error('[StashGraphQL] GraphQL errors:', errorMessages);
+
+      // Log full error details for debugging
+      result.errors.forEach((error: any, index: number) => {
+        console.error(`[StashGraphQL] Error ${index + 1}:`, {
+          message: error.message,
+          path: error.path,
+          extensions: error.extensions,
+        });
+      });
     }
 
     return result;
