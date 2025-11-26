@@ -112,41 +112,25 @@ export class YtDlpScraper implements IMetadataScraper {
       });
       console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
 
-      // runPluginOperation returns IPluginTaskResult with {data?, error?}
-      // The Python script outputs PluginOutput format: {error?, output?}
-      // Stash wraps this in the 'data' field of IPluginTaskResult
+      // runPluginOperation returns the actual data directly
+      // Stash extracts the 'output' field from PluginOutput and returns it as the result
+      // So operationResult is already our data (title, description, etc.)
       if (!operationResult) {
         throw new Error('runPluginOperation returned null - check Stash server logs');
       }
 
-      console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
-      console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
-      
-      // If Stash returned a GraphQL error, operationResult.error will be set
+      // Check if operationResult has an 'error' field (from PluginOutput.error)
       if (operationResult.error) {
-        console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
-        throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
+        console.error('[YtDlpScraper] Python script returned error:', operationResult.error);
+        throw new Error(`Python script error: ${operationResult.error}`);
       }
       
-      // Extract the PluginOutput from data field
-      // Python script outputs: {error?: string, output?: {...actual data...}}
-      const pluginOutput = operationResult.data;
-      if (!pluginOutput) {
-        throw new Error('operationResult.data is null/undefined');
-      }
+      // The result is already the extracted data from PluginOutput.output
+      readResult = operationResult;
       
-      // Check for error in PluginOutput
-      if (pluginOutput.error) {
-        console.error('[YtDlpScraper] Python script returned error:', pluginOutput.error);
-        throw new Error(`Python script error: ${pluginOutput.error}`);
-      }
-      
-      // Extract the actual result from the 'output' field
-      // pluginOutput.output contains our actual data (title, description, etc.)
-      readResult = pluginOutput.output !== undefined ? pluginOutput.output : pluginOutput;
-      
-      if (!readResult || (!readResult.title && readResult.success === false)) {
-        throw new Error('Invalid result data from Python script');
+      // Validate we got valid data
+      if (!readResult.title && readResult.success === false) {
+        throw new Error('Invalid result data from Python script - missing title and success is false');
       }
       
       console.log('[YtDlpScraper] ✓ Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
