@@ -37,16 +37,16 @@ export class ScraperRegistry {
     // - All scrapers available (CORS proxy required)
 
     this.register(new StashScraper());  // Always available (server-side in Stash, noop in test-app)
+    this.register(new YtDlpScraper());  // Server-side in Stash (file-based), CORS proxy in test-app
 
     if (!isStashEnv) {
       // Client-side scrapers only work in test-app with CORS proxy
       console.log('[ScraperRegistry] Test-app mode: enabling client-side scrapers');
-      this.register(new YtDlpScraper());  // Uses CORS proxy API in test-app
       this.register(new PornhubScraper());
       this.register(new YouPornScraper());
       this.register(new HTMLScraper());
     } else {
-      console.log('[ScraperRegistry] Stash mode: using server-side scrapers only');
+      console.log('[ScraperRegistry] Stash mode: using StashScraper and YtDlpScraper (server-side)');
     }
   }
 

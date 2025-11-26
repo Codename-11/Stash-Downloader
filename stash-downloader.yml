@@ -50,6 +50,14 @@ tasks:
     description: Extract video metadata without downloading
     defaultArgs:
       task: extract_metadata
+  - name: Read Result
+    description: Read a saved task result from temp file
+    defaultArgs:
+      task: read_result
+  - name: Cleanup Result
+    description: Delete a saved task result file
+    defaultArgs:
+      task: cleanup_result
   - name: Check yt-dlp
     description: Check if yt-dlp is installed and available
     defaultArgs:

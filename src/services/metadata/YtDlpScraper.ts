@@ -6,6 +6,13 @@
  * 2. Client-side (test-app): Uses CORS proxy
  *
  * Server-side mode is preferred as it bypasses CORS restrictions entirely.
+ *
+ * Server-side flow:
+ * 1. Generate unique result_id
+ * 2. Call runPluginTask for extract_metadata (saves to temp file)
+ * 3. Poll for job completion
+ * 4. Call runPluginOperation for read_result (reads temp file)
+ * 5. Cleanup temp file
  */
 
 import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
@@ -47,30 +54,70 @@ export class YtDlpScraper implements IMetadataScraper {
   }
 
   /**
+   * Generate a unique result ID for tracking async results
+   */
+  private generateResultId(): string {
+    return `ytdlp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  /**
    * Server-side extraction using Python backend (NO CORS)
-   * Uses runPluginOperation for synchronous execution with direct result
+   * Uses file-based result passing:
+   * 1. runPluginTask extracts metadata and saves to temp file
+   * 2. runPluginOperation reads the result from temp file
    */
   private async scrapeServerSide(url: string): Promise<IScrapedMetadata> {
     const stashService = getStashService();
+    const resultId = this.generateResultId();
 
-    console.log('[YtDlpScraper] Calling runPluginOperation for metadata extraction...');
+    console.log('[YtDlpScraper] Starting server-side extraction with result_id:', resultId);
 
-    // Use runPluginOperation for synchronous execution
-    // This calls the Python script and returns the JSON result directly
-    const result = await stashService.runPluginOperation(PLUGIN_ID, {
-      task: 'extract_metadata',
-      url: url,
-    });
+    // Step 1: Run extract_metadata task (saves result to temp file)
+    const taskResult = await stashService.runPluginTaskAndWait(
+      PLUGIN_ID,
+      'Extract Metadata',
+      {
+        task: 'extract_metadata',
+        url: url,
+        result_id: resultId,
+      },
+      {
+        maxWaitMs: this.timeoutMs,
+        onProgress: (progress) => {
+          console.log(`[YtDlpScraper] Extraction progress: ${progress}%`);
+        },
+      }
+    );
 
-    console.log('[YtDlpScraper] runPluginOperation result:', result);
+    console.log('[YtDlpScraper] Task result:', taskResult);
 
-    // Check if result indicates success
-    if (!result) {
-      throw new Error('No response from yt-dlp extraction task');
+    if (!taskResult.success) {
+      throw new Error(`yt-dlp extraction task failed: ${taskResult.error || 'Unknown error'}`);
     }
 
-    // The result is parsed from Python script's JSON output
-    const data = result as any;
+    // Step 2: Read the result using runPluginOperation
+    console.log('[YtDlpScraper] Reading result from temp file...');
+    const readResult = await stashService.runPluginOperation(PLUGIN_ID, {
+      task: 'read_result',
+      result_id: resultId,
+    });
+
+    console.log('[YtDlpScraper] Read result:', readResult);
+
+    // Step 3: Cleanup (fire and forget)
+    stashService.runPluginOperation(PLUGIN_ID, {
+      task: 'cleanup_result',
+      result_id: resultId,
+    }).catch(() => {
+      // Ignore cleanup errors
+    });
+
+    // Check if we got the result
+    if (!readResult) {
+      throw new Error('Failed to read extraction result');
+    }
+
+    const data = readResult as any;
 
     if (data.error) {
       throw new Error(`yt-dlp extraction failed: ${data.error}`);

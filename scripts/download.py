@@ -13,6 +13,10 @@ Requirements:
 Usage:
   Called automatically by the Stash Downloader plugin via runPluginTask.
   Not intended to be run directly.
+
+Result Communication:
+  Since runPluginTask doesn't return script output, results are stored in
+  a temp file that can be read via the 'read_result' task.
 """
 
 import json
@@ -32,6 +36,58 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stderr)]
 )
 log = logging.getLogger(__name__)
+
+# Directory for storing task results (accessible to both tasks)
+RESULT_DIR = os.path.join(tempfile.gettempdir(), 'stash-downloader-results')
+
+def ensure_result_dir():
+    """Ensure the result directory exists."""
+    os.makedirs(RESULT_DIR, exist_ok=True)
+
+def get_result_path(result_id: str) -> str:
+    """Get the path for a result file."""
+    # Sanitize result_id to prevent path traversal
+    safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', result_id)
+    return os.path.join(RESULT_DIR, f'{safe_id}.json')
+
+def save_result(result_id: str, data: dict) -> bool:
+    """Save a result to a file for later retrieval."""
+    try:
+        ensure_result_dir()
+        result_path = get_result_path(result_id)
+        with open(result_path, 'w') as f:
+            json.dump(data, f)
+        log.info(f"Saved result to: {result_path}")
+        return True
+    except Exception as e:
+        log.error(f"Failed to save result: {e}")
+        return False
+
+def load_result(result_id: str) -> Optional[dict]:
+    """Load a result from file."""
+    try:
+        result_path = get_result_path(result_id)
+        if os.path.exists(result_path):
+            with open(result_path, 'r') as f:
+                return json.load(f)
+        else:
+            log.warning(f"Result file not found: {result_path}")
+            return None
+    except Exception as e:
+        log.error(f"Failed to load result: {e}")
+        return None
+
+def delete_result(result_id: str) -> bool:
+    """Delete a result file."""
+    try:
+        result_path = get_result_path(result_id)
+        if os.path.exists(result_path):
+            os.remove(result_path)
+            log.info(f"Deleted result: {result_path}")
+        return True
+    except Exception as e:
+        log.error(f"Failed to delete result: {e}")
+        return False
 
 # Read input from stdin (Stash passes JSON)
 def read_input() -> dict:
@@ -243,22 +299,31 @@ def task_extract_metadata(args: dict) -> dict:
 
     Args:
         url: URL to extract metadata from
+        result_id: Optional ID for storing result (for async retrieval)
 
     Returns:
-        Dict with metadata on success, error on failure
+        Dict with metadata on success, error on failure.
+        If result_id is provided, also saves to file for later retrieval.
     """
     url = args.get('url')
+    result_id = args.get('result_id')
 
     if not url:
-        return {'error': 'No URL provided'}
+        result = {'error': 'No URL provided', 'success': False}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
     if not check_ytdlp():
-        return {'error': 'yt-dlp is not installed'}
+        result = {'error': 'yt-dlp is not installed', 'success': False}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
     metadata = extract_metadata(url)
 
     if metadata:
-        return {
+        result = {
             'success': True,
             'title': metadata.get('title'),
             'description': metadata.get('description'),
@@ -279,7 +344,58 @@ def task_extract_metadata(args: dict) -> dict:
             ][:5]  # Limit to top 5 formats
         }
     else:
-        return {'error': 'Failed to extract metadata', 'success': False}
+        result = {'error': 'Failed to extract metadata', 'success': False}
+
+    # Save result for async retrieval if result_id provided
+    if result_id:
+        save_result(result_id, result)
+        log.info(f"Metadata saved with result_id: {result_id}")
+
+    return result
+
+
+def task_read_result(args: dict) -> dict:
+    """
+    Read a previously saved result.
+
+    Args:
+        result_id: ID of the result to read
+
+    Returns:
+        The saved result data, or error if not found
+    """
+    result_id = args.get('result_id')
+
+    if not result_id:
+        return {'error': 'No result_id provided', 'success': False}
+
+    data = load_result(result_id)
+    if data:
+        # Include the loaded data plus success flag
+        return {**data, 'retrieved': True}
+    else:
+        return {'error': 'Result not found', 'success': False}
+
+
+def task_cleanup_result(args: dict) -> dict:
+    """
+    Delete a saved result file.
+
+    Args:
+        result_id: ID of the result to delete
+
+    Returns:
+        Success status
+    """
+    result_id = args.get('result_id')
+
+    if not result_id:
+        return {'error': 'No result_id provided', 'success': False}
+
+    if delete_result(result_id):
+        return {'success': True, 'deleted': True}
+    else:
+        return {'error': 'Failed to delete result', 'success': False}
 
 
 def task_check_ytdlp(args: dict) -> dict:
@@ -306,6 +422,8 @@ def main():
     tasks = {
         'download': task_download,
         'extract_metadata': task_extract_metadata,
+        'read_result': task_read_result,
+        'cleanup_result': task_cleanup_result,
         'check_ytdlp': task_check_ytdlp,
     }
 
