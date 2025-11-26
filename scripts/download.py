@@ -244,32 +244,66 @@ def check_ytdlp() -> bool:
         return False
 
 
-def extract_metadata(url: str) -> Optional[dict]:
-    """Extract metadata using yt-dlp without downloading."""
+def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
+    """
+    Extract metadata using yt-dlp without downloading.
+    
+    Args:
+        url: URL to extract metadata from
+        proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
+    """
+    cmd = [
+        'yt-dlp',
+        '--dump-json',
+        '--no-download',
+        '--no-playlist',
+    ]
+    
+    # Add proxy if provided
+    if proxy:
+        cmd.extend(['--proxy', proxy])
+        log.info(f"✓ Proxy configured for metadata extraction: {proxy}")
+    else:
+        log.info("ℹ No proxy configured for metadata extraction - using direct connection")
+    
+    cmd.append(url)
+    
+    log.info(f"Extracting metadata from: {url}")
+    log.info(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
+    
     try:
         result = subprocess.run(
-            [
-                'yt-dlp',
-                '--dump-json',
-                '--no-download',
-                '--no-playlist',
-                url
-            ],
+            cmd,
             capture_output=True,
             text=True,
             timeout=60
         )
 
         if result.returncode == 0 and result.stdout:
+            log.info("✓ Metadata extraction successful")
             return json.loads(result.stdout)
         else:
-            log.error(f"yt-dlp metadata extraction failed: {result.stderr}")
+            # Enhanced error logging with proxy context
+            error_msg = result.stderr or result.stdout or "Unknown error"
+            if proxy:
+                log.error(f"yt-dlp metadata extraction failed (using proxy {proxy}): {error_msg}")
+            else:
+                log.error(f"yt-dlp metadata extraction failed (no proxy): {error_msg}")
             return None
     except subprocess.TimeoutExpired:
-        log.error("yt-dlp metadata extraction timed out")
+        timeout_msg = "yt-dlp metadata extraction timed out"
+        if proxy:
+            timeout_msg += f" (using proxy {proxy})"
+        log.error(timeout_msg)
         return None
     except json.JSONDecodeError as e:
-        log.error(f"Failed to parse yt-dlp output: {e}")
+        log.error(f"Failed to parse yt-dlp output: {e}", exc_info=True)
+        return None
+    except Exception as e:
+        error_msg = f"Metadata extraction error: {e}"
+        if proxy:
+            error_msg += f" (using proxy {proxy})"
+        log.error(error_msg, exc_info=True)
         return None
 
 
@@ -278,7 +312,8 @@ def download_video(
     output_dir: str,
     filename_template: str = '%(title)s.%(ext)s',
     quality: str = 'best',
-    progress_callback: Optional[callable] = None
+    progress_callback: Optional[callable] = None,
+    proxy: Optional[str] = None
 ) -> Optional[str]:
     """
     Download video using yt-dlp.
@@ -289,6 +324,7 @@ def download_video(
         filename_template: yt-dlp output template
         quality: Quality preference (best, 1080p, 720p, 480p)
         progress_callback: Optional callback for progress updates
+        proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
 
     Returns:
         Path to downloaded file, or None if failed
@@ -314,12 +350,21 @@ def download_video(
         '--no-playlist',
         '--newline',  # For progress parsing
         '--print', 'after_move:filepath',  # Print final path
-        url
     ]
+    
+    # Add proxy if provided (yt-dlp supports http://, https://, socks4://, socks5://)
+    if proxy:
+        cmd.extend(['--proxy', proxy])
+        log.info(f"✓ Proxy configured: {proxy}")
+    else:
+        log.info("ℹ No proxy configured - using direct connection")
+
+    cmd.append(url)
 
     log.info(f"Starting download: {url}")
     log.info(f"Output directory: {output_dir}")
     log.info(f"Quality: {quality}")
+    log.info(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
 
     try:
         result = subprocess.run(
@@ -346,14 +391,25 @@ def download_video(
                     log.info(f"Found downloaded file: {newest}")
                     return str(newest)
 
-        log.error(f"yt-dlp download failed: {result.stderr}")
+        # Enhanced error logging with proxy context
+        error_msg = result.stderr or result.stdout or "Unknown error"
+        if proxy:
+            log.error(f"yt-dlp download failed (using proxy {proxy}): {error_msg}")
+        else:
+            log.error(f"yt-dlp download failed (no proxy): {error_msg}")
         return None
 
     except subprocess.TimeoutExpired:
-        log.error("Download timed out after 1 hour")
+        timeout_msg = f"Download timed out after 1 hour"
+        if proxy:
+            timeout_msg += f" (using proxy {proxy})"
+        log.error(timeout_msg)
         return None
     except Exception as e:
-        log.error(f"Download error: {e}")
+        error_msg = f"Download error: {e}"
+        if proxy:
+            error_msg += f" (using proxy {proxy})"
+        log.error(error_msg, exc_info=True)
         return None
 
 
@@ -366,6 +422,7 @@ def task_download(args: dict) -> dict:
         output_dir: Directory to save file (defaults to /data/StashDownloader)
         filename: Optional custom filename
         quality: Quality preference (best, 1080p, 720p, 480p)
+        proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         result_id: Optional ID for storing result (for async retrieval)
 
     Returns:
@@ -377,7 +434,14 @@ def task_download(args: dict) -> dict:
     output_dir = args.get('output_dir', '/data/StashDownloader')
     filename = args.get('filename')
     quality = args.get('quality', 'best')
+    proxy = args.get('proxy')  # Optional proxy for bypassing restrictions
     result_id = args.get('result_id')
+    
+    # Log proxy configuration for troubleshooting
+    if proxy:
+        log.info(f"[task_download] Proxy configured: {proxy}")
+    else:
+        log.info("[task_download] No proxy configured - using direct connection")
 
     if not url:
         result = {'result_error': 'No URL provided', 'success': False}
@@ -400,8 +464,8 @@ def task_download(args: dict) -> dict:
     else:
         template = '%(title)s.%(ext)s'
 
-    # Download
-    file_path = download_video(url, output_dir, template, quality)
+    # Download (with proxy if provided)
+    file_path = download_video(url, output_dir, template, quality, proxy=proxy)
 
     if file_path:
         file_size = os.path.getsize(file_path)
@@ -428,6 +492,7 @@ def task_extract_metadata(args: dict) -> dict:
 
     Args:
         url: URL to extract metadata from
+        proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         result_id: Optional ID for storing result (for async retrieval)
 
     Returns:
@@ -435,7 +500,14 @@ def task_extract_metadata(args: dict) -> dict:
         If result_id is provided, also saves to file for later retrieval.
     """
     url = args.get('url')
+    proxy = args.get('proxy')  # Optional proxy for bypassing restrictions
     result_id = args.get('result_id')
+    
+    # Log proxy configuration for troubleshooting
+    if proxy:
+        log.info(f"[task_extract_metadata] Proxy configured: {proxy}")
+    else:
+        log.info("[task_extract_metadata] No proxy configured - using direct connection")
 
     if not url:
         result = {'result_error': 'No URL provided', 'success': False}
@@ -449,7 +521,7 @@ def task_extract_metadata(args: dict) -> dict:
             save_result(result_id, result)
         return result
 
-    metadata = extract_metadata(url)
+    metadata = extract_metadata(url, proxy=proxy)
 
     if metadata:
         result = {

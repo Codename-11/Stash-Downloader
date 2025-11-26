@@ -94,6 +94,7 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 - Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
 - Configurable download directory via `serverDownloadPath` setting (default: `/data/StashDownloader`)
+- HTTP/HTTPS/SOCKS proxy support via `httpProxy` setting (for bypassing geo-restrictions, IP blocks, rate limits)
 
 ### PluginOutput Format (Critical for `runPluginOperation`)
 

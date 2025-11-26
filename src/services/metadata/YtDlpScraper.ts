@@ -74,17 +74,40 @@ export class YtDlpScraper implements IMetadataScraper {
 
     let taskResult: { success: boolean; error?: string; jobId?: string };
 
-    // Step 1: Run extract_metadata task (saves result to temp file)
-    try {
-      console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
-      taskResult = await stashService.runPluginTaskAndWait(
-        PLUGIN_ID,
-        'Extract Metadata',
-        {
-          mode: 'extract_metadata',
-          url: url,
-          result_id: resultId,
-        },
+        // Step 1: Run extract_metadata task (saves result to temp file)
+        try {
+          console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
+          
+          // Get proxy setting from localStorage if available
+          let proxy: string | undefined;
+          if (typeof window !== 'undefined') {
+            const settings = localStorage.getItem('stash-downloader:settings');
+            if (settings) {
+              try {
+                const parsed = JSON.parse(settings);
+                proxy = parsed.httpProxy;
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+          
+          // Log proxy configuration for troubleshooting
+          if (proxy) {
+            console.log(`[YtDlpScraper] Using HTTP proxy for metadata extraction: ${proxy}`);
+          } else {
+            console.log('[YtDlpScraper] No HTTP proxy configured - using direct connection');
+          }
+          
+          taskResult = await stashService.runPluginTaskAndWait(
+            PLUGIN_ID,
+            'Extract Metadata',
+            {
+              mode: 'extract_metadata',
+              url: url,
+              result_id: resultId,
+              proxy: proxy, // Pass proxy if configured
+            },
         {
           maxWaitMs: this.timeoutMs,
           onProgress: (progress) => {

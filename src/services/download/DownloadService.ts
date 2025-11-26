@@ -92,9 +92,17 @@ export class DownloadService {
       // Generate result_id for async result retrieval
       const resultId = `download-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-      // Get server download path from settings (defaults to /data/StashDownloader)
+      // Get server download path and proxy from settings
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const serverDownloadPath = options.outputDir || settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
+      const httpProxy = settings.httpProxy; // Optional proxy (e.g., http://proxy.example.com:8080)
+      
+      // Log proxy configuration for troubleshooting
+      if (httpProxy) {
+        console.log(`[DownloadService] Using HTTP proxy for server-side download: ${httpProxy}`);
+      } else {
+        console.log('[DownloadService] No HTTP proxy configured - using direct connection');
+      }
 
       // Run the download task and wait for completion
       const taskResult = await stashService.runPluginTaskAndWait(
@@ -107,6 +115,7 @@ export class DownloadService {
           filename: options.filename,
           quality: options.quality || 'best',
           result_id: resultId,
+          proxy: httpProxy, // Pass proxy to Python script (optional)
         },
         {
           maxWaitMs: 600000, // 10 minutes for large downloads

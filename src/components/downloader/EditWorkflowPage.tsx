@@ -11,6 +11,7 @@ import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
+import { formatDownloadError } from '@/utils/helpers';
 
 interface EditWorkflowPageProps {
   items: IDownloadItem[];
@@ -72,13 +73,14 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
         onBack();
       }
     } catch (err) {
-      let errorMsg = err instanceof Error ? err.message : 'Failed to import to Stash';
       const errorStack = err instanceof Error ? err.stack : undefined;
+      const formattedError = formatDownloadError(err, currentItem.url);
       
       // Log detailed error information
       console.error('[EditWorkflowPage] Import error details:', {
         error: err,
-        message: errorMsg,
+        originalMessage: err instanceof Error ? err.message : String(err),
+        formattedError,
         stack: errorStack,
         itemUrl: currentItem.url,
         itemTitle: itemTitle,
@@ -86,26 +88,11 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
         videoUrl: currentItem.metadata?.videoUrl,
       });
       
-      // Provide helpful error messages for common issues
-      if (errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch') || errorMsg.includes('CORS')) {
-        const corsEnabled = typeof window !== 'undefined' && localStorage.getItem('corsProxyEnabled') === 'true';
-        if (!corsEnabled) {
-          errorMsg = 'CORS Error: Enable CORS proxy in settings to download from this site. The site blocks direct browser requests.';
-        } else {
-          errorMsg = 'Network Error: Check if CORS proxy is running and accessible. Some sites may block downloads even with proxy.';
-        }
-      }
-      
-      // Add more context to error message
-      if (errorMsg.includes('Invalid URL')) {
-        errorMsg += ` (URL: ${currentItem.url})`;
-      }
-      
-      log.addLog('error', 'download', `Failed to import to Stash: ${errorMsg}`, 
+      log.addLog('error', 'download', `Failed to import to Stash: ${formattedError}`, 
         `URL: ${currentItem.url}\nVideo URL: ${currentItem.metadata?.videoUrl || 'none'}\n${errorStack || ''}`
       );
-      toast.showToast('error', 'Import Failed', errorMsg);
-      setError(errorMsg);
+      toast.showToast('error', 'Import Failed', formattedError);
+      setError(formattedError);
     } finally {
       setIsImporting(false);
     }

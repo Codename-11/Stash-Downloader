@@ -11,6 +11,10 @@ settings:
     displayName: Server Download Path
     description: Directory for server-side downloads (absolute path, e.g., /data/StashDownloader)
     type: STRING
+  httpProxy:
+    displayName: HTTP Proxy
+    description: HTTP/HTTPS proxy for server-side downloads (e.g., http://proxy.example.com:8080 or socks5://proxy.example.com:1080)
+    type: STRING
   concurrentDownloads:
     displayName: Concurrent Downloads
     description: Maximum number of simultaneous downloads

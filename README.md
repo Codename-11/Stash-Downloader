@@ -233,6 +233,7 @@ Settings are configurable in Stash at Settings > Plugins > Stash Downloader:
 
 - **Default Download Path**: Where to save downloaded files (browser downloads)
 - **Server Download Path**: Directory for server-side downloads (default: `/data/StashDownloader`, absolute path)
+- **HTTP Proxy**: HTTP/HTTPS/SOCKS proxy for server-side downloads (e.g., `http://proxy.example.com:8080` or `socks5://proxy.example.com:1080`) - Useful for bypassing geo-restrictions, IP blocks, or network restrictions
 - **Concurrent Downloads**: Maximum simultaneous downloads (default: 3)
 - **Auto-Create Performers/Tags/Studios**: Automatically create missing entities
 - **Download Quality**: Preferred video quality

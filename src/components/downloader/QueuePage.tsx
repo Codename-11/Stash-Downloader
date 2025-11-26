@@ -18,6 +18,7 @@ import { getDownloadService, getBrowserDownloadService } from '@/services/downlo
 import { DownloadStatus, ContentType } from '@/types';
 import type { IDownloadItem } from '@/types';
 import { checkYtDlpAvailable } from '@/utils/systemCheck';
+import { formatDownloadError } from '@/utils/helpers';
 import logoSvg from '@/assets/logo.svg';
 
 interface QueuePageProps {
@@ -256,26 +257,27 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         fileSize: blob.size,
       });
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Download failed';
       const errorStack = error instanceof Error ? error.stack : undefined;
+      const formattedError = formatDownloadError(error, item.url);
       const errorDetails = error instanceof Error ? 
-        `Error: ${errorMsg}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
-        `Error: ${String(error)}`;
+        `Error: ${formattedError}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
+        `Error: ${formattedError}`;
       
       console.error('[QueuePage] Download failed with full details:', {
         itemId,
         url: item.url,
-        errorMsg,
+        originalError: error instanceof Error ? error.message : String(error),
+        formattedError,
         errorStack,
         error,
       });
       
-      log.addLog('error', 'download', `Direct download failed: ${errorMsg}`, errorDetails);
-      toast.showToast('error', 'Download Failed', errorMsg);
+      log.addLog('error', 'download', `Direct download failed: ${formattedError}`, errorDetails);
+      toast.showToast('error', 'Download Failed', formattedError);
       
       queue.updateItem(itemId, {
         status: DownloadStatus.Failed,
-        error: errorMsg,
+        error: formattedError,
       });
     }
   };
