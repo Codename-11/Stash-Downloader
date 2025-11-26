@@ -459,19 +459,18 @@ def main():
     log.info(f"Raw input received: {json.dumps(input_data, default=str)[:500]}")
 
     # Get task name and arguments
-    # Handle multiple input formats from Stash:
-    # 1. runPluginTask: {"args": {"task": "...", ...}, "server_connection": {...}}
-    # 2. runPluginOperation: {"task": "...", ...} or possibly just the args directly
-    # 3. Direct call: {"task": "...", ...}
+    # Stash sends JSON to stdin: {"args": {"mode": "...", ...}, "server_connection": {...}}
+    # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
 
-    # Check for nested args first (runPluginTask format)
+    # Check for nested args first (standard Stash format)
     if 'args' in input_data and isinstance(input_data.get('args'), dict):
         args = input_data['args']
-        task_name = args.get('task', 'download')
+        # Try 'mode' first (community pattern), then 'task' for backwards compat
+        task_name = args.get('mode') or args.get('task', 'download')
     else:
         # Direct format (runPluginOperation or direct call)
         args = input_data
-        task_name = input_data.get('task', 'download')
+        task_name = input_data.get('mode') or input_data.get('task', 'download')
 
     log.info(f"Detected task: {task_name}")
     log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")

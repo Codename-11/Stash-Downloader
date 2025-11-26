@@ -46,23 +46,23 @@ tasks:
   - name: Download Video
     description: Download a video from URL using yt-dlp (server-side)
     defaultArgs:
-      task: download
+      mode: download
   - name: Extract Metadata
     description: Extract video metadata without downloading
     defaultArgs:
-      task: extract_metadata
+      mode: extract_metadata
   - name: Read Result
     description: Read a saved task result from temp file
     defaultArgs:
-      task: read_result
+      mode: read_result
   - name: Cleanup Result
     description: Delete a saved task result file
     defaultArgs:
-      task: cleanup_result
+      mode: cleanup_result
   - name: Check yt-dlp
     description: Check if yt-dlp is installed and available
     defaultArgs:
-      task: check_ytdlp
+      mode: check_ytdlp
 
 ui:
   javascript:

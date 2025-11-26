@@ -81,7 +81,7 @@ export class YtDlpScraper implements IMetadataScraper {
         PLUGIN_ID,
         'Extract Metadata',
         {
-          task: 'extract_metadata',
+          mode: 'extract_metadata',
           url: url,
           result_id: resultId,
         },
@@ -128,7 +128,7 @@ export class YtDlpScraper implements IMetadataScraper {
         // Try runPluginOperation as last resort (may not work with interface: raw)
         console.log('[YtDlpScraper] Trying runPluginOperation as fallback...');
         readResult = await stashService.runPluginOperation(PLUGIN_ID, {
-          task: 'read_result',
+          mode: 'read_result',
           result_id: resultId,
         });
         console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
@@ -140,6 +140,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
     // Step 3: Cleanup (fire and forget)
     stashService.runPluginTask(PLUGIN_ID, 'Cleanup Result', {
+      mode: 'cleanup_result',
       result_id: resultId,
     }).catch((cleanupErr) => {
       console.warn('[YtDlpScraper] Cleanup error (ignored):', cleanupErr);
