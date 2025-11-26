@@ -491,14 +491,43 @@ export class DownloadService {
       }
     }
 
-    // PRIORITY 3: Use yt-dlp for sites that require it (fallback if direct download fails)
+    // PRIORITY 3: In Stash environment, use server-side download for videos that need yt-dlp
+    // This bypasses CORS issues and uses server's yt-dlp
+    if (this.isStashEnvironment() && this.shouldUseYtDlp(url)) {
+      console.log('[DownloadService] Stash environment: using server-side download for yt-dlp');
+      try {
+        const serverResult = await this.downloadServerSide(url, options);
+        if (serverResult.success && serverResult.file_path) {
+          // File is on server filesystem - we can't fetch it directly via HTTP
+          // Server-side downloads save to server disk, not accessible as Blob
+          // TODO: Ultimate goal - download directly to Stash's data directory for automatic indexing
+          // For now, throw a helpful error explaining the limitation
+          // Browser downloads work for testing, but server-side downloads are ready for direct Stash import
+          throw new Error(
+            `Server-side download succeeded! File saved to: ${serverResult.file_path}\n\n` +
+            `However, server-side downloads save files to the server's filesystem, which cannot be ` +
+            `accessed as a Blob for browser downloads. This is a current limitation.\n\n` +
+            `Future enhancement: Download directly to Stash's data directory for automatic indexing as scenes/images.`
+          );
+        } else {
+          throw new Error(serverResult.error || 'Server-side download failed');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[DownloadService] Server-side download failed:', errorMessage);
+        // Fall through to client-side yt-dlp as last resort (will fail with CORS, but at least we tried)
+        console.warn('[DownloadService] Falling back to client-side yt-dlp (may fail with CORS)');
+      }
+    }
+
+    // PRIORITY 4: Use client-side yt-dlp for sites that require it (test-app or fallback)
     // Never use yt-dlp for direct image URLs (checked in shouldUseYtDlp)
     if (this.shouldUseYtDlp(url)) {
       try {
         return await this.downloadWithYtDlp(url, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[DownloadService] yt-dlp also failed:', errorMessage);
+        console.error('[DownloadService] Client-side yt-dlp also failed:', errorMessage);
         throw error;
       }
     }
