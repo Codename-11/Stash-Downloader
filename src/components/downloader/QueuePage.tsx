@@ -15,10 +15,15 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
 import { getDownloadService, getBrowserDownloadService } from '@/services/download';
+import { getStashService } from '@/services/stash/StashGraphQLService';
 import { DownloadStatus, ContentType } from '@/types';
 import type { IDownloadItem } from '@/types';
 import { checkYtDlpAvailable } from '@/utils/systemCheck';
 import { formatDownloadError } from '@/utils/helpers';
+import { useSettings } from '@/hooks';
+import { STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
+import { getStorageItem } from '@/utils';
+import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
 
 interface QueuePageProps {
@@ -31,10 +36,77 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const toast = useToast();
   const log = useLog();
   const scraperRegistry = getScraperRegistry();
+  const { settings } = useSettings();
+  const stashService = getStashService();
+  const isStashEnvironment = stashService.isStashEnvironment();
   const [editingItem, setEditingItem] = useState<IDownloadItem | null>(null);
   const [viewingLogsForItem, setViewingLogsForItem] = useState<IDownloadItem | null>(null);
   const [urlFieldValue, setUrlFieldValue] = useState('');
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
+  
+  // Get proxy info for display
+  const httpProxy = settings.httpProxy;
+  const serverDownloadPath = settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
+  
+  // Listen for settings changes from Stash's Settings UI
+  useEffect(() => {
+    if (!isStashEnvironment) return;
+    
+    // Check settings on mount and log current proxy status
+    const currentSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+    if (currentSettings.httpProxy) {
+      const masked = currentSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
+      console.log(`[Settings] Current HTTP/SOCKS proxy: ${masked}`);
+    } else {
+      console.log('[Settings] HTTP/SOCKS proxy not configured');
+    }
+    
+    // Listen for cross-tab storage changes (when settings are updated in another tab/window)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEYS.SETTINGS && e.newValue) {
+        try {
+          const newSettings = JSON.parse(e.newValue) as IPluginSettings;
+          const oldSettings = JSON.parse(e.oldValue || '{}') as IPluginSettings;
+          
+          // Check if proxy changed
+          if (newSettings.httpProxy !== oldSettings.httpProxy) {
+            if (newSettings.httpProxy) {
+              const masked = newSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
+              console.log(`[Settings] HTTP/SOCKS proxy updated via Stash Settings UI: ${masked}`);
+            } else {
+              console.log('[Settings] HTTP/SOCKS proxy removed via Stash Settings UI');
+            }
+          }
+          
+          // Check if server download path changed
+          if (newSettings.serverDownloadPath !== oldSettings.serverDownloadPath) {
+            console.log(`[Settings] Server download path updated: ${oldSettings.serverDownloadPath || 'default'} → ${newSettings.serverDownloadPath || 'default'}`);
+          }
+        } catch (error) {
+          // Ignore parse errors
+        }
+      }
+    };
+    
+    // Also check periodically for same-tab changes (Stash may update localStorage directly)
+    const checkInterval = setInterval(() => {
+      const latestSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+      if (latestSettings.httpProxy !== httpProxy) {
+        if (latestSettings.httpProxy) {
+          const masked = latestSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
+          console.log(`[Settings] HTTP/SOCKS proxy changed (detected via polling): ${masked}`);
+        } else {
+          console.log('[Settings] HTTP/SOCKS proxy removed (detected via polling)');
+        }
+      }
+    }, 2000); // Check every 2 seconds
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkInterval);
+    };
+  }, [isStashEnvironment, httpProxy]);
 
   // Check for yt-dlp on component mount
   useEffect(() => {
@@ -315,6 +387,41 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
 
           {/* Test settings panel in test mode */}
           {isTestMode && testSettingsPanel}
+
+          {/* Proxy and Server Status (Stash mode only) */}
+          {!isTestMode && isStashEnvironment && (
+            <div className="card text-light mb-3" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
+              <div className="card-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
+                <h6 className="mb-0">Server Configuration</h6>
+              </div>
+              <div className="card-body">
+                <div className="d-flex flex-column gap-2">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span style={{ color: '#8b9fad' }}>Server Download Path:</span>
+                    <code className="text-light">{serverDownloadPath}</code>
+                  </div>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span style={{ color: '#8b9fad' }}>HTTP/SOCKS Proxy:</span>
+                    {httpProxy ? (
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="badge bg-success">Enabled</span>
+                        <code className="text-light" style={{ fontSize: '0.85em' }}>
+                          {httpProxy.replace(/:[^:@]*@/, ':****@')}
+                        </code>
+                      </div>
+                    ) : (
+                      <span className="badge bg-secondary">Not Configured</span>
+                    )}
+                  </div>
+                  {httpProxy && (
+                    <small className="text-muted" style={{ color: '#8b9fad' }}>
+                      ℹ️ Proxy will be used for server-side downloads and metadata extraction. SSL certificate verification is disabled when using proxy.
+                    </small>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <URLInputForm
             onSubmit={handleAddUrl}

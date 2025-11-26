@@ -18,7 +18,37 @@ export function useSettings() {
   }, [settings]);
 
   const updateSettings = (partial: Partial<IPluginSettings>) => {
-    setSettings((prev) => ({ ...prev, ...partial }));
+    setSettings((prev) => {
+      const updated = { ...prev, ...partial };
+      
+      // Log settings changes to console
+      const changedKeys = Object.keys(partial).filter(key => {
+        const oldValue = prev[key as keyof IPluginSettings];
+        const newValue = updated[key as keyof IPluginSettings];
+        return oldValue !== newValue;
+      });
+      
+      if (changedKeys.length > 0) {
+        console.log('[Settings] Settings updated:', changedKeys);
+        changedKeys.forEach(key => {
+          const oldValue = prev[key as keyof IPluginSettings];
+          const newValue = updated[key as keyof IPluginSettings];
+          console.log(`[Settings]   ${key}:`, oldValue, '→', newValue);
+          
+          // Special logging for proxy changes
+          if (key === 'httpProxy') {
+            if (newValue) {
+              const masked = String(newValue).replace(/:[^:@]*@/, ':****@');
+              console.log(`[Settings] ✓ HTTP/SOCKS proxy configured: ${masked}`);
+            } else {
+              console.log('[Settings] ⚠ HTTP/SOCKS proxy removed');
+            }
+          }
+        });
+      }
+      
+      return updated;
+    });
   };
 
   const resetToDefaults = () => {
