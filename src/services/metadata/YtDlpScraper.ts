@@ -107,38 +107,59 @@ export class YtDlpScraper implements IMetadataScraper {
     console.log('[YtDlpScraper] Task succeeded, reading result...');
     let readResult: any;
     try {
-      // Wait a moment for file to be written
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Try runPluginOperation first (proper way, should work now with mode key)
-      console.log('[YtDlpScraper] Calling runPluginOperation to read result...');
-      const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
-        mode: 'read_result',
-        result_id: resultId,
-      });
-      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
-      console.log('[YtDlpScraper] operationResult type:', typeof operationResult);
-      console.log('[YtDlpScraper] operationResult is null?', operationResult === null);
-      console.log('[YtDlpScraper] operationResult is undefined?', operationResult === undefined);
-
-      // runPluginOperation returns IPluginTaskResult with {data?, error?}
-      // The actual result data is in the 'data' field
-      if (operationResult) {
-        console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
-        console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
-        
-        // If Stash returned a GraphQL error, operationResult.error will be set
-        if (operationResult.error) {
-          console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
-          throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
+      // Retry reading the result with exponential backoff
+      // The file might not be written immediately after task completion
+      const maxRetries = 5;
+      const initialDelay = 1000; // Start with 1 second
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const delay = initialDelay * Math.pow(2, attempt); // 1s, 2s, 4s, 8s, 16s
+        if (attempt > 0) {
+          console.log(`[YtDlpScraper] Retry attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          // First attempt, wait a bit
+          await new Promise((resolve) => setTimeout(resolve, initialDelay));
         }
-        // The data field contains the actual result from the Python script
-        // If data is not present, use operationResult itself (might be the data directly)
-        readResult = operationResult.data !== undefined ? operationResult.data : operationResult;
-        console.log('[YtDlpScraper] Extracted readResult:', JSON.stringify(readResult, null, 2));
-      } else {
-        console.error('[YtDlpScraper] runPluginOperation returned null/undefined');
-        console.error('[YtDlpScraper] This usually means GraphQL errors occurred - check browser console for GraphQL error details');
+
+        // Try runPluginOperation (proper way, should work now with mode key)
+        console.log(`[YtDlpScraper] Calling runPluginOperation to read result (attempt ${attempt + 1}/${maxRetries})...`);
+        const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
+          mode: 'read_result',
+          result_id: resultId,
+        });
+        console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
+
+        // runPluginOperation returns IPluginTaskResult with {data?, error?}
+        // The actual result data is in the 'data' field
+        if (operationResult) {
+          console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
+          console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
+          
+          // If Stash returned a GraphQL error, operationResult.error will be set
+          if (operationResult.error) {
+            console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
+            throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
+          }
+          // The data field contains the actual result from the Python script
+          // If data is not present, use operationResult itself (might be the data directly)
+          readResult = operationResult.data !== undefined ? operationResult.data : operationResult;
+          
+          // Check if we got valid data
+          if (readResult && (readResult.title || readResult.success !== false)) {
+            console.log('[YtDlpScraper] ✓ Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
+            break; // Success, exit retry loop
+          } else {
+            console.warn('[YtDlpScraper] Got result but it appears invalid, will retry...');
+            readResult = null; // Reset for next attempt
+          }
+        } else {
+          console.warn(`[YtDlpScraper] runPluginOperation returned null (attempt ${attempt + 1}/${maxRetries})`);
+          if (attempt === maxRetries - 1) {
+            console.error('[YtDlpScraper] All retry attempts failed - runPluginOperation returned null');
+            console.error('[YtDlpScraper] This usually means GraphQL errors occurred or Python script failed - check Stash server logs');
+          }
+        }
       }
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);
