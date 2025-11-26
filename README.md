@@ -523,9 +523,9 @@ That's it! The content is now in your Stash library with all metadata.
 The plugin uses Stash's `PluginApi` for integration:
 
 - **Routes**: Registered at `/downloader` using `PluginApi.register.route()`
-- **Navigation**: Added to navbar via `PluginApi.patch.after('MainNavBar.MenuItems', ...)`
+- **Navigation**: Added to navbar via MutationObserver DOM injection (`.navbar-buttons` selector)
 - **Dependencies**: Uses React, ReactDOM, Bootstrap provided by Stash (not bundled)
-- **GraphQL**: Communicates with Stash via `PluginApi.GQL`
+- **GraphQL**: Direct fetch to `/graphql` endpoint (community plugin pattern)
 - **Styling**: Bootstrap utility classes + Stash theme colors via inline styles
 
 ### Libraries Available via PluginApi
@@ -565,10 +565,44 @@ User Input → Metadata Scraper → Download Service → Stash GraphQL → Scene
 Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`feature/description` or `fix/description`)
 3. Make your changes following the conventions in `.claude/conventions.md`
 4. Test thoroughly
 5. Submit a pull request
+
+### Versioning
+
+This project uses [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (X.0.0): Breaking changes
+- **MINOR** (0.X.0): New features, backwards compatible
+- **PATCH** (0.0.X): Bug fixes, backwards compatible
+
+Version is managed in `package.json` and propagated to the plugin manifest during build.
+
+### Commit Messages
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) with emoji prefixes:
+
+| Type | Emoji | Description |
+|------|-------|-------------|
+| `feat:` | ✨ | New feature |
+| `fix:` | 🐛 | Bug fix |
+| `docs:` | 📝 | Documentation |
+| `refactor:` | ♻️ | Code refactoring |
+| `chore:` | 🔧 | Build/tooling |
+| `perf:` | ⚡️ | Performance |
+| `test:` | ✅ | Tests |
+
+**Examples:**
+```
+feat: add batch import from clipboard
+fix: resolve memory leak in download queue
+docs: update installation instructions
+refactor: simplify metadata scraper logic
+```
+
+See [.claude/commands/commit.md](.claude/commands/commit.md) for full emoji list.
 
 ## License
 

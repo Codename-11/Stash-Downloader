@@ -197,14 +197,73 @@ import { formatBytes } from '@/utils';
 - **CORS**: Handle CORS properly for external requests
 
 ## Git Conventions
-- **Commit Messages**: Follow Conventional Commits
-  - `feat:` new features
-  - `fix:` bug fixes
-  - `refactor:` code refactoring
-  - `docs:` documentation updates
-  - `chore:` maintenance tasks
-- **Branch Naming**: `feature/description`, `fix/description`
-- **Pull Requests**: Include description, testing notes, and breaking changes
+
+### Semantic Versioning
+This project follows [Semantic Versioning](https://semver.org/) (SemVer):
+
+```
+MAJOR.MINOR.PATCH (e.g., 1.2.3)
+```
+
+- **MAJOR**: Breaking changes (incompatible API changes)
+- **MINOR**: New features (backwards compatible)
+- **PATCH**: Bug fixes (backwards compatible)
+
+Version is the single source of truth in `package.json`. GitHub Actions reads it for releases.
+
+### Conventional Commits
+All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types with Emoji Prefixes:**
+| Type | Emoji | When to Use |
+|------|-------|-------------|
+| `feat:` | ✨ | New feature or capability |
+| `fix:` | 🐛 | Bug fix |
+| `docs:` | 📝 | Documentation only |
+| `refactor:` | ♻️ | Code change without fixing bug or adding feature |
+| `chore:` | 🔧 | Build, tooling, dependencies |
+| `perf:` | ⚡️ | Performance improvement |
+| `test:` | ✅ | Adding or fixing tests |
+| `style:` | 🎨 | Code formatting (no logic change) |
+| `ci:` | 🚀 | CI/CD changes |
+
+**Examples:**
+```bash
+feat: add batch import from clipboard
+fix: resolve navbar button not appearing
+docs: update README with installation steps
+refactor: simplify GraphQL service
+chore: update dependencies
+```
+
+**Breaking Changes:**
+Add `!` after type or include `BREAKING CHANGE:` in footer:
+```
+feat!: change API response format
+
+BREAKING CHANGE: Response now returns array instead of object
+```
+
+### Branch Naming
+- `feature/description` - New features
+- `fix/description` - Bug fixes
+- `docs/description` - Documentation
+- `refactor/description` - Code refactoring
+
+### Pull Requests
+Include:
+- Clear description of changes
+- Testing notes (how to verify)
+- Breaking changes (if any)
+- Related issues (closes #123)
 
 ## Documentation
 - **Code Comments**: Explain "why", not "what"
