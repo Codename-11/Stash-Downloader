@@ -92,6 +92,9 @@ export class StashGraphQLService {
         });
       });
     }
+    
+    // Log full GraphQL response for debugging
+    console.log('[StashGraphQL] Full GraphQL response:', JSON.stringify(result, null, 2));
 
     return result;
   }

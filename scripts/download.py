@@ -317,11 +317,11 @@ def task_download(args: dict) -> dict:
     quality = args.get('quality', 'best')
 
     if not url:
-        return {'error': 'No URL provided'}
+        return {'result_error': 'No URL provided', 'success': False}
 
     # Check yt-dlp availability
     if not check_ytdlp():
-        return {'error': 'yt-dlp is not installed or not accessible'}
+        return {'result_error': 'yt-dlp is not installed or not accessible', 'success': False}
 
     # Build filename template
     if filename:
@@ -342,7 +342,7 @@ def task_download(args: dict) -> dict:
             'success': True
         }
     else:
-        return {'error': 'Download failed', 'success': False}
+        return {'result_error': 'Download failed', 'success': False}
 
 
 def task_extract_metadata(args: dict) -> dict:
@@ -361,13 +361,13 @@ def task_extract_metadata(args: dict) -> dict:
     result_id = args.get('result_id')
 
     if not url:
-        result = {'error': 'No URL provided', 'success': False}
+        result = {'result_error': 'No URL provided', 'success': False}
         if result_id:
             save_result(result_id, result)
         return result
 
     if not check_ytdlp():
-        result = {'error': 'yt-dlp is not installed', 'success': False}
+        result = {'result_error': 'yt-dlp is not installed', 'success': False}
         if result_id:
             save_result(result_id, result)
         return result
@@ -396,7 +396,7 @@ def task_extract_metadata(args: dict) -> dict:
             ][:5]  # Limit to top 5 formats
         }
     else:
-        result = {'error': 'Failed to extract metadata', 'success': False}
+        result = {'result_error': 'Failed to extract metadata', 'success': False}
 
     # Save result for async retrieval if result_id provided
     if result_id:
@@ -500,12 +500,12 @@ def task_cleanup_result(args: dict) -> dict:
     result_id = args.get('result_id')
 
     if not result_id:
-        return {'error': 'No result_id provided', 'success': False}
+        return {'result_error': 'No result_id provided', 'success': False}
 
     if delete_result(result_id):
         return {'success': True, 'deleted': True}
     else:
-        return {'error': 'Failed to delete result', 'success': False}
+        return {'result_error': 'Failed to delete result', 'success': False}
 
 
 def task_check_ytdlp(args: dict) -> dict:
@@ -555,13 +555,15 @@ def main():
         if handler:
             result = handler(args)
         else:
-            result = {'error': f'Unknown task: {task_name}', 'success': False}
+            # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
+            result = {'result_error': f'Unknown task: {task_name}', 'success': False}
 
         write_output(result)
     except Exception as e:
         log.error(f"Unhandled exception in main: {e}", exc_info=True)
+        # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
         error_result = {
-            'error': f'Internal error: {str(e)}',
+            'result_error': f'Internal error: {str(e)}',
             'success': False
         }
         write_output(error_result)
