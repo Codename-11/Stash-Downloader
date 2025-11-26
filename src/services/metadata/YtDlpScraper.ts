@@ -112,18 +112,21 @@ export class YtDlpScraper implements IMetadataScraper {
 
       // Try runPluginOperation first (proper way, should work now with mode key)
       console.log('[YtDlpScraper] Calling runPluginOperation to read result...');
-      readResult = await stashService.runPluginOperation(PLUGIN_ID, {
+      const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'read_result',
         result_id: resultId,
       });
-      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
+      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult));
 
-      // Fallback: If runPluginOperation didn't work, log the error
-      // (HTTP fetch via assets not available without assets field in manifest)
-      if (!readResult || readResult.error) {
-        console.warn('[YtDlpScraper] runPluginOperation failed or returned error:', readResult?.error);
-        // Note: HTTP fetch fallback would require assets field in manifest
-        // For now, rely on runPluginOperation working correctly with mode key
+      // runPluginOperation returns IPluginTaskResult with {data?, error?}
+      // The actual result data is in the 'data' field
+      if (operationResult) {
+        if (operationResult.error) {
+          console.error('[YtDlpScraper] runPluginOperation returned error:', operationResult.error);
+          throw new Error(`runPluginOperation error: ${operationResult.error}`);
+        }
+        // The data field contains the actual result from the Python script
+        readResult = operationResult.data || operationResult;
       }
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);
@@ -145,14 +148,17 @@ export class YtDlpScraper implements IMetadataScraper {
     }
 
     console.log('[YtDlpScraper] Parsing result data...');
+    console.log('[YtDlpScraper] Result structure:', JSON.stringify(readResult));
 
+    // Check for error in result
     if (readResult.error) {
       throw new Error(`yt-dlp extraction failed: ${readResult.error}`);
     }
 
-    if (!readResult.success) {
-      console.error('[YtDlpScraper] Result missing success flag:', readResult);
-      throw new Error('yt-dlp extraction did not succeed');
+    // Check success flag
+    if (readResult.success === false || (readResult.success === undefined && !readResult.title)) {
+      console.error('[YtDlpScraper] Result missing success flag or failed:', readResult);
+      throw new Error(`yt-dlp extraction did not succeed: ${readResult.error || 'Unknown error'}`);
     }
 
     console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', readResult.title);

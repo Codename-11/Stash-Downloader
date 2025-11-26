@@ -409,16 +409,37 @@ def task_read_result(args: dict) -> dict:
         The saved result data, or error if not found
     """
     result_id = args.get('result_id')
+    
+    log.info(f"Reading result for result_id: {result_id}")
+    log.info(f"Result directory: {RESULT_DIR}")
 
     if not result_id:
+        log.error("No result_id provided to read_result")
         return {'error': 'No result_id provided', 'success': False}
+
+    # Check if result directory exists
+    if not os.path.exists(RESULT_DIR):
+        log.error(f"Result directory does not exist: {RESULT_DIR}")
+        return {'error': f'Result directory not found: {RESULT_DIR}', 'success': False}
+
+    # List all files in result directory for debugging
+    try:
+        files = os.listdir(RESULT_DIR)
+        log.info(f"Files in result directory: {files}")
+    except Exception as e:
+        log.warning(f"Could not list result directory: {e}")
 
     data = load_result(result_id)
     if data:
+        log.info(f"Successfully loaded result for {result_id}")
         # Include the loaded data plus success flag
         return {**data, 'retrieved': True}
     else:
-        return {'error': 'Result not found', 'success': False}
+        log.error(f"Result not found for result_id: {result_id}")
+        result_path = get_result_path(result_id)
+        log.error(f"Expected result file path: {result_path}")
+        log.error(f"File exists: {os.path.exists(result_path)}")
+        return {'error': f'Result not found for result_id: {result_id}', 'success': False}
 
 
 def task_cleanup_result(args: dict) -> dict:
@@ -453,44 +474,53 @@ def task_check_ytdlp(args: dict) -> dict:
 
 def main():
     """Main entry point."""
-    input_data = read_input()
+    try:
+        input_data = read_input()
 
-    # Debug: log the raw input received
-    log.info(f"Raw input received: {json.dumps(input_data, default=str)[:500]}")
+        # Debug: log the raw input received
+        log.info(f"Raw input received: {json.dumps(input_data, default=str)[:500]}")
 
-    # Get task name and arguments
-    # Stash sends JSON to stdin: {"args": {"mode": "...", ...}, "server_connection": {...}}
-    # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
+        # Get task name and arguments
+        # Stash sends JSON to stdin: {"args": {"mode": "...", ...}, "server_connection": {...}}
+        # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
 
-    # Check for nested args first (standard Stash format)
-    if 'args' in input_data and isinstance(input_data.get('args'), dict):
-        args = input_data['args']
-        # Try 'mode' first (community pattern), then 'task' for backwards compat
-        task_name = args.get('mode') or args.get('task', 'download')
-    else:
-        # Direct format (runPluginOperation or direct call)
-        args = input_data
-        task_name = input_data.get('mode') or input_data.get('task', 'download')
+        # Check for nested args first (standard Stash format)
+        if 'args' in input_data and isinstance(input_data.get('args'), dict):
+            args = input_data['args']
+            # Try 'mode' first (community pattern), then 'task' for backwards compat
+            task_name = args.get('mode') or args.get('task', 'download')
+        else:
+            # Direct format (runPluginOperation or direct call)
+            args = input_data
+            task_name = input_data.get('mode') or input_data.get('task', 'download')
 
-    log.info(f"Detected task: {task_name}")
-    log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")
+        log.info(f"Detected task: {task_name}")
+        log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")
 
-    # Route to appropriate task handler
-    tasks = {
-        'download': task_download,
-        'extract_metadata': task_extract_metadata,
-        'read_result': task_read_result,
-        'cleanup_result': task_cleanup_result,
-        'check_ytdlp': task_check_ytdlp,
-    }
+        # Route to appropriate task handler
+        tasks = {
+            'download': task_download,
+            'extract_metadata': task_extract_metadata,
+            'read_result': task_read_result,
+            'cleanup_result': task_cleanup_result,
+            'check_ytdlp': task_check_ytdlp,
+        }
 
-    handler = tasks.get(task_name)
-    if handler:
-        result = handler(args)
-    else:
-        result = {'error': f'Unknown task: {task_name}'}
+        handler = tasks.get(task_name)
+        if handler:
+            result = handler(args)
+        else:
+            result = {'error': f'Unknown task: {task_name}', 'success': False}
 
-    write_output(result)
+        write_output(result)
+    except Exception as e:
+        log.error(f"Unhandled exception in main: {e}", exc_info=True)
+        error_result = {
+            'error': f'Internal error: {str(e)}',
+            'success': False
+        }
+        write_output(error_result)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
