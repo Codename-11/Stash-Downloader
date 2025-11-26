@@ -102,36 +102,36 @@ export class YtDlpScraper implements IMetadataScraper {
       throw new Error(`yt-dlp extraction task failed: ${taskResult.error || 'Unknown error'}`);
     }
 
-    // Step 2: Read the result from temp file via HTTP (plugin serves static files)
-    // With interface: raw, runPluginOperation doesn't work correctly
-    // So we fetch the result file directly from the plugin's temp directory
-    console.log('[YtDlpScraper] Task succeeded, fetching result file...');
+    // Step 2: Read the result from temp file
+    // Now that we use 'mode' key (FileMonitor pattern), runPluginOperation should work correctly
+    console.log('[YtDlpScraper] Task succeeded, reading result...');
     let readResult: any;
     try {
       // Wait a moment for file to be written
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Try to fetch the result file from the plugin's accessible location
-      // First try via plugin static directory, then fall back to temp directory
-      const resultUrl = `/plugin/${PLUGIN_ID}/results/${resultId}.json`;
-      console.log('[YtDlpScraper] Trying to fetch result from:', resultUrl);
+      // Try runPluginOperation first (proper way, should work now with mode key)
+      console.log('[YtDlpScraper] Calling runPluginOperation to read result...');
+      readResult = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'read_result',
+        result_id: resultId,
+      });
+      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
 
-      const response = await fetch(resultUrl);
-      if (response.ok) {
-        readResult = await response.json();
-        console.log('[YtDlpScraper] Got result via HTTP:', JSON.stringify(readResult));
-      } else {
-        // If static file not available, the result should be in the job output
-        // For now, we'll have to indicate the limitation
-        console.warn('[YtDlpScraper] Could not fetch result file, status:', response.status);
+      // Fallback to HTTP fetch if runPluginOperation didn't work
+      if (!readResult || readResult.error) {
+        console.warn('[YtDlpScraper] runPluginOperation failed, trying HTTP fetch...');
+        // Use /assets/results/ path (configured in manifest assets field)
+        const resultUrl = `/plugin/${PLUGIN_ID}/assets/results/${resultId}.json`;
+        console.log('[YtDlpScraper] Trying to fetch result from:', resultUrl);
 
-        // Try runPluginOperation as last resort (may not work with interface: raw)
-        console.log('[YtDlpScraper] Trying runPluginOperation as fallback...');
-        readResult = await stashService.runPluginOperation(PLUGIN_ID, {
-          mode: 'read_result',
-          result_id: resultId,
-        });
-        console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
+        const response = await fetch(resultUrl);
+        if (response.ok) {
+          readResult = await response.json();
+          console.log('[YtDlpScraper] Got result via HTTP:', JSON.stringify(readResult));
+        } else {
+          console.warn('[YtDlpScraper] HTTP fetch also failed, status:', response.status);
+        }
       }
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);

@@ -85,7 +85,7 @@ export class DownloadService {
 
       // Run the download task
       const jobId = await stashService.runPluginTask(PLUGIN_ID, 'Download Video', {
-        task: 'download',
+        mode: 'download',
         url: url,
         output_dir: options.outputDir,
         filename: options.filename,
@@ -123,7 +123,7 @@ export class DownloadService {
       }
 
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
-        task: 'check_ytdlp',
+        mode: 'check_ytdlp',
       });
 
       return result?.data?.available === true;
