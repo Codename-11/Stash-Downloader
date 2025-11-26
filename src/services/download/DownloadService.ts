@@ -126,7 +126,9 @@ export class DownloadService {
         mode: 'check_ytdlp',
       });
 
-      return result?.data?.available === true;
+      // Stash extracts the 'output' field from PluginOutput and returns it directly
+      // So result is already {available: bool, success: bool}
+      return result?.available === true;
     } catch {
       return false;
     }
