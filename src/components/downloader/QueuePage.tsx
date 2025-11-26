@@ -414,9 +414,29 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                     )}
                   </div>
                   {httpProxy && (
-                    <small className="text-muted" style={{ color: '#8b9fad' }}>
-                      ℹ️ Proxy will be used for server-side downloads and metadata extraction. SSL certificate verification is disabled when using proxy.
-                    </small>
+                    <>
+                      <div className="d-flex gap-2 mt-2">
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={async () => {
+                            const { testHttpProxy } = await import('@/utils/systemCheck');
+                            const result = await testHttpProxy(httpProxy, isStashEnvironment);
+                            if (result.success) {
+                              toast.showToast('success', 'Proxy Test', result.message);
+                              log.addLog('success', 'proxy', result.message, result.details);
+                            } else {
+                              toast.showToast('error', 'Proxy Test Failed', result.message);
+                              log.addLog('error', 'proxy', result.message, result.details);
+                            }
+                          }}
+                        >
+                          Test Proxy
+                        </button>
+                      </div>
+                      <small className="text-muted" style={{ color: '#8b9fad' }}>
+                        ℹ️ Proxy will be used for server-side downloads and metadata extraction. SSL certificate verification is disabled when using proxy.
+                      </small>
+                    </>
                   )}
                 </div>
               </div>

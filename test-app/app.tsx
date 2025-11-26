@@ -203,13 +203,31 @@ const TestApp: React.FC = () => {
                       </label>
                     </div>
                     {corsProxyEnabled && (
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="http://localhost:8080"
-                        value={corsProxyUrl}
-                        onChange={(e) => handleCorsProxyUrlChange(e.target.value)}
-                      />
+                      <>
+                        <div className="d-flex gap-2">
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="http://localhost:8080"
+                            value={corsProxyUrl}
+                            onChange={(e) => handleCorsProxyUrlChange(e.target.value)}
+                          />
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={async () => {
+                              const { testCorsProxy } = await import('@/utils/systemCheck');
+                              const result = await testCorsProxy();
+                              if (result.success) {
+                                alert(`✅ ${result.message}\n\n${result.details || ''}`);
+                              } else {
+                                alert(`❌ ${result.message}\n\n${result.details || ''}`);
+                              }
+                            }}
+                          >
+                            Test
+                          </button>
+                        </div>
+                      </>
                     )}
                     <small className="text-muted">
                       {corsProxyEnabled ? (
@@ -242,6 +260,22 @@ const TestApp: React.FC = () => {
                       value={httpProxy}
                       onChange={(e) => handleHttpProxyChange(e.target.value)}
                     />
+                    {httpProxy && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={async () => {
+                          const { testHttpProxy } = await import('@/utils/systemCheck');
+                          const result = await testHttpProxy(httpProxy, false);
+                          if (result.success) {
+                            alert(`✅ ${result.message}\n\n${result.details || ''}`);
+                          } else {
+                            alert(`❌ ${result.message}\n\n${result.details || ''}`);
+                          }
+                        }}
+                      >
+                        Test HTTP Proxy
+                      </button>
+                    )}
                     <small className="text-muted">
                       {httpProxy ? (
                         <>
