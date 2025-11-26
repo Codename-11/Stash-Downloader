@@ -100,7 +100,27 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
             mergedSettings = { ...mergedSettings, ...pluginApi.settings };
           }
           
-          // Method 3: Check if settings are passed via GQL query helper
+          // Method 3: Check if StashService has settings helper
+          if (pluginApi.StashService && typeof pluginApi.StashService === 'object') {
+            try {
+              // StashService might have a getPluginSettings method
+              if (pluginApi.StashService.getPluginSettings) {
+                const stashServiceSettings = await Promise.resolve(
+                  pluginApi.StashService.getPluginSettings(PLUGIN_ID)
+                );
+                if (stashServiceSettings && typeof stashServiceSettings === 'object') {
+                  console.log('[Settings] Found settings via PluginApi.StashService.getPluginSettings():', stashServiceSettings);
+                  mergedSettings = { ...mergedSettings, ...stashServiceSettings };
+                }
+              }
+            } catch (stashServiceError) {
+              console.warn('[Settings] PluginApi.StashService.getPluginSettings() failed:', stashServiceError);
+            }
+          }
+          
+          // Method 4: Check if settings are passed via GQL query helper (if available)
+          // Note: According to architecture docs, PluginApi.GQL.query() may not exist
+          // but we try it as a fallback
           if (pluginApi.GQL && pluginApi.GQL.query) {
             try {
               const gqlSettings = await pluginApi.GQL.query(`

@@ -51,6 +51,13 @@ export interface IPluginApi {
     addEventListener: (event: string, callback: Function) => void;
     removeEventListener: (event: string, callback: Function) => void;
   };
+
+  // Plugin settings methods (based on bulkImageScrape and other community plugins)
+  getPluginSettings?: (pluginId: string) => Promise<Record<string, any>> | Record<string, any>;
+  configurePlugin?: (pluginId: string, settings: Record<string, any>) => Promise<boolean> | boolean;
+  
+  // Direct settings property (if available)
+  settings?: Record<string, any>;
 }
 
 declare global {
