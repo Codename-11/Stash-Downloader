@@ -92,8 +92,36 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 - Quality selection (best, 1080p, 720p, 480p)
 - Metadata extraction without downloading
 - Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
-- **Critical**: Uses `result_error` field instead of `error` to prevent Stash from interpreting Python errors as GraphQL errors
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
+
+### PluginOutput Format (Critical for `runPluginOperation`)
+
+**Stash Source References:**
+- `pkg/plugin/common/msg.go` - Defines `PluginOutput` struct:
+  ```go
+  type PluginOutput struct {
+      Error *string `json:"error"`
+      Output interface{} `json:"output"`
+  }
+  ```
+- `pkg/plugin/raw.go` - `getOutput()` function unmarshals stdout into `PluginOutput`
+- GraphQL resolver extracts `PluginOutput.Output` and returns it directly as the result
+
+**Required Format:**
+Python scripts must output JSON matching this structure:
+```json
+{
+  "error": "optional error message (string)",
+  "output": { ... actual result data ... }
+}
+```
+
+**Implementation:**
+- Success case: `{"output": {"title": "...", "description": "...", ...}}`
+- Error case: `{"error": "error message", "output": {...context...}}`
+- Use `result_error` in Python code, then map to `error` field in output
+- Stash's GraphQL resolver extracts the `output` field and returns it directly
+- TypeScript receives the extracted data (not wrapped in `output` field)
 
 ### Data Flow
 ```
@@ -317,7 +345,7 @@ If a scraper throws an error, the registry tries the next one.
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
 | CORS errors (scraping) | Browser security restrictions | Use `YtDlpScraper` (server-side) or CORS proxy |
 | Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
-| `runPluginOperation` returns null | Python script outputs `error` field | Use `result_error` instead - Stash treats top-level `error` as GraphQL error |
+| `runPluginOperation` returns null | Python script output doesn't match PluginOutput format | Output must be `{error?: string, output?: {...data...}}` - Stash extracts `output` field and returns it directly |
 
 ## Performance Optimizations
 
