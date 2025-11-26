@@ -69,6 +69,11 @@ export class DownloadService {
   /**
    * Download using server-side plugin task (no CORS issues)
    * This uses Stash's runPluginTask to execute the Python backend
+   * 
+   * NOTE: Server-side downloads save files to the server's filesystem.
+   * The file_path returned is on the server, not accessible via HTTP.
+   * For browser downloads, use the regular download() method which returns Blobs.
+   * Server-side downloads are better suited for direct Stash import (future enhancement).
    */
   async downloadServerSide(
     url: string,
@@ -83,26 +88,81 @@ export class DownloadService {
         return { success: false, error: 'Not in Stash environment' };
       }
 
-      // Run the download task
-      const jobId = await stashService.runPluginTask(PLUGIN_ID, 'Download Video', {
-        mode: 'download',
-        url: url,
-        output_dir: options.outputDir,
-        filename: options.filename,
-        quality: options.quality || 'best',
-      });
+      // Generate result_id for async result retrieval
+      const resultId = `download-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-      if (!jobId) {
-        return { success: false, error: 'Failed to start download task' };
+      // Run the download task and wait for completion
+      const taskResult = await stashService.runPluginTaskAndWait(
+        PLUGIN_ID,
+        'Download Video',
+        {
+          mode: 'download',
+          url: url,
+          output_dir: options.outputDir,
+          filename: options.filename,
+          quality: options.quality || 'best',
+          result_id: resultId,
+        },
+        {
+          maxWaitMs: 600000, // 10 minutes for large downloads
+          onProgress: (progress) => {
+            if (options.onProgress) {
+              // Convert job progress (0-100) to download progress
+              options.onProgress({
+                bytesDownloaded: 0,
+                totalBytes: 0,
+                percentage: progress,
+                speed: 0,
+                timeRemaining: undefined,
+              });
+            }
+          },
+        }
+      );
+
+      if (!taskResult.success) {
+        return { success: false, error: taskResult.error || 'Download task failed' };
       }
 
-      console.log('[DownloadService] Server-side download task started, job ID:', jobId);
+      console.log('[DownloadService] Server-side download task completed, reading result...');
 
-      // Note: For now, we return the job ID and let the caller handle polling
-      // In the future, we could implement job status polling here
+      // Read the result to get file_path
+      const result = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'read_result',
+        result_id: resultId,
+      });
+
+      if (!result) {
+        return { success: false, error: 'Failed to read download result' };
+      }
+
+      // Check for error in result
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+
+      // Extract file_path from result
+      const filePath = result.file_path;
+      const fileSize = result.file_size;
+
+      if (!filePath) {
+        return { success: false, error: 'Download completed but no file_path in result' };
+      }
+
+      console.log('[DownloadService] Server-side download succeeded:', filePath);
+
+      // Cleanup result file
+      stashService.runPluginTask(PLUGIN_ID, 'Cleanup Result', {
+        mode: 'cleanup_result',
+        result_id: resultId,
+      }).catch((err) => {
+        console.warn('[DownloadService] Cleanup error (ignored):', err);
+      });
+
       return {
         success: true,
-        file_path: `Job started: ${jobId}`,
+        file_path: filePath,
+        file_size: fileSize,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -384,7 +444,12 @@ export class DownloadService {
   }
 
   /**
-   * Download file from URL
+   * Download file from URL and return as Blob (for browser downloads)
+   * 
+   * NOTE: This method returns Blobs for browser downloads.
+   * For server-side downloads (which save to server filesystem), use downloadServerSide().
+   * Server-side downloads are better suited for direct Stash import (future enhancement).
+   * 
    * @param videoUrl Optional direct video URL from scraper (preferred over yt-dlp)
    * @param imageUrl Optional direct image URL from scraper (for image downloads)
    */

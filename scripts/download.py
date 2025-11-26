@@ -366,21 +366,30 @@ def task_download(args: dict) -> dict:
         output_dir: Directory to save file
         filename: Optional custom filename
         quality: Quality preference (best, 1080p, 720p, 480p)
+        result_id: Optional ID for storing result (for async retrieval)
 
     Returns:
-        Dict with file_path on success, error on failure
+        Dict with file_path on success, error on failure.
+        If result_id is provided, also saves to file for later retrieval.
     """
     url = args.get('url')
     output_dir = args.get('output_dir', tempfile.gettempdir())
     filename = args.get('filename')
     quality = args.get('quality', 'best')
+    result_id = args.get('result_id')
 
     if not url:
-        return {'result_error': 'No URL provided', 'success': False}
+        result = {'result_error': 'No URL provided', 'success': False}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
     # Check yt-dlp availability
     if not check_ytdlp():
-        return {'result_error': 'yt-dlp is not installed or not accessible', 'success': False}
+        result = {'result_error': 'yt-dlp is not installed or not accessible', 'success': False}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
     # Build filename template
     if filename:
@@ -395,13 +404,21 @@ def task_download(args: dict) -> dict:
 
     if file_path:
         file_size = os.path.getsize(file_path)
-        return {
+        result = {
             'file_path': file_path,
             'file_size': file_size,
             'success': True
         }
+        # Save result if result_id provided (for async retrieval)
+        if result_id:
+            save_result(result_id, result)
+            log.info(f"Download result saved with result_id: {result_id}")
+        return result
     else:
-        return {'result_error': 'Download failed', 'success': False}
+        result = {'result_error': 'Download failed', 'success': False}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
 
 def task_extract_metadata(args: dict) -> dict:
