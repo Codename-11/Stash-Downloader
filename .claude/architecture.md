@@ -317,6 +317,7 @@ If a scraper throws an error, the registry tries the next one.
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
 | CORS errors (scraping) | Browser security restrictions | Use `StashScraper` (server-side) or CORS proxy |
 | Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
+| `runPluginOperation` returns null | Python script outputs `error` field | Use `result_error` instead - Stash treats top-level `error` as GraphQL error |
 
 ## Performance Optimizations
 
