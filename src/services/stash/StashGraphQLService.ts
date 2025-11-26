@@ -680,9 +680,53 @@ export class StashGraphQLService {
   /**
    * Get plugin settings from Stash
    * Plugin settings are stored server-side and accessed via GraphQL
+   * 
+   * Based on Stash documentation and community plugins, we try multiple query formats:
+   * 1. plugin(id: $pluginId) with settings { name, value }
+   * 2. findPlugin(id: $plugin_id) with config.settings
+   * 3. configuration.plugins array
    */
   async getPluginSettings(pluginId: string): Promise<Record<string, any> | null> {
-    const query = `
+    // Try method 1: plugin(id: $pluginId) query
+    const query1 = `
+      query GetPluginSettings($pluginId: String!) {
+        plugin(id: $pluginId) {
+          id
+          name
+          settings {
+            name
+            value
+          }
+        }
+      }
+    `;
+
+    try {
+      const result1 = await this.gqlRequest<{ 
+        plugin?: { 
+          id: string;
+          name: string;
+          settings?: Array<{ name: string; value: any }>;
+        } | null;
+      }>(query1, {
+        pluginId: pluginId,
+      });
+
+      if (result1.data?.plugin?.settings && result1.data.plugin.settings.length > 0) {
+        // Convert array of {name, value} to object
+        const settings: Record<string, any> = {};
+        result1.data.plugin.settings.forEach((setting) => {
+          settings[setting.name] = setting.value;
+        });
+        console.log('[StashGraphQL] Found settings via plugin() query:', settings);
+        return settings;
+      }
+    } catch (error) {
+      console.warn('[StashGraphQL] plugin() query failed, trying alternatives:', error);
+    }
+
+    // Try method 2: findPlugin(id: $plugin_id) query
+    const query2 = `
       query FindPlugin($plugin_id: ID!) {
         findPlugin(id: $plugin_id) {
           id
@@ -702,33 +746,76 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gqlRequest<{ 
-        findPlugin: { 
+      const result2 = await this.gqlRequest<{ 
+        findPlugin?: { 
           id: string;
           name: string;
           config?: {
             settings?: Array<{ key: string; value: any }>;
           };
         } | null;
-      }>(query, {
+      }>(query2, {
         plugin_id: pluginId,
       });
 
-      if (!result.data?.findPlugin?.config?.settings) {
-        return null;
+      if (result2.data?.findPlugin?.config?.settings && result2.data.findPlugin.config.settings.length > 0) {
+        // Convert array of {key, value} to object
+        const settings: Record<string, any> = {};
+        result2.data.findPlugin.config.settings.forEach((setting) => {
+          settings[setting.key] = setting.value;
+        });
+        console.log('[StashGraphQL] Found settings via findPlugin() query:', settings);
+        return settings;
       }
-
-      // Convert array of {key, value} to object
-      const settings: Record<string, any> = {};
-      result.data.findPlugin.config.settings.forEach((setting) => {
-        settings[setting.key] = setting.value;
-      });
-
-      return settings;
     } catch (error) {
-      console.error('[StashGraphQL] getPluginSettings exception:', error);
-      return null;
+      console.warn('[StashGraphQL] findPlugin() query failed, trying alternatives:', error);
     }
+
+    // Try method 3: configuration.plugins array
+    const query3 = `
+      query GetConfiguration {
+        configuration {
+          plugins {
+            id
+            name
+            settings {
+              name
+              value
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const result3 = await this.gqlRequest<{ 
+        configuration?: {
+          plugins?: Array<{
+            id: string;
+            name: string;
+            settings?: Array<{ name: string; value: any }>;
+          }>;
+        };
+      }>(query3);
+
+      if (result3.data?.configuration?.plugins) {
+        const plugin = result3.data.configuration.plugins.find(p => p.id === pluginId);
+        if (plugin?.settings && plugin.settings.length > 0) {
+          // Convert array of {name, value} to object
+          const settings: Record<string, any> = {};
+          plugin.settings.forEach((setting) => {
+            settings[setting.name] = setting.value;
+          });
+          console.log('[StashGraphQL] Found settings via configuration.plugins query:', settings);
+          return settings;
+        }
+      }
+    } catch (error) {
+      console.warn('[StashGraphQL] configuration.plugins query failed:', error);
+    }
+
+    console.warn('[StashGraphQL] All plugin settings queries failed - settings may not be accessible via GraphQL');
+    return null;
   }
 
   /**
