@@ -6,7 +6,9 @@
  * - Leverages community scrapers already installed in Stash
  * - Provides consistent metadata format
  *
- * Falls back to null if Stash scraping fails, allowing other scrapers to try.
+ * NOTE: Currently DISABLED - kept in code but not used.
+ * We prioritize yt-dlp for video URL extraction instead.
+ * To re-enable, change canHandle() to return true in Stash environment.
  */
 
 import type { IMetadataScraper, IScrapedMetadata, IStashScrapedScene } from '@/types';
@@ -19,16 +21,19 @@ export class StashScraper implements IMetadataScraper {
 
   /**
    * Check if this scraper can handle the URL
-   * Always returns true - we try Stash first and fall back if it fails
+   * Currently DISABLED - returns false to prevent usage
+   * Kept in code for potential future use
    */
   canHandle(_url: string): boolean {
-    // Only works in Stash environment, not test-app
-    try {
-      const stashService = getStashService();
-      return stashService.isStashEnvironment();
-    } catch {
-      return false;
-    }
+    // DISABLED: We prioritize yt-dlp for video URL extraction
+    // To re-enable, uncomment the code below:
+    // try {
+    //   const stashService = getStashService();
+    //   return stashService.isStashEnvironment();
+    // } catch {
+    //   return false;
+    // }
+    return false;
   }
 
   /**
