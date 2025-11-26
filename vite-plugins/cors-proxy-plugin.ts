@@ -128,18 +128,57 @@ export function corsProxyPlugin(): Plugin {
         const proxyReq = protocol.request(options, (proxyRes) => {
           console.log(`[CORS Proxy] Response ${proxyRes.statusCode} from ${targetUrl}`);
 
-          res.writeHead(proxyRes.statusCode || 200, {
+          // Handle redirects (3xx) - don't follow, just proxy with CORS headers
+          if (proxyRes.statusCode && proxyRes.statusCode >= 300 && proxyRes.statusCode < 400) {
+            const location = proxyRes.headers.location;
+            console.log(`[CORS Proxy] Redirect detected: ${location}`);
+            // Keep the redirect but add CORS headers
+            const responseHeaders: Record<string, string | string[] | undefined> = {
+              ...proxyRes.headers,
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Range, User-Agent, Accept, Accept-Language, Accept-Encoding, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests, Origin',
+              'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
+            };
+            res.writeHead(proxyRes.statusCode || 200, responseHeaders);
+            proxyRes.pipe(res);
+            return;
+          }
+
+          // Build response headers - ensure CORS headers are set and not overridden
+          const responseHeaders: Record<string, string | string[] | undefined> = {
             ...proxyRes.headers,
             'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Range, User-Agent, Accept, Accept-Language, Accept-Encoding, Referer, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests, Origin',
             'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
+          };
+          
+          // Remove any conflicting CORS headers from upstream (case-insensitive)
+          Object.keys(responseHeaders).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey.startsWith('access-control-') && 
+                lowerKey !== 'access-control-allow-origin' && 
+                lowerKey !== 'access-control-allow-methods' && 
+                lowerKey !== 'access-control-allow-headers' &&
+                lowerKey !== 'access-control-expose-headers') {
+              delete responseHeaders[key];
+            }
           });
+
+          // Forward status code with CORS headers (must be called before piping)
+          res.writeHead(proxyRes.statusCode || 200, responseHeaders);
 
           proxyRes.pipe(res);
         });
 
-        proxyReq.on('error', (error) => {
+        proxyReq.on('error', (error: any) => {
           console.error(`[CORS Proxy] Error: ${error.message}`);
-          res.writeHead(502);
+          res.writeHead(502, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          });
           res.end(JSON.stringify({
             error: 'Proxy error',
             message: error.message,
