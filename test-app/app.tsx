@@ -74,6 +74,21 @@ const TestApp: React.FC = () => {
   const [corsProxyUrl, setCorsProxyUrl] = React.useState(
     localStorage.getItem('corsProxyUrl') || 'http://localhost:8080'
   );
+  
+  // HTTP Proxy settings (for server-side downloads in Stash)
+  const [httpProxy, setHttpProxy] = React.useState(() => {
+    try {
+      const settings = localStorage.getItem('stash-downloader:settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        return parsed.httpProxy || '';
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return '';
+  });
+  
   const [testSectionExpanded, setTestSectionExpanded] = React.useState(
     localStorage.getItem('testSectionExpanded') !== 'false'
   );
@@ -101,6 +116,24 @@ const TestApp: React.FC = () => {
   const handleCorsProxyUrlChange = (url: string) => {
     setCorsProxyUrl(url);
     localStorage.setItem('corsProxyUrl', url);
+  };
+
+  // Handle HTTP proxy change (for server-side downloads)
+  const handleHttpProxyChange = (proxy: string) => {
+    setHttpProxy(proxy);
+    try {
+      const settingsKey = 'stash-downloader:settings';
+      const existing = localStorage.getItem(settingsKey);
+      const settings = existing ? JSON.parse(existing) : {};
+      if (proxy) {
+        settings.httpProxy = proxy;
+      } else {
+        delete settings.httpProxy;
+      }
+      localStorage.setItem(settingsKey, JSON.stringify(settings));
+    } catch {
+      // Ignore parse errors
+    }
   };
 
   // Handle test section expand/collapse
@@ -186,6 +219,39 @@ const TestApp: React.FC = () => {
                           ⚠️ CORS proxy is <strong>disabled</strong>. Only sites with CORS headers will work.
                           Enable proxy to download from sites like pornhub. See{' '}
                           <a href="test/CORS_LIMITATIONS.md" target="_blank" rel="noreferrer">CORS_LIMITATIONS.md</a>
+                        </>
+                      )}
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              {/* HTTP Proxy Settings (for server-side downloads) */}
+              <div className="card bg-secondary">
+                <div className="card-body">
+                  <h6 className="card-title text-light">HTTP Proxy Settings (Server-Side)</h6>
+                  <div className="d-flex flex-column gap-2">
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="http://proxy.example.com:8080 or socks5://proxy.example.com:1080"
+                      value={httpProxy}
+                      onChange={(e) => handleHttpProxyChange(e.target.value)}
+                    />
+                    <small className="text-muted">
+                      {httpProxy ? (
+                        <>
+                          ✅ HTTP proxy is <strong>configured</strong>: <code>{httpProxy}</code>
+                          <br />
+                          This proxy will be used for server-side downloads in Stash (bypasses geo-restrictions, IP blocks, etc.)
+                        </>
+                      ) : (
+                        <>
+                          ⚠️ HTTP proxy is <strong>not configured</strong>.
+                          <br />
+                          Configure a proxy (HTTP/HTTPS/SOCKS) for server-side downloads to bypass website restrictions.
+                          <br />
+                          <strong>Note:</strong> This setting is used in Stash environment for server-side downloads via yt-dlp.
                         </>
                       )}
                     </small>
