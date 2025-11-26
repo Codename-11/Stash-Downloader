@@ -127,21 +127,22 @@ export class DownloadService {
       console.log('[DownloadService] Server-side download task completed, reading result...');
 
       // Read the result to get file_path
+      // Stash extracts the 'output' field from PluginOutput and returns it directly
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'read_result',
         result_id: resultId,
-      });
+      }) as any; // Result is the data directly, not wrapped in IPluginTaskResult
 
       if (!result) {
         return { success: false, error: 'Failed to read download result' };
       }
 
-      // Check for error in result
+      // Check for error in result (from PluginOutput.error)
       if (result.error) {
         return { success: false, error: result.error };
       }
 
-      // Extract file_path from result
+      // Extract file_path from result (result is already the data object)
       const filePath = result.file_path;
       const fileSize = result.file_size;
 
@@ -184,7 +185,7 @@ export class DownloadService {
 
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      });
+      }) as any; // Result is the data directly, not wrapped in IPluginTaskResult
 
       // Stash extracts the 'output' field from PluginOutput and returns it directly
       // So result is already {available: bool, success: bool}
