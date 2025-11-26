@@ -72,74 +72,109 @@ export class YtDlpScraper implements IMetadataScraper {
 
     console.log('[YtDlpScraper] Starting server-side extraction with result_id:', resultId);
 
-    // Step 1: Run extract_metadata task (saves result to temp file)
-    const taskResult = await stashService.runPluginTaskAndWait(
-      PLUGIN_ID,
-      'Extract Metadata',
-      {
-        task: 'extract_metadata',
-        url: url,
-        result_id: resultId,
-      },
-      {
-        maxWaitMs: this.timeoutMs,
-        onProgress: (progress) => {
-          console.log(`[YtDlpScraper] Extraction progress: ${progress}%`);
-        },
-      }
-    );
+    let taskResult: { success: boolean; error?: string; jobId?: string };
 
-    console.log('[YtDlpScraper] Task result:', taskResult);
+    // Step 1: Run extract_metadata task (saves result to temp file)
+    try {
+      console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
+      taskResult = await stashService.runPluginTaskAndWait(
+        PLUGIN_ID,
+        'Extract Metadata',
+        {
+          task: 'extract_metadata',
+          url: url,
+          result_id: resultId,
+        },
+        {
+          maxWaitMs: this.timeoutMs,
+          onProgress: (progress) => {
+            console.log(`[YtDlpScraper] Extraction progress: ${progress}%`);
+          },
+        }
+      );
+      console.log('[YtDlpScraper] runPluginTaskAndWait returned:', JSON.stringify(taskResult));
+    } catch (taskError) {
+      console.error('[YtDlpScraper] runPluginTaskAndWait threw error:', taskError);
+      throw taskError;
+    }
 
     if (!taskResult.success) {
       throw new Error(`yt-dlp extraction task failed: ${taskResult.error || 'Unknown error'}`);
     }
 
-    // Step 2: Read the result using runPluginOperation
-    console.log('[YtDlpScraper] Reading result from temp file...');
-    const readResult = await stashService.runPluginOperation(PLUGIN_ID, {
-      task: 'read_result',
-      result_id: resultId,
-    });
+    // Step 2: Read the result from temp file via HTTP (plugin serves static files)
+    // With interface: raw, runPluginOperation doesn't work correctly
+    // So we fetch the result file directly from the plugin's temp directory
+    console.log('[YtDlpScraper] Task succeeded, fetching result file...');
+    let readResult: any;
+    try {
+      // Wait a moment for file to be written
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-    console.log('[YtDlpScraper] Read result:', readResult);
+      // Try to fetch the result file from the plugin's accessible location
+      // First try via plugin static directory, then fall back to temp directory
+      const resultUrl = `/plugin/${PLUGIN_ID}/results/${resultId}.json`;
+      console.log('[YtDlpScraper] Trying to fetch result from:', resultUrl);
+
+      const response = await fetch(resultUrl);
+      if (response.ok) {
+        readResult = await response.json();
+        console.log('[YtDlpScraper] Got result via HTTP:', JSON.stringify(readResult));
+      } else {
+        // If static file not available, the result should be in the job output
+        // For now, we'll have to indicate the limitation
+        console.warn('[YtDlpScraper] Could not fetch result file, status:', response.status);
+
+        // Try runPluginOperation as last resort (may not work with interface: raw)
+        console.log('[YtDlpScraper] Trying runPluginOperation as fallback...');
+        readResult = await stashService.runPluginOperation(PLUGIN_ID, {
+          task: 'read_result',
+          result_id: resultId,
+        });
+        console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(readResult));
+      }
+    } catch (readError) {
+      console.error('[YtDlpScraper] Read result error:', readError);
+      throw readError;
+    }
 
     // Step 3: Cleanup (fire and forget)
-    stashService.runPluginOperation(PLUGIN_ID, {
-      task: 'cleanup_result',
+    stashService.runPluginTask(PLUGIN_ID, 'Cleanup Result', {
       result_id: resultId,
-    }).catch(() => {
-      // Ignore cleanup errors
+    }).catch((cleanupErr) => {
+      console.warn('[YtDlpScraper] Cleanup error (ignored):', cleanupErr);
     });
 
     // Check if we got the result
     if (!readResult) {
-      throw new Error('Failed to read extraction result');
+      console.error('[YtDlpScraper] readResult is null/undefined');
+      throw new Error('Failed to read extraction result - runPluginOperation returned null');
     }
 
-    const data = readResult as any;
+    console.log('[YtDlpScraper] Parsing result data...');
 
-    if (data.error) {
-      throw new Error(`yt-dlp extraction failed: ${data.error}`);
+    if (readResult.error) {
+      throw new Error(`yt-dlp extraction failed: ${readResult.error}`);
     }
 
-    if (!data.success) {
+    if (!readResult.success) {
+      console.error('[YtDlpScraper] Result missing success flag:', readResult);
       throw new Error('yt-dlp extraction did not succeed');
     }
 
-    console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', data.title);
+    console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', readResult.title);
 
     // Convert to our metadata format
     return {
       url: url,
-      title: data.title || undefined,
-      description: data.description || undefined,
-      date: data.upload_date ? this.formatDate(data.upload_date) : undefined,
-      duration: data.duration || undefined,
-      thumbnailUrl: data.thumbnail || undefined,
-      performers: data.uploader ? [data.uploader] : [],
+      title: readResult.title || undefined,
+      description: readResult.description || undefined,
+      date: readResult.upload_date ? this.formatDate(readResult.upload_date) : undefined,
+      duration: readResult.duration || undefined,
+      thumbnailUrl: readResult.thumbnail || undefined,
+      performers: readResult.uploader ? [readResult.uploader] : [],
       tags: [],
-      studio: data.uploader || undefined,
+      studio: readResult.uploader || undefined,
       contentType: 'video' as ContentType,
     };
   }
