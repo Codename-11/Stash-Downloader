@@ -21,7 +21,7 @@ import type { IDownloadItem } from '@/types';
 import { checkYtDlpAvailable } from '@/utils/systemCheck';
 import { formatDownloadError } from '@/utils/helpers';
 import { useSettings } from '@/hooks';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
 import { getStorageItem } from '@/utils';
 import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
@@ -52,17 +52,94 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   useEffect(() => {
     if (!isStashEnvironment) return;
     
+    // Function to read settings from multiple sources
+    const readSettings = (): IPluginSettings => {
+      // Try to get settings from Stash's PluginApi first (if available)
+      let stashSettings: any = null;
+      try {
+        if (typeof window !== 'undefined' && (window as any).PluginApi) {
+          // Stash may provide settings through PluginApi
+          const pluginApi = (window as any).PluginApi;
+          if (pluginApi.getPluginSettings) {
+            stashSettings = pluginApi.getPluginSettings(PLUGIN_ID);
+          } else if (pluginApi.settings) {
+            stashSettings = pluginApi.settings;
+          }
+        }
+      } catch (error) {
+        // PluginApi might not have settings method
+      }
+      
+      // Fallback to localStorage
+      const localSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+      
+      // Merge: Stash settings override localStorage
+      const mergedSettings = { ...localSettings, ...(stashSettings || {}) };
+      
+      // Also check if Stash stores settings in a different localStorage key
+      // Stash might use a key like 'plugin:stash-downloader:settings' or similar
+      const stashStorageKey = `plugin:${PLUGIN_ID}:settings`;
+      const stashStorageSettings = localStorage.getItem(stashStorageKey);
+      if (stashStorageSettings) {
+        try {
+          const parsed = JSON.parse(stashStorageSettings);
+          Object.assign(mergedSettings, parsed);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      
+      return mergedSettings;
+    };
+    
     // Check settings on mount and log current proxy status
-    const currentSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-    if (currentSettings.httpProxy) {
-      const masked = currentSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
-      console.log(`[Settings] Current HTTP/SOCKS proxy: ${masked}`);
-    } else {
-      console.log('[Settings] HTTP/SOCKS proxy not configured');
-    }
+    const logCurrentSettings = () => {
+      // First, log all localStorage keys that might contain settings
+      const allKeys = Object.keys(localStorage);
+      const relevantKeys = allKeys.filter(key => 
+        key.includes('stash') || 
+        key.includes('plugin') || 
+        key.includes('downloader') ||
+        key.includes('settings')
+      );
+      console.log('[Settings] Relevant localStorage keys:', relevantKeys);
+      
+      // Log what's in each relevant key
+      relevantKeys.forEach(key => {
+        try {
+          const value = localStorage.getItem(key);
+          if (value) {
+            console.log(`[Settings] ${key}:`, value.substring(0, 200));
+          }
+        } catch {
+          // Ignore
+        }
+      });
+      
+      const currentSettings = readSettings();
+      console.log('[Settings] Final merged settings:', {
+        localStorage: getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS),
+        merged: currentSettings,
+      });
+      
+      if (currentSettings.httpProxy) {
+        const masked = currentSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
+        console.log(`[Settings] ✓ Current HTTP/SOCKS proxy: ${masked}`);
+      } else {
+        console.log('[Settings] ⚠ HTTP/SOCKS proxy not configured');
+      }
+      
+      if (currentSettings.serverDownloadPath) {
+        console.log(`[Settings] Server download path: ${currentSettings.serverDownloadPath}`);
+      }
+    };
+    
+    // Log on mount
+    logCurrentSettings();
     
     // Listen for cross-tab storage changes (when settings are updated in another tab/window)
     const handleStorageChange = (e: StorageEvent) => {
+      // Check our key
       if (e.key === STORAGE_KEYS.SETTINGS && e.newValue) {
         try {
           const newSettings = JSON.parse(e.newValue) as IPluginSettings;
@@ -86,12 +163,20 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
           // Ignore parse errors
         }
       }
+      
+      // Also check for Stash's plugin settings key
+      if (e.key && e.key.startsWith('plugin:') && e.key.includes(PLUGIN_ID)) {
+        console.log('[Settings] Detected change in Stash plugin settings:', e.key);
+        logCurrentSettings();
+      }
     };
     
-    // Also check periodically for same-tab changes (Stash may update localStorage directly)
+    // Check periodically for same-tab changes (Stash may update localStorage directly)
+    let lastProxy = httpProxy;
     const checkInterval = setInterval(() => {
-      const latestSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-      if (latestSettings.httpProxy !== httpProxy) {
+      const latestSettings = readSettings();
+      if (latestSettings.httpProxy !== lastProxy) {
+        lastProxy = latestSettings.httpProxy;
         if (latestSettings.httpProxy) {
           const masked = latestSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
           console.log(`[Settings] HTTP/SOCKS proxy changed (detected via polling): ${masked}`);
