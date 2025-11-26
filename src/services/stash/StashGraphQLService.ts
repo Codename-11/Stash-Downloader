@@ -661,6 +661,108 @@ export class StashGraphQLService {
   }
 
   /**
+   * Find a job by ID to check its status
+   */
+  async findJob(jobId: string): Promise<{
+    id: string;
+    status: 'READY' | 'RUNNING' | 'FINISHED' | 'STOPPING' | 'CANCELLED' | 'FAILED';
+    progress?: number;
+    error?: string;
+    description: string;
+  } | null> {
+    const query = `
+      query FindJob($input: FindJobInput!) {
+        findJob(input: $input) {
+          id
+          status
+          progress
+          error
+          description
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ findJob: any }>(query, { input: { id: jobId } });
+      return result.data?.findJob || null;
+    } catch (error) {
+      console.error('[StashGraphQL] findJob failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Poll for job completion and return result
+   * Uses runPluginTask and polls findJob until complete
+   */
+  async runPluginTaskAndWait(
+    pluginId: string,
+    taskName: string,
+    args?: Record<string, unknown>,
+    options?: {
+      pollIntervalMs?: number;
+      maxWaitMs?: number;
+      onProgress?: (progress: number) => void;
+    }
+  ): Promise<{ success: boolean; error?: string; jobId?: string }> {
+    const pollInterval = options?.pollIntervalMs || 500;
+    const maxWait = options?.maxWaitMs || 120000; // 2 minutes default
+
+    console.log(`[StashGraphQL] Starting plugin task: ${pluginId}/${taskName}`);
+
+    // Start the task
+    const jobId = await this.runPluginTask(pluginId, taskName, args);
+    if (!jobId) {
+      return { success: false, error: 'Failed to start plugin task' };
+    }
+
+    console.log(`[StashGraphQL] Task started with job ID: ${jobId}`);
+
+    // Poll for completion
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      const job = await this.findJob(jobId);
+      if (!job) {
+        console.warn(`[StashGraphQL] Job ${jobId} not found, may have completed quickly`);
+        return { success: true, jobId };
+      }
+
+      console.log(`[StashGraphQL] Job ${jobId} status: ${job.status}, progress: ${job.progress || 0}`);
+
+      if (options?.onProgress && job.progress !== undefined) {
+        options.onProgress(job.progress);
+      }
+
+      switch (job.status) {
+        case 'FINISHED':
+          console.log(`[StashGraphQL] Job ${jobId} finished successfully`);
+          return { success: true, jobId };
+
+        case 'FAILED':
+          console.error(`[StashGraphQL] Job ${jobId} failed:`, job.error);
+          return { success: false, error: job.error || 'Job failed', jobId };
+
+        case 'CANCELLED':
+        case 'STOPPING':
+          console.warn(`[StashGraphQL] Job ${jobId} was cancelled/stopped`);
+          return { success: false, error: 'Job was cancelled', jobId };
+
+        case 'READY':
+        case 'RUNNING':
+          // Continue polling
+          break;
+      }
+    }
+
+    // Timeout - try to stop the job
+    console.warn(`[StashGraphQL] Job ${jobId} timed out after ${maxWait}ms`);
+    await this.stopJob(jobId);
+    return { success: false, error: 'Job timed out', jobId };
+  }
+
+  /**
    * Check if we're running in Stash (vs test-app)
    */
   isStashEnvironment(): boolean {
