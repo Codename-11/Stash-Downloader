@@ -46,13 +46,29 @@ addNavLinkViaMutationObserver();
 All external interactions go through dedicated services:
 
 **StashGraphQLService**
-- Wraps PluginApi.GQL and PluginApi.StashService
+- Uses direct `fetch` to `/graphql` endpoint (community plugin pattern)
+- **IMPORTANT**: Do NOT use `PluginApi.GQL.query()` - it doesn't exist
 - Provides typed methods for all Stash operations
 - Server-side scraping: `scrapeSceneURL()`, `scrapeGalleryURL()`, `scrapeImageURL()`
 - Plugin task execution: `runPluginTask()`, `runPluginOperation()`
 - Job management: `stopJob()`
 - Environment detection: `isStashEnvironment()`
-- Handles authentication and error mapping
+- Handles authentication via localStorage API key
+
+**GraphQL Request Pattern**:
+```typescript
+private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) {
+  const response = await fetch('/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+  return await response.json();
+}
+```
 
 **DownloadService**
 - Manages HTTP requests to external sources
@@ -292,6 +308,8 @@ If a scraper throws an error, the registry tries the next one.
 |-------|-------|-----|
 | Navbar items disappear | patch.after receives empty/null output | Use MutationObserver pattern instead |
 | React Error #31 | patch.after returns `{}` | Avoid patch.after for navbar; use DOM injection |
+| `this.gql.query is not a function` | PluginApi.GQL is not Apollo Client | Use direct fetch to `/graphql` (see GraphQL pattern above) |
+| Navbar button not showing | Wrong CSS selector | Use `.navbar-buttons` not `.navbar-nav.me-auto` |
 | IntlProvider error | Stash internal code | Ignore - not plugin's fault |
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
@@ -513,41 +531,45 @@ permissions:
 
 ## Navigation Integration
 
-### Adding Nav Link (MutationObserver Pattern)
-The `patch.after('MainNavBar.MenuItems')` approach is unreliable - it often receives empty/null output causing React Error #31. Use MutationObserver to inject the link via DOM instead:
+### Adding Nav Button (MutationObserver Pattern)
+The `patch.after('MainNavBar.MenuItems')` approach is unreliable - it often receives empty/null output causing React Error #31. Use MutationObserver to inject the button via DOM instead.
+
+**IMPORTANT**: Use `.navbar-buttons` selector (not `.navbar-nav.me-auto`). This is the container for utility buttons on the right side of the navbar, used by community plugins.
 
 ```typescript
-function addNavLinkViaMutationObserver() {
-  const NAV_LINK_ID = 'stash-downloader-nav-link';
+function addNavButtonViaMutationObserver() {
+  const NAV_BUTTON_ID = 'stash-downloader-nav-button';
 
-  function injectNavLink() {
-    if (document.getElementById(NAV_LINK_ID)) return true;
+  function injectNavButton() {
+    if (document.getElementById(NAV_BUTTON_ID)) return true;
 
-    const navbarNav = document.querySelector('.navbar-nav.me-auto');
-    if (!navbarNav) return false;
+    // Use .navbar-buttons selector (community plugin pattern)
+    const navbarButtons = document.querySelector('.navbar-buttons');
+    if (!navbarButtons) return false;
 
-    const navItem = document.createElement('a');
-    navItem.id = NAV_LINK_ID;
-    navItem.className = 'nav-link';
-    navItem.href = '#/plugin/stash-downloader';
-    navItem.textContent = 'Downloader';
+    const navButton = document.createElement('button');
+    navButton.id = NAV_BUTTON_ID;
+    navButton.className = 'btn nav-link';
+    navButton.type = 'button';
+    navButton.textContent = 'Downloader';
+    navButton.title = 'Open Stash Downloader';
 
     // Use history API for React Router navigation
-    navItem.addEventListener('click', (e) => {
+    navButton.addEventListener('click', (e) => {
       e.preventDefault();
       window.history.pushState({}, '', '/plugin/stash-downloader');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    navbarNav.appendChild(navItem);
+    navbarButtons.insertBefore(navButton, navbarButtons.firstChild);
     return true;
   }
 
-  if (injectNavLink()) return;
+  if (injectNavButton()) return;
 
   // Wait for navbar to appear
   const observer = new MutationObserver((_mutations, obs) => {
-    if (injectNavLink()) obs.disconnect();
+    if (injectNavButton()) obs.disconnect();
   });
 
   observer.observe(document.body, { childList: true, subtree: true });

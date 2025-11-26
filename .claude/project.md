@@ -94,12 +94,22 @@ The plugin must:
 3. NOT use contexts that require providers (ThemeProvider, etc.)
 
 ## Common Integration Issues
-- **Navbar issues with patch.after**: Use MutationObserver pattern instead - injects link via DOM
+- **Navbar issues with patch.after**: Use MutationObserver pattern instead - injects button via DOM
 - **React Error #31**: MainNavBar patch receives empty object `{}` - avoid using patch.after for navbar
+- **Navbar button not showing**: Use `.navbar-buttons` selector (NOT `.navbar-nav.me-auto`)
+- **GQL.query is not a function**: Use direct `fetch` to `/graphql` (NOT PluginApi.GQL)
 - **IntlProvider errors**: Stash's own code may log these - not plugin's fault
 - **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
 - **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
 - **CORS errors**: Use StashScraper (server-side) instead of client-side fetch, or enable CORS proxy
+
+## Finding CSS Selectors in Stash
+When adding UI elements via DOM injection:
+1. Use browser DevTools (F12) to inspect Stash's navbar
+2. Look for stable class names used by community plugins (e.g., `.navbar-buttons`)
+3. Reference community plugin examples: [Serechops Stash Plugins](https://github.com/Serechops/Serechops-Stash)
+4. Test selectors in console: `document.querySelector('.navbar-buttons')`
+5. Watch for class names that might change between Stash versions
 
 ## Future Enhancement Considerations
 - Plugin architecture supports adding new source scrapers

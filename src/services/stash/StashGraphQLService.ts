@@ -1,5 +1,8 @@
 /**
  * StashGraphQLService - Wrapper for Stash GraphQL API
+ *
+ * Uses direct fetch to /graphql endpoint (community plugin pattern)
+ * PluginApi.GQL is a low-level interface without .query()/.mutate() methods
  */
 
 import type {
@@ -23,14 +26,64 @@ import type {
   ScrapeContentType,
 } from '@/types';
 
+// GraphQL response type
+interface GQLResponse<T = unknown> {
+  data?: T;
+  errors?: Array<{ message: string }>;
+}
+
 export class StashGraphQLService {
-  private gql: typeof window.PluginApi.GQL;
+  private endpoint: string;
 
   constructor() {
-    if (!window.PluginApi?.GQL) {
-      throw new Error('PluginApi.GQL not available');
+    // Use apiEndpoint from localStorage if available, otherwise default to /graphql
+    this.endpoint = localStorage.getItem('apiEndpoint') || '/graphql';
+  }
+
+  /**
+   * Get headers for GraphQL requests
+   * Includes API key authentication if available
+   */
+  private getHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add API key if available (from Stash settings)
+    const apiKey = localStorage.getItem('apiKey');
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
     }
-    this.gql = window.PluginApi.GQL;
+
+    return headers;
+  }
+
+  /**
+   * Execute a GraphQL query or mutation
+   * Uses direct fetch to /graphql endpoint (community plugin pattern)
+   */
+  private async gqlRequest<T = unknown>(
+    query: string,
+    variables?: Record<string, unknown>
+  ): Promise<GQLResponse<T>> {
+    const response = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+
+    // Check for GraphQL errors
+    if (result.errors && result.errors.length > 0) {
+      console.error('[StashGraphQL] GraphQL errors:', result.errors);
+    }
+
+    return result;
   }
 
   /**
@@ -53,8 +106,11 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.query(query, { filter: name });
-    return result.data.findPerformers.performers;
+    const result = await this.gqlRequest<{ findPerformers: { performers: IStashPerformer[] } }>(
+      query,
+      { filter: name }
+    );
+    return result.data?.findPerformers?.performers || [];
   }
 
   /**
@@ -76,8 +132,11 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.query(query, { filter: name });
-    return result.data.findTags.tags;
+    const result = await this.gqlRequest<{ findTags: { tags: IStashTag[] } }>(
+      query,
+      { filter: name }
+    );
+    return result.data?.findTags?.tags || [];
   }
 
   /**
@@ -100,9 +159,12 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.query(query, { filter: name });
-    const studios = result.data.findStudios.studios;
-    return studios.length > 0 ? studios[0] : null;
+    const result = await this.gqlRequest<{ findStudios: { studios: IStashStudio[] } }>(
+      query,
+      { filter: name }
+    );
+    const studios = result.data?.findStudios?.studios || [];
+    return studios.length > 0 ? studios[0]! : null;
   }
 
   /**
@@ -125,7 +187,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ sceneCreate: IStashScene }>(mutation, { input });
+    if (!result.data?.sceneCreate) {
+      throw new Error('Failed to create scene');
+    }
     return result.data.sceneCreate;
   }
 
@@ -146,7 +211,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ imageCreate: IStashImage }>(mutation, { input });
+    if (!result.data?.imageCreate) {
+      throw new Error('Failed to create image');
+    }
     return result.data.imageCreate;
   }
 
@@ -170,7 +238,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ galleryCreate: IStashGallery }>(mutation, { input });
+    if (!result.data?.galleryCreate) {
+      throw new Error('Failed to create gallery');
+    }
     return result.data.galleryCreate;
   }
 
@@ -190,7 +261,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ performerCreate: IStashPerformer }>(mutation, { input });
+    if (!result.data?.performerCreate) {
+      throw new Error('Failed to create performer');
+    }
     return result.data.performerCreate;
   }
 
@@ -209,7 +283,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ tagCreate: IStashTag }>(mutation, { input });
+    if (!result.data?.tagCreate) {
+      throw new Error('Failed to create tag');
+    }
     return result.data.tagCreate;
   }
 
@@ -229,7 +306,10 @@ export class StashGraphQLService {
       }
     `;
 
-    const result = await this.gql.mutate(mutation, { input });
+    const result = await this.gqlRequest<{ studioCreate: IStashStudio }>(mutation, { input });
+    if (!result.data?.studioCreate) {
+      throw new Error('Failed to create studio');
+    }
     return result.data.studioCreate;
   }
 
@@ -321,7 +401,10 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.query(query, { url });
+      const result = await this.gqlRequest<{ scrapeSceneURL: IStashScrapedScene }>(
+        query,
+        { url }
+      );
       return result.data?.scrapeSceneURL || null;
     } catch (error) {
       console.error('[StashGraphQL] scrapeSceneURL failed:', error);
@@ -365,7 +448,10 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.query(query, { url });
+      const result = await this.gqlRequest<{ scrapeGalleryURL: IStashScrapedGallery }>(
+        query,
+        { url }
+      );
       return result.data?.scrapeGalleryURL || null;
     } catch (error) {
       console.error('[StashGraphQL] scrapeGalleryURL failed:', error);
@@ -409,7 +495,10 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.query(query, { url });
+      const result = await this.gqlRequest<{ scrapeImageURL: IStashScrapedImage }>(
+        query,
+        { url }
+      );
       return result.data?.scrapeImageURL || null;
     } catch (error) {
       console.error('[StashGraphQL] scrapeImageURL failed:', error);
@@ -443,7 +532,10 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.query(query, { types });
+      const result = await this.gqlRequest<{ listScrapers: IStashScraper[] }>(
+        query,
+        { types }
+      );
       return result.data?.listScrapers || [];
     } catch (error) {
       console.error('[StashGraphQL] listScrapers failed:', error);
@@ -501,7 +593,7 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.mutate(mutation, {
+      const result = await this.gqlRequest<{ runPluginTask: string }>(mutation, {
         plugin_id: pluginId,
         task_name: taskName,
         args_map: args || {},
@@ -528,7 +620,7 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.mutate(mutation, {
+      const result = await this.gqlRequest<{ runPluginOperation: IPluginTaskResult }>(mutation, {
         plugin_id: pluginId,
         args: args || {},
       });
@@ -550,7 +642,7 @@ export class StashGraphQLService {
     `;
 
     try {
-      const result = await this.gql.mutate(mutation, { job_id: jobId });
+      const result = await this.gqlRequest<{ stopJob: boolean }>(mutation, { job_id: jobId });
       return result.data?.stopJob || false;
     } catch (error) {
       console.error('[StashGraphQL] stopJob failed:', error);
@@ -562,7 +654,7 @@ export class StashGraphQLService {
    * Check if we're running in Stash (vs test-app)
    */
   isStashEnvironment(): boolean {
-    return !!(window.PluginApi?.GQL && !(window as any).__TEST_APP__);
+    return !!(window.PluginApi && !(window as any).__TEST_APP__);
   }
 }
 
