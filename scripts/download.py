@@ -110,16 +110,26 @@ def read_input() -> dict:
 
 
 def write_output(result: dict) -> None:
-    """Write JSON output to stdout."""
+    """Write JSON output to stdout.
+    
+    IMPORTANT: For runPluginOperation, Stash expects ONLY valid JSON on stdout.
+    Any extra output (including newlines before/after) can cause Stash to return null.
+    We use sys.stdout.write() and flush() to ensure clean output.
+    """
     try:
-        output = json.dumps(result)
+        output = json.dumps(result, ensure_ascii=False)
         log.info(f"Writing output to stdout: {output[:200]}...")  # Log first 200 chars
-        print(output)
+        
+        # Write directly to stdout and flush to ensure it's sent immediately
+        # Don't use print() as it adds a newline which might confuse Stash
+        sys.stdout.write(output)
+        sys.stdout.flush()
     except Exception as e:
         log.error(f"Failed to serialize output: {e}")
-        # Fallback: write error as JSON
-        error_output = json.dumps({'error': f'Failed to serialize output: {str(e)}', 'success': False})
-        print(error_output)
+        # Fallback: write error as JSON (using result_error to avoid GraphQL error interpretation)
+        error_output = json.dumps({'result_error': f'Failed to serialize output: {str(e)}', 'success': False}, ensure_ascii=False)
+        sys.stdout.write(error_output)
+        sys.stdout.flush()
 
 
 def sanitize_filename(filename: str) -> str:
