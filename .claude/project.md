@@ -101,7 +101,7 @@ The plugin must:
 - **IntlProvider errors**: Stash's own code may log these - not plugin's fault
 - **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
 - **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
-- **CORS errors**: Use StashScraper (server-side) instead of client-side fetch, or enable CORS proxy
+- **CORS errors**: Use YtDlpScraper (server-side) instead of client-side fetch, or enable CORS proxy
 
 ## Finding CSS Selectors in Stash
 When adding UI elements via DOM injection:

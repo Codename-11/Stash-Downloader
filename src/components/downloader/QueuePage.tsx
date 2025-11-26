@@ -123,7 +123,9 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         } else if (metadata.imageUrl) {
           console.log('[QueuePage] ✓ Scraper extracted imageUrl:', metadata.imageUrl.substring(0, 100) + '...');
         } else {
-          console.warn('[QueuePage] ⚠️ Scraper did not extract videoUrl or imageUrl - download may fail');
+          // This is normal for Stash's built-in scraper - it doesn't return direct video URLs
+          // The download service will use yt-dlp or the page URL as fallback
+          console.log('[QueuePage] ℹ️ No direct video/image URL extracted - download service will use yt-dlp or page URL');
         }
         toast.showToast('success', 'Metadata Scraped', `Successfully scraped metadata for ${metadata.title || url}`);
       } catch (error) {

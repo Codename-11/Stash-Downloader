@@ -80,8 +80,8 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 
 **MetadataService (ScraperRegistry)**
 - Pluggable scraper architecture with priority ordering
-- **StashScraper**: Server-side via Stash GraphQL (NO CORS, highest priority)
-- **YtDlpScraper**: yt-dlp metadata extraction
+- **YtDlpScraper**: yt-dlp metadata extraction (PRIMARY - always extracts video URLs)
+- **StashScraper**: Server-side via Stash GraphQL (NO CORS, fallback only - kept in code but not used by default)
 - **Site-specific**: PornhubScraper, YouPornScraper
 - **HTMLScraper**: Generic Open Graph tag parser
 - **GenericScraper**: Fallback for basic URL parsing
@@ -271,8 +271,8 @@ interface IMetadataScraper {
 // Scrapers registered in priority order (first match wins)
 class ScraperRegistry {
   constructor() {
-    this.register(new StashScraper());    // Server-side, no CORS
-    this.register(new YtDlpScraper());    // Video URL extraction
+    this.register(new YtDlpScraper());    // PRIMARY: Always extracts video URLs
+    this.register(new StashScraper());    // FALLBACK: Kept in code but only used if yt-dlp fails
     this.register(new PornhubScraper());  // Site-specific
     this.register(new YouPornScraper());
     this.register(new HTMLScraper());     // Generic OG tags
@@ -282,8 +282,8 @@ class ScraperRegistry {
 ```
 
 ### Scraper Fallback Chain
-1. **StashScraper** - Tries Stash's built-in scrapers (server-side)
-2. **YtDlpScraper** - For sites supported by yt-dlp
+1. **YtDlpScraper** - PRIMARY: Always extracts video URLs via yt-dlp (server-side in Stash, CORS proxy in test-app)
+2. **StashScraper** - FALLBACK: Kept in code but only used if yt-dlp fails (server-side, no CORS)
 3. **Site-Specific** - Custom scrapers for known sites
 4. **HTMLScraper** - Parses Open Graph meta tags
 5. **GenericScraper** - Extracts filename from URL (last resort)
@@ -315,7 +315,7 @@ If a scraper throws an error, the registry tries the next one.
 | IntlProvider error | Stash internal code | Ignore - not plugin's fault |
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
-| CORS errors (scraping) | Browser security restrictions | Use `StashScraper` (server-side) or CORS proxy |
+| CORS errors (scraping) | Browser security restrictions | Use `YtDlpScraper` (server-side) or CORS proxy |
 | Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
 | `runPluginOperation` returns null | Python script outputs `error` field | Use `result_error` instead - Stash treats top-level `error` as GraphQL error |
 

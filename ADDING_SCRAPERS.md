@@ -6,15 +6,17 @@ The plugin includes a flexible scraper system that automatically extracts metada
 
 The plugin comes with these scrapers out of the box (in priority order):
 
-1. **StashScraper** - Uses Stash's built-in scraping (server-side, NO CORS)
+1. **YtDlpScraper** - PRIMARY: Uses yt-dlp for video URL extraction
+   - Always extracts direct video URLs (required for reliable downloads)
+   - Gets highest quality video stream URLs
+   - Server-side in Stash (no CORS), CORS proxy in test-app
+   - Best for sites that require authentication or complex extraction
+
+2. **StashScraper** - FALLBACK: Uses Stash's built-in scraping (server-side, NO CORS)
+   - Kept in code but only used if yt-dlp fails
    - Leverages community scrapers installed in Stash
    - Runs on server, bypasses browser CORS restrictions
-   - Best option when running in production Stash
-
-2. **YtDlpScraper** - Uses yt-dlp for video URL extraction
-   - Gets highest quality video stream URLs
-   - Requires CORS proxy or server-side yt-dlp
-   - Best for sites that require authentication or complex extraction
+   - Note: Does not extract direct video URLs (only metadata)
 
 3. **PornhubScraper** - Specialized for pornhub.com
    - Extracts: title, performers, tags, description, duration, thumbnail, date

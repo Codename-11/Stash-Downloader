@@ -1,13 +1,19 @@
 /**
  * ScraperRegistry - Manages metadata scrapers
  *
+ * Priority order (yt-dlp first for video URL extraction):
+ * - YtDlpScraper (primary) - Always extracts video URLs via yt-dlp
+ * - StashScraper (fallback) - Kept in code but only used if yt-dlp fails
+ * - GenericScraper (last resort) - URL parsing only
+ *
  * In Stash environment:
- * - Uses StashScraper (server-side, no CORS)
- * - Falls back to GenericScraper (URL parsing only)
+ * - YtDlpScraper uses server-side extraction (no CORS)
+ * - StashScraper available as fallback (server-side, no CORS)
  * - Skips client-side scrapers that fail due to CORS/CSP
  *
  * In test-app environment:
- * - Uses all scrapers including CORS proxy-based ones
+ * - YtDlpScraper uses CORS proxy
+ * - All scrapers available including CORS proxy-based ones
  */
 
 import type { IMetadataScraper, IScrapedMetadata } from '@/types';
@@ -30,14 +36,17 @@ export class ScraperRegistry {
     const isStashEnv = this.isStashEnvironment();
 
     // Register built-in scrapers based on environment
+    // Priority: yt-dlp first (always extracts video URLs), StashScraper as fallback
     // In Stash environment:
-    // - StashScraper uses server-side scraping (no CORS)
+    // - YtDlpScraper uses server-side extraction (no CORS)
+    // - StashScraper available as fallback (server-side, no CORS)
     // - Skip client-side scrapers that fail due to CSP
     // In test-app:
+    // - YtDlpScraper uses CORS proxy
     // - All scrapers available (CORS proxy required)
 
-    this.register(new StashScraper());  // Always available (server-side in Stash, noop in test-app)
-    this.register(new YtDlpScraper());  // Server-side in Stash (file-based), CORS proxy in test-app
+    this.register(new YtDlpScraper());  // PRIMARY: Always extracts video URLs (server-side in Stash, CORS proxy in test-app)
+    this.register(new StashScraper());  // FALLBACK: Kept in code but only used if yt-dlp fails (server-side in Stash, noop in test-app)
 
     if (!isStashEnv) {
       // Client-side scrapers only work in test-app with CORS proxy
@@ -46,7 +55,7 @@ export class ScraperRegistry {
       this.register(new YouPornScraper());
       this.register(new HTMLScraper());
     } else {
-      console.log('[ScraperRegistry] Stash mode: using StashScraper and YtDlpScraper (server-side)');
+      console.log('[ScraperRegistry] Stash mode: using YtDlpScraper (primary) and StashScraper (fallback) - server-side');
     }
   }
 
