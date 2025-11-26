@@ -93,6 +93,7 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 - Metadata extraction without downloading
 - Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
+- Configurable download directory via `serverDownloadPath` setting (default: `/data/StashDownloader`)
 
 ### PluginOutput Format (Critical for `runPluginOperation`)
 

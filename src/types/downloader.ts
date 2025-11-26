@@ -94,6 +94,7 @@ export interface IDownloadQueueState {
 
 export interface IPluginSettings {
   defaultDownloadPath?: string;
+  serverDownloadPath?: string;
   concurrentDownloads: number;
   autoCreatePerformers: boolean;
   autoCreateTags: boolean;

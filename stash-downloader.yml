@@ -7,6 +7,10 @@ settings:
     displayName: Default Download Path
     description: Default directory for downloaded content (relative to Stash library)
     type: STRING
+  serverDownloadPath:
+    displayName: Server Download Path
+    description: Directory for server-side downloads (absolute path, e.g., /data/StashDownloader)
+    type: STRING
   concurrentDownloads:
     displayName: Concurrent Downloads
     description: Maximum number of simultaneous downloads

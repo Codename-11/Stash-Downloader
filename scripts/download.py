@@ -363,7 +363,7 @@ def task_download(args: dict) -> dict:
 
     Args:
         url: URL to download
-        output_dir: Directory to save file
+        output_dir: Directory to save file (defaults to /data/StashDownloader)
         filename: Optional custom filename
         quality: Quality preference (best, 1080p, 720p, 480p)
         result_id: Optional ID for storing result (for async retrieval)
@@ -373,7 +373,8 @@ def task_download(args: dict) -> dict:
         If result_id is provided, also saves to file for later retrieval.
     """
     url = args.get('url')
-    output_dir = args.get('output_dir', tempfile.gettempdir())
+    # Default to /data/StashDownloader (configurable via plugin settings)
+    output_dir = args.get('output_dir', '/data/StashDownloader')
     filename = args.get('filename')
     quality = args.get('quality', 'best')
     result_id = args.get('result_id')

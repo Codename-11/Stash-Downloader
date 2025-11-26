@@ -9,9 +9,10 @@
  */
 
 import type { IDownloadProgress } from '@/types';
-import { fetchWithTimeout } from '@/utils';
+import { fetchWithTimeout, getStorageItem } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
-import { PLUGIN_ID } from '@/constants';
+import { PLUGIN_ID, STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
+import type { IPluginSettings } from '@/types';
 
 export interface IDownloadOptions {
   onProgress?: (progress: IDownloadProgress) => void;
@@ -91,6 +92,10 @@ export class DownloadService {
       // Generate result_id for async result retrieval
       const resultId = `download-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+      // Get server download path from settings (defaults to /data/StashDownloader)
+      const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+      const serverDownloadPath = options.outputDir || settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
+
       // Run the download task and wait for completion
       const taskResult = await stashService.runPluginTaskAndWait(
         PLUGIN_ID,
@@ -98,7 +103,7 @@ export class DownloadService {
         {
           mode: 'download',
           url: url,
-          output_dir: options.outputDir,
+          output_dir: serverDownloadPath,
           filename: options.filename,
           quality: options.quality || 'best',
           result_id: resultId,
