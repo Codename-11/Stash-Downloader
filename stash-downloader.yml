@@ -37,10 +37,10 @@ settings:
     type: BOOLEAN
 
 # Python backend for server-side downloads (bypasses CORS)
-# Bare command name (no /) should search PATH per Stash docs
+# Same pattern as PythonDepManager (interface: raw + {pluginDir})
 exec:
   - python
-  - scripts/download.py
+  - "{pluginDir}/scripts/download.py"
 
 tasks:
   - name: Download Video
