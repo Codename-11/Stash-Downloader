@@ -119,67 +119,88 @@ export async function testHttpProxy(
   // Sanitize proxy URL
   const sanitized = proxyUrl.trim().replace(/^["']|["']$/g, '').trim();
   
+  // List of test URLs to try (fallback if one fails)
+  const testUrls = [
+    'https://www.google.com',  // Most reliable
+    'https://www.cloudflare.com',  // Fast CDN
+    'https://httpbin.org/get',  // Testing service (may be down)
+  ];
+  
   if (isStashEnvironment) {
     // Server-side test: Use yt-dlp to test proxy via plugin task
     try {
       const { getStashService } = await import('@/services/stash/StashGraphQLService');
       const stashService = getStashService();
       
-      // Use a simple test URL that yt-dlp can handle
-      const testUrl = 'https://httpbin.org/get';
       const resultId = `proxy-test-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const masked = sanitized.replace(/:[^:@]*@/, ':****@');
       
       console.log('[Proxy Test] Testing HTTP proxy via server-side yt-dlp...');
       
-      // Run extract_metadata task with proxy
-      const taskResult = await stashService.runPluginTaskAndWait(
-        'stash-downloader',
-        'Test Proxy',
-        {
-          mode: 'extract_metadata',
-          url: testUrl,
-          proxy: sanitized,
-          result_id: resultId,
-        },
-        {
-          maxWaitMs: 10000, // 10 second timeout
+      // Try each test URL until one succeeds
+      let lastError: string | undefined;
+      for (const testUrl of testUrls) {
+        try {
+          console.log(`[Proxy Test] Trying test URL: ${testUrl}`);
+          
+          // Run extract_metadata task with proxy
+          const taskResult = await stashService.runPluginTaskAndWait(
+            'stash-downloader',
+            'Test Proxy',
+            {
+              mode: 'extract_metadata',
+              url: testUrl,
+              proxy: sanitized,
+              result_id: resultId,
+            },
+            {
+              maxWaitMs: 10000, // 10 second timeout
+            }
+          );
+
+          if (taskResult.success) {
+            // Read the result
+            const result = await stashService.runPluginOperation('stash-downloader', {
+              mode: 'read_result',
+              result_id: resultId,
+            }) as any;
+
+            // Cleanup
+            stashService.runPluginTask('stash-downloader', 'Cleanup Result', {
+              mode: 'cleanup_result',
+              result_id: resultId,
+            }).catch(() => {});
+
+            if (result && result.success !== false) {
+              return {
+                success: true,
+                message: 'Proxy test successful',
+                details: `Successfully connected through ${masked} and reached ${testUrl}`,
+              };
+            } else {
+              lastError = result?.result_error || result?.error || 'Unknown error';
+              // Try next URL
+              continue;
+            }
+          } else {
+            lastError = taskResult.error || 'Task execution failed';
+            // Try next URL
+            continue;
+          }
+        } catch (urlError) {
+          lastError = urlError instanceof Error ? urlError.message : String(urlError);
+          console.log(`[Proxy Test] Test URL ${testUrl} failed:`, lastError);
+          // Try next URL
+          continue;
         }
-      );
-
-      if (taskResult.success) {
-        // Read the result
-        const result = await stashService.runPluginOperation('stash-downloader', {
-          mode: 'read_result',
-          result_id: resultId,
-        }) as any;
-
-        // Cleanup
-        stashService.runPluginTask('stash-downloader', 'Cleanup Result', {
-          mode: 'cleanup_result',
-          result_id: resultId,
-        }).catch(() => {});
-
-        if (result && result.success !== false) {
-          const masked = sanitized.replace(/:[^:@]*@/, ':****@');
-          return {
-            success: true,
-            message: `Proxy test successful`,
-            details: `Successfully connected through ${masked} and extracted metadata from test URL`,
-          };
-        } else {
-          return {
-            success: false,
-            message: 'Proxy test failed',
-            details: result?.result_error || result?.error || 'Unknown error',
-          };
-        }
-      } else {
-        return {
-          success: false,
-          message: 'Proxy test failed',
-          details: taskResult.error || 'Task execution failed',
-        };
       }
+      
+      // All URLs failed
+      return {
+        success: false,
+        message: 'Proxy test failed',
+        details: `Could not connect through proxy ${masked}. Last error: ${lastError || 'All test URLs failed'}`,
+      };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[Proxy Test] Server-side test error:', error);
@@ -203,32 +224,47 @@ export async function testHttpProxy(
         };
       }
 
-      // Test URL that should work through proxy
-      const testUrl = 'https://httpbin.org/get';
-      const testProxyUrl = `${corsProxyUrl}/?url=${encodeURIComponent(testUrl)}&proxy=${encodeURIComponent(sanitized)}`;
-      
+      const masked = sanitized.replace(/:[^:@]*@/, ':****@');
       console.log('[Proxy Test] Testing HTTP proxy via CORS proxy...');
       
-      const response = await fetch(testProxyUrl, {
-        method: 'GET',
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
+      // Try each test URL until one succeeds
+      let lastError: string | undefined;
+      for (const testUrl of testUrls) {
+        try {
+          console.log(`[Proxy Test] Trying test URL: ${testUrl}`);
+          const testProxyUrl = `${corsProxyUrl}/?url=${encodeURIComponent(testUrl)}&proxy=${encodeURIComponent(sanitized)}`;
+          
+          const response = await fetch(testProxyUrl, {
+            method: 'GET',
+            signal: AbortSignal.timeout(10000), // 10 second timeout
+          });
 
-      if (response.ok) {
-        const masked = sanitized.replace(/:[^:@]*@/, ':****@');
-        return {
-          success: true,
-          message: 'Proxy test successful',
-          details: `Successfully connected through ${masked} and reached test URL`,
-        };
-      } else {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        return {
-          success: false,
-          message: 'Proxy test failed',
-          details: `HTTP ${response.status}: ${errorText.substring(0, 100)}`,
-        };
+          if (response.ok) {
+            return {
+              success: true,
+              message: 'Proxy test successful',
+              details: `Successfully connected through ${masked} and reached ${testUrl}`,
+            };
+          } else {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            lastError = `HTTP ${response.status}: ${errorText.substring(0, 100)}`;
+            // Try next URL
+            continue;
+          }
+        } catch (urlError) {
+          lastError = urlError instanceof Error ? urlError.message : String(urlError);
+          console.log(`[Proxy Test] Test URL ${testUrl} failed:`, lastError);
+          // Try next URL
+          continue;
+        }
       }
+      
+      // All URLs failed
+      return {
+        success: false,
+        message: 'Proxy test failed',
+        details: `Could not connect through proxy ${masked}. Last error: ${lastError || 'All test URLs failed'}`,
+      };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('[Proxy Test] Client-side test error:', error);
@@ -251,30 +287,52 @@ export async function testCorsProxy(): Promise<{ success: boolean; message: stri
     
     console.log('[CORS Proxy Test] Testing CORS proxy connectivity...');
     
-    // Test with a simple URL
-    const testUrl = 'https://httpbin.org/get';
-    const response = await fetch(
-      `${corsProxyUrl}/?url=${encodeURIComponent(testUrl)}`,
-      {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000), // 5 second timeout
-      }
-    );
+    // List of test URLs to try (fallback if one fails)
+    const testUrls = [
+      'https://www.google.com',  // Most reliable
+      'https://www.cloudflare.com',  // Fast CDN
+      'https://httpbin.org/get',  // Testing service (may be down)
+    ];
+    
+    // Try each test URL until one succeeds
+    let lastError: string | undefined;
+    for (const testUrl of testUrls) {
+      try {
+        console.log(`[CORS Proxy Test] Trying test URL: ${testUrl}`);
+        const response = await fetch(
+          `${corsProxyUrl}/?url=${encodeURIComponent(testUrl)}`,
+          {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000), // 5 second timeout
+          }
+        );
 
-    if (response.ok) {
-      return {
-        success: true,
-        message: 'CORS proxy test successful',
-        details: `Successfully connected to CORS proxy at ${corsProxyUrl} and reached test URL`,
-      };
-    } else {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      return {
-        success: false,
-        message: 'CORS proxy test failed',
-        details: `HTTP ${response.status}: ${errorText.substring(0, 100)}`,
-      };
+        if (response.ok) {
+          return {
+            success: true,
+            message: 'CORS proxy test successful',
+            details: `Successfully connected to CORS proxy at ${corsProxyUrl} and reached ${testUrl}`,
+          };
+        } else {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          lastError = `HTTP ${response.status}: ${errorText.substring(0, 100)}`;
+          // Try next URL
+          continue;
+        }
+      } catch (urlError) {
+        lastError = urlError instanceof Error ? urlError.message : String(urlError);
+        console.log(`[CORS Proxy Test] Test URL ${testUrl} failed:`, lastError);
+        // Try next URL
+        continue;
+      }
     }
+    
+    // All URLs failed
+    return {
+      success: false,
+      message: 'CORS proxy test failed',
+      details: `Could not reach any test URLs through CORS proxy at ${corsProxyUrl}. Last error: ${lastError || 'All test URLs failed'}`,
+    };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error('[CORS Proxy Test] Error:', error);
