@@ -103,80 +103,53 @@ export class YtDlpScraper implements IMetadataScraper {
     }
 
     // Step 2: Read the result from temp file
-    // Now that we use 'mode' key (FileMonitor pattern), runPluginOperation should work correctly
     console.log('[YtDlpScraper] Task succeeded, reading result...');
     let readResult: any;
     try {
-      // Retry reading the result with exponential backoff
-      // The file might not be written immediately after task completion
-      const maxRetries = 5;
-      const initialDelay = 1000; // Start with 1 second
-      
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const delay = initialDelay * Math.pow(2, attempt); // 1s, 2s, 4s, 8s, 16s
-        if (attempt > 0) {
-          console.log(`[YtDlpScraper] Retry attempt ${attempt + 1}/${maxRetries}, waiting ${delay}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        } else {
-          // First attempt, wait a bit
-          await new Promise((resolve) => setTimeout(resolve, initialDelay));
-        }
+      const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'read_result',
+        result_id: resultId,
+      });
+      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
 
-        // Try runPluginOperation (proper way, should work now with mode key)
-        console.log(`[YtDlpScraper] Calling runPluginOperation to read result (attempt ${attempt + 1}/${maxRetries})...`);
-        const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
-          mode: 'read_result',
-          result_id: resultId,
-        });
-        console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
-
-        // runPluginOperation returns IPluginTaskResult with {data?, error?}
-        // The Python script outputs PluginOutput format: {error?, output?}
-        // Stash wraps this in the 'data' field of IPluginTaskResult
-        if (operationResult) {
-          console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
-          console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
-          
-          // If Stash returned a GraphQL error, operationResult.error will be set
-          if (operationResult.error) {
-            console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
-            throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
-          }
-          
-          // Extract the PluginOutput from data field
-          // Python script outputs: {error?: string, output?: {...actual data...}}
-          const pluginOutput = operationResult.data;
-          if (pluginOutput) {
-            // Check for error in PluginOutput
-            if (pluginOutput.error) {
-              console.error('[YtDlpScraper] Python script returned error:', pluginOutput.error);
-              throw new Error(`Python script error: ${pluginOutput.error}`);
-            }
-            
-            // Extract the actual result from the 'output' field
-            // pluginOutput.output contains our actual data (title, description, etc.)
-            readResult = pluginOutput.output !== undefined ? pluginOutput.output : pluginOutput;
-            
-            // Check if we got valid data
-            if (readResult && (readResult.title || readResult.success !== false)) {
-              console.log('[YtDlpScraper] ✓ Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
-              break; // Success, exit retry loop
-            } else {
-              console.warn('[YtDlpScraper] Got result but it appears invalid, will retry...');
-              readResult = null; // Reset for next attempt
-            }
-          } else {
-            console.warn('[YtDlpScraper] operationResult.data is null/undefined');
-            readResult = null; // Reset for next attempt
-          }
-        } else {
-          console.warn(`[YtDlpScraper] runPluginOperation returned null (attempt ${attempt + 1}/${maxRetries})`);
-          if (attempt === maxRetries - 1) {
-            console.error('[YtDlpScraper] All retry attempts failed - runPluginOperation returned null');
-            console.error('[YtDlpScraper] This usually means GraphQL errors occurred or Python script failed - check Stash server logs');
-          }
-        }
+      // runPluginOperation returns IPluginTaskResult with {data?, error?}
+      // The Python script outputs PluginOutput format: {error?, output?}
+      // Stash wraps this in the 'data' field of IPluginTaskResult
+      if (!operationResult) {
+        throw new Error('runPluginOperation returned null - check Stash server logs');
       }
+
+      console.log('[YtDlpScraper] operationResult.data:', JSON.stringify(operationResult.data, null, 2));
+      console.log('[YtDlpScraper] operationResult.error:', operationResult.error);
+      
+      // If Stash returned a GraphQL error, operationResult.error will be set
+      if (operationResult.error) {
+        console.error('[YtDlpScraper] runPluginOperation returned GraphQL error:', operationResult.error);
+        throw new Error(`runPluginOperation GraphQL error: ${operationResult.error}`);
+      }
+      
+      // Extract the PluginOutput from data field
+      // Python script outputs: {error?: string, output?: {...actual data...}}
+      const pluginOutput = operationResult.data;
+      if (!pluginOutput) {
+        throw new Error('operationResult.data is null/undefined');
+      }
+      
+      // Check for error in PluginOutput
+      if (pluginOutput.error) {
+        console.error('[YtDlpScraper] Python script returned error:', pluginOutput.error);
+        throw new Error(`Python script error: ${pluginOutput.error}`);
+      }
+      
+      // Extract the actual result from the 'output' field
+      // pluginOutput.output contains our actual data (title, description, etc.)
+      readResult = pluginOutput.output !== undefined ? pluginOutput.output : pluginOutput;
+      
+      if (!readResult || (!readResult.title && readResult.success === false)) {
+        throw new Error('Invalid result data from Python script');
+      }
+      
+      console.log('[YtDlpScraper] ✓ Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
     } catch (readError) {
       console.error('[YtDlpScraper] Read result error:', readError);
       throw readError;
@@ -189,12 +162,6 @@ export class YtDlpScraper implements IMetadataScraper {
     }).catch((cleanupErr) => {
       console.warn('[YtDlpScraper] Cleanup error (ignored):', cleanupErr);
     });
-
-    // Check if we got the result
-    if (!readResult) {
-      console.error('[YtDlpScraper] readResult is null/undefined');
-      throw new Error('Failed to read extraction result - runPluginOperation returned null');
-    }
 
     console.log('[YtDlpScraper] Parsing result data...');
     console.log('[YtDlpScraper] Result structure:', JSON.stringify(readResult));
