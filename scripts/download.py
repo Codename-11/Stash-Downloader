@@ -703,6 +703,79 @@ def task_check_ytdlp(args: dict) -> dict:
     }
 
 
+def task_test_proxy(args: dict) -> dict:
+    """
+    Test proxy connectivity by fetching a URL through the proxy.
+
+    Args:
+        url: URL to fetch (default: https://www.google.com)
+        proxy: HTTP/HTTPS/SOCKS proxy URL
+
+    Returns:
+        Dict with success status and response info
+    """
+    url = args.get('url', 'https://www.google.com')
+    proxy = args.get('proxy')
+
+    if not proxy:
+        return {'result_error': 'No proxy URL provided', 'success': False}
+
+    log.info(f"Testing proxy {proxy} with URL {url}")
+
+    try:
+        # Use yt-dlp to test the proxy (it handles SOCKS proxies natively)
+        cmd = [
+            'yt-dlp',
+            '--proxy', proxy,
+            '--no-download',
+            '--no-playlist',
+            '--dump-json',
+            '--no-check-certificate',  # Skip SSL verification for proxy
+            url
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            log.info(f"✓ Proxy test successful for {url}")
+            return {
+                'success': True,
+                'url': url,
+                'proxy': proxy,
+                'message': f'Successfully connected through proxy'
+            }
+        else:
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            log.error(f"Proxy test failed: {error_msg}")
+            return {
+                'result_error': f'Proxy connection failed: {error_msg[:200]}',
+                'success': False,
+                'url': url,
+                'proxy': proxy
+            }
+    except subprocess.TimeoutExpired:
+        log.error("Proxy test timed out")
+        return {
+            'result_error': 'Proxy connection timed out after 30 seconds',
+            'success': False,
+            'url': url,
+            'proxy': proxy
+        }
+    except Exception as e:
+        log.error(f"Proxy test error: {e}")
+        return {
+            'result_error': f'Proxy test error: {str(e)}',
+            'success': False,
+            'url': url,
+            'proxy': proxy
+        }
+
+
 def main():
     """Main entry point."""
     try:
@@ -735,6 +808,7 @@ def main():
         'read_result': task_read_result,
         'cleanup_result': task_cleanup_result,
         'check_ytdlp': task_check_ytdlp,
+        'test_proxy': task_test_proxy,
     }
 
     handler = tasks.get(task_name)

@@ -71,6 +71,10 @@ tasks:
     description: Check if yt-dlp is installed and available
     defaultArgs:
       mode: check_ytdlp
+  - name: Test Proxy
+    description: Test proxy connectivity by fetching a URL
+    defaultArgs:
+      mode: test_proxy
 
 ui:
   javascript:
