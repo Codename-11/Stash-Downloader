@@ -327,12 +327,35 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         fileSize: blob.size,
       });
     } catch (error) {
+      // Check if this is a server-side success (file saved to server)
+      const isServerSuccess = (error as any)?.isServerSuccess === true;
+      const serverResult = (error as any)?.serverResult;
+
+      if (isServerSuccess && serverResult?.file_path) {
+        // Server-side download succeeded! File is saved to server's filesystem.
+        const filePath = serverResult.file_path;
+        const fileSize = serverResult.file_size || 0;
+
+        log.addLog('success', 'download',
+          `Downloaded to server: ${item.metadata?.title || item.url}`,
+          `File saved to: ${filePath}\nSize: ${fileSize} bytes\n\nStash will automatically index this file on the next scan.`
+        );
+        toast.showToast('success', 'Download Complete', `Saved to server: ${filePath}`);
+
+        queue.updateItem(itemId, {
+          status: DownloadStatus.Complete,
+          completedAt: new Date(),
+          fileSize: fileSize,
+        });
+        return;
+      }
+
       const errorStack = error instanceof Error ? error.stack : undefined;
       const formattedError = formatDownloadError(error, item.url);
-      const errorDetails = error instanceof Error ? 
+      const errorDetails = error instanceof Error ?
         `Error: ${formattedError}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
         `Error: ${formattedError}`;
-      
+
       console.error('[QueuePage] Download failed with full details:', {
         itemId,
         url: item.url,
@@ -341,10 +364,10 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         errorStack,
         error,
       });
-      
+
       log.addLog('error', 'download', `Direct download failed: ${formattedError}`, errorDetails);
       toast.showToast('error', 'Download Failed', formattedError);
-      
+
       queue.updateItem(itemId, {
         status: DownloadStatus.Failed,
         error: formattedError,

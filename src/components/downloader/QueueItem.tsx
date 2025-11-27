@@ -109,9 +109,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 border: '1px solid #394b59',
               }}
             >
-              <div className="spinner-border spinner-border-sm text-secondary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
+              <div className="spinner-border spinner-border-sm text-info" role="status" aria-label="Loading"></div>
             </div>
           ) : item.metadata?.thumbnailUrl ? (
             <img
@@ -177,13 +175,9 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             {/* Title section */}
             <div className="d-flex gap-2 align-items-center mb-2">
               {isScrapingMetadata ? (
-                <div className="w-100">
-                  <div className="d-flex gap-2 align-items-center">
-                    <div className="spinner-border spinner-border-sm text-info" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <small style={{ color: '#8b9fad' }}>Scraping metadata...</small>
-                  </div>
+                <div className="d-flex gap-2 align-items-center">
+                  <div className="spinner-border spinner-border-sm text-info" role="status" aria-label="Loading"></div>
+                  <span style={{ color: '#8b9fad' }}>Scraping metadata...</span>
                 </div>
               ) : item.metadata?.title ? (
                 <h6 className="mb-0">{item.metadata.title}</h6>
@@ -204,7 +198,14 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               {getStatusChip()}
               {isScrapingMetadata ? null : (
                 item.metadata?.contentType && (
-                  <span className={`badge ${item.metadata.contentType === ContentType.Image ? 'bg-secondary' : 'bg-primary'} bg-opacity-10 text-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'} border border-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'}`}>
+                  <span
+                    className="badge"
+                    style={{
+                      backgroundColor: item.metadata.contentType === ContentType.Image ? 'rgba(108, 117, 125, 0.2)' : 'rgba(13, 110, 253, 0.2)',
+                      color: item.metadata.contentType === ContentType.Image ? '#adb5bd' : '#6ea8fe',
+                      border: `1px solid ${item.metadata.contentType === ContentType.Image ? '#6c757d' : '#0d6efd'}`,
+                    }}
+                  >
                     {item.metadata.contentType === ContentType.Image ? '🖼️ Image' : '🎥 Video'}
                   </span>
                 )

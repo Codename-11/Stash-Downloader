@@ -207,13 +207,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   {scrapeError}
                 </div>
               )}
-              <small className="mt-1" style={{ color: '#8b9fad' }}>
+              <small className="mt-1 d-block" style={{ color: '#8b9fad' }}>
                 Click "Scrape Metadata" to fetch title, description, and other data from the website.
-                {!localStorage.getItem('corsProxyEnabled') && (
-                  <span className="text-warning">
-                    {' '}Enable CORS proxy for better results!
-                  </span>
-                )}
               </small>
             </div>
 
