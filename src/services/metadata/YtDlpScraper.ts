@@ -193,23 +193,52 @@ export class YtDlpScraper implements IMetadataScraper {
 
     console.log('[YtDlpScraper] ✓ Got metadata from server-side yt-dlp:', readResult.title);
 
-    // Convert server-side result to yt-dlp-like format for convertYtDlpToMetadata
-    // This allows us to reuse the same conversion logic
-    const ytdlpFormat = {
-      title: readResult.title,
-      description: readResult.description,
-      duration: readResult.duration,
-      uploader: readResult.uploader,
-      upload_date: readResult.upload_date,
-      thumbnail: readResult.thumbnail,
-      url: readResult.url,  // Direct video URL (if available)
-      webpage_url: readResult.webpage_url || url,  // Original page URL
-      original_url: readResult.original_url || url,  // Fallback URL
-      formats: readResult.formats || [],  // Format list with URLs
-    };
+    // Extract video URL from the result
+    // Try formats first (contains actual downloadable URLs), then fall back to top-level url
+    let videoUrl: string | undefined;
+    let quality: string | undefined;
 
-    // Use the same conversion logic as client-side
-    return this.convertYtDlpToMetadata(ytdlpFormat, url);
+    if (readResult.formats && Array.isArray(readResult.formats) && readResult.formats.length > 0) {
+      // Sort by height descending to get best quality first
+      const sortedFormats = [...readResult.formats].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
+      for (const format of sortedFormats) {
+        if (format.url || format.manifest_url) {
+          videoUrl = format.url || format.manifest_url;
+          quality = format.height ? `${format.height}p` : undefined;
+          console.log(`[YtDlpScraper] Selected format: ${quality || 'unknown'} from ${sortedFormats.length} formats`);
+          break;
+        }
+      }
+    }
+
+    // Fall back to top-level URL if no format URL found
+    if (!videoUrl && readResult.url) {
+      videoUrl = readResult.url;
+      quality = readResult.height ? `${readResult.height}p` : undefined;
+      console.log('[YtDlpScraper] Using top-level URL');
+    }
+
+    if (videoUrl) {
+      console.log(`[YtDlpScraper] ✓ Video URL extracted: ${videoUrl.substring(0, 100)}...`);
+    } else {
+      console.log('[YtDlpScraper] ⚠ No video URL found in result');
+    }
+
+    // Convert to our metadata format
+    return {
+      url: url,
+      videoUrl: videoUrl,
+      title: readResult.title || undefined,
+      description: readResult.description || undefined,
+      date: readResult.upload_date ? this.formatDate(readResult.upload_date) : undefined,
+      duration: readResult.duration || undefined,
+      thumbnailUrl: readResult.thumbnail || undefined,
+      performers: readResult.uploader ? [readResult.uploader] : [],
+      tags: [],
+      studio: readResult.uploader || undefined,
+      quality: quality,
+      contentType: 'video' as ContentType,
+    };
   }
 
   /**
