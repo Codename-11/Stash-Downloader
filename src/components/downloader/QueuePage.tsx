@@ -22,7 +22,6 @@ import { checkYtDlpAvailable } from '@/utils/systemCheck';
 import { formatDownloadError } from '@/utils/helpers';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
-import { getStorageItem } from '@/utils';
 import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
 
@@ -36,7 +35,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const toast = useToast();
   const log = useLog();
   const scraperRegistry = getScraperRegistry();
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const stashService = getStashService();
   const isStashEnvironment = stashService.isStashEnvironment();
   const [editingItem, setEditingItem] = useState<IDownloadItem | null>(null);
@@ -48,227 +47,63 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const httpProxy = settings.httpProxy;
   const serverDownloadPath = settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
   
-  // Listen for settings changes from Stash's Settings UI
+  // Fetch and sync settings from Stash on mount (once, no polling)
   useEffect(() => {
     if (!isStashEnvironment) return;
-    
-    let stashService: ReturnType<typeof getStashService> | null = null;
-    
-    // Function to read settings from multiple sources
-    const readSettings = async (): Promise<IPluginSettings> => {
-      // Start with localStorage as base
-      const localSettings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-      let mergedSettings = { ...localSettings };
-      
-      // Try to get settings from Stash GraphQL API (server-side settings)
+
+    let mounted = true;
+
+    const syncSettingsFromStash = async () => {
       try {
-        if (!stashService) {
-          stashService = getStashService();
-        }
         const graphqlSettings = await stashService.getPluginSettings(PLUGIN_ID);
+        if (!mounted) return;
+
         if (graphqlSettings && Object.keys(graphqlSettings).length > 0) {
-          console.log('[Settings] Found settings from Stash GraphQL:', graphqlSettings);
-          // Merge GraphQL settings (server-side) override localStorage
-          mergedSettings = { ...mergedSettings, ...graphqlSettings };
+          console.log('[Settings] Loaded from Stash:', graphqlSettings);
+
+          // Merge Stash settings into local settings (Stash settings take priority)
+          updateSettings(graphqlSettings as Partial<IPluginSettings>);
+
+          // Log proxy status
+          if (graphqlSettings.httpProxy) {
+            const masked = String(graphqlSettings.httpProxy).replace(/:[^:@]*@/, ':****@');
+            console.log(`[Settings] ✓ HTTP/SOCKS proxy: ${masked}`);
+          }
+          if (graphqlSettings.serverDownloadPath) {
+            console.log(`[Settings] Server download path: ${graphqlSettings.serverDownloadPath}`);
+          }
+        } else {
+          console.log('[Settings] No settings configured in Stash');
         }
       } catch (error) {
-        console.warn('[Settings] Could not fetch settings from GraphQL:', error);
-      }
-      
-      // Try to get settings from Stash's PluginApi (if available)
-      // Based on bulkImageScrape plugin pattern: PluginApi.getPluginSettings()
-      try {
-        if (typeof window !== 'undefined' && (window as any).PluginApi) {
-          const pluginApi = (window as any).PluginApi;
-          
-          // Method 1: PluginApi.getPluginSettings(pluginId) - may be async
-          if (pluginApi.getPluginSettings) {
-            try {
-              const apiSettings = await Promise.resolve(pluginApi.getPluginSettings(PLUGIN_ID));
-              if (apiSettings && typeof apiSettings === 'object') {
-                console.log('[Settings] Found settings from PluginApi.getPluginSettings():', apiSettings);
-                mergedSettings = { ...mergedSettings, ...apiSettings };
-              }
-            } catch (apiError) {
-              console.warn('[Settings] PluginApi.getPluginSettings() failed:', apiError);
-            }
-          }
-          
-          // Method 2: PluginApi.settings (direct property)
-          if (pluginApi.settings && typeof pluginApi.settings === 'object') {
-            console.log('[Settings] Found settings from PluginApi.settings:', pluginApi.settings);
-            mergedSettings = { ...mergedSettings, ...pluginApi.settings };
-          }
-          
-          // Method 3: Check if StashService has settings helper
-          if (pluginApi.StashService && typeof pluginApi.StashService === 'object') {
-            try {
-              // StashService might have a getPluginSettings method
-              if (pluginApi.StashService.getPluginSettings) {
-                const stashServiceSettings = await Promise.resolve(
-                  pluginApi.StashService.getPluginSettings(PLUGIN_ID)
-                );
-                if (stashServiceSettings && typeof stashServiceSettings === 'object') {
-                  console.log('[Settings] Found settings via PluginApi.StashService.getPluginSettings():', stashServiceSettings);
-                  mergedSettings = { ...mergedSettings, ...stashServiceSettings };
-                }
-              }
-            } catch (stashServiceError) {
-              console.warn('[Settings] PluginApi.StashService.getPluginSettings() failed:', stashServiceError);
-            }
-          }
-          
-          // Method 4: Check if settings are passed via GQL query helper (if available)
-          // Note: According to architecture docs, PluginApi.GQL.query() may not exist
-          // but we try it as a fallback
-          if (pluginApi.GQL && pluginApi.GQL.query) {
-            try {
-              const gqlSettings = await pluginApi.GQL.query(`
-                query {
-                  plugin(id: "${PLUGIN_ID}") {
-                    settings {
-                      name
-                      value
-                    }
-                  }
-                }
-              `);
-              if (gqlSettings?.data?.plugin?.settings) {
-                const settingsObj: Record<string, any> = {};
-                gqlSettings.data.plugin.settings.forEach((s: any) => {
-                  settingsObj[s.name] = s.value;
-                });
-                if (Object.keys(settingsObj).length > 0) {
-                  console.log('[Settings] Found settings via PluginApi.GQL.query():', settingsObj);
-                  mergedSettings = { ...mergedSettings, ...settingsObj };
-                }
-              }
-            } catch (gqlError) {
-              // GQL query might not be supported or might fail
-              console.warn('[Settings] PluginApi.GQL.query() failed:', gqlError);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('[Settings] Error accessing PluginApi:', error);
-      }
-      
-      // Also check if Stash stores settings in a different localStorage key
-      const stashStorageKey = `plugin:${PLUGIN_ID}:settings`;
-      const stashStorageSettings = localStorage.getItem(stashStorageKey);
-      if (stashStorageSettings) {
-        try {
-          const parsed = JSON.parse(stashStorageSettings);
-          console.log('[Settings] Found settings in alternative localStorage key:', parsed);
-          mergedSettings = { ...mergedSettings, ...parsed };
-        } catch {
-          // Ignore parse errors
-        }
-      }
-      
-      return mergedSettings;
-    };
-    
-    // Check settings on mount and log current proxy status
-    const logCurrentSettings = async () => {
-      // First, log all localStorage keys that might contain settings
-      const allKeys = Object.keys(localStorage);
-      const relevantKeys = allKeys.filter(key => 
-        key.includes('stash') || 
-        key.includes('plugin') || 
-        key.includes('downloader') ||
-        key.includes('settings')
-      );
-      console.log('[Settings] Relevant localStorage keys:', relevantKeys);
-      
-      // Log what's in each relevant key
-      relevantKeys.forEach(key => {
-        try {
-          const value = localStorage.getItem(key);
-          if (value) {
-            console.log(`[Settings] ${key}:`, value.substring(0, 200));
-          }
-        } catch {
-          // Ignore
-        }
-      });
-      
-      const currentSettings = await readSettings();
-      console.log('[Settings] Final merged settings:', {
-        localStorage: getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS),
-        merged: currentSettings,
-      });
-      
-      if (currentSettings.httpProxy) {
-        const masked = currentSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
-        console.log(`[Settings] ✓ Current HTTP/SOCKS proxy: ${masked}`);
-      } else {
-        console.log('[Settings] ⚠ HTTP/SOCKS proxy not configured');
-      }
-      
-      if (currentSettings.serverDownloadPath) {
-        console.log(`[Settings] Server download path: ${currentSettings.serverDownloadPath}`);
+        console.warn('[Settings] Could not fetch settings from Stash:', error);
       }
     };
-    
-    // Log on mount
-    logCurrentSettings();
-    
-    // Listen for cross-tab storage changes (when settings are updated in another tab/window)
+
+    syncSettingsFromStash();
+
+    // Listen for cross-tab storage changes (no polling needed)
     const handleStorageChange = (e: StorageEvent) => {
-      // Check our key
       if (e.key === STORAGE_KEYS.SETTINGS && e.newValue) {
         try {
           const newSettings = JSON.parse(e.newValue) as IPluginSettings;
-          const oldSettings = JSON.parse(e.oldValue || '{}') as IPluginSettings;
-          
-          // Check if proxy changed
-          if (newSettings.httpProxy !== oldSettings.httpProxy) {
-            if (newSettings.httpProxy) {
-              const masked = newSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
-              console.log(`[Settings] HTTP/SOCKS proxy updated via Stash Settings UI: ${masked}`);
-            } else {
-              console.log('[Settings] HTTP/SOCKS proxy removed via Stash Settings UI');
-            }
+          if (newSettings.httpProxy) {
+            const masked = newSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
+            console.log(`[Settings] Updated: proxy=${masked}`);
           }
-          
-          // Check if server download path changed
-          if (newSettings.serverDownloadPath !== oldSettings.serverDownloadPath) {
-            console.log(`[Settings] Server download path updated: ${oldSettings.serverDownloadPath || 'default'} → ${newSettings.serverDownloadPath || 'default'}`);
-          }
-        } catch (error) {
+        } catch {
           // Ignore parse errors
         }
       }
-      
-      // Also check for Stash's plugin settings key
-      if (e.key && e.key.startsWith('plugin:') && e.key.includes(PLUGIN_ID)) {
-        console.log('[Settings] Detected change in Stash plugin settings:', e.key);
-        logCurrentSettings();
-      }
     };
-    
-    // Also check periodically for same-tab changes (Stash may update settings via GraphQL)
-    let lastProxy = httpProxy;
-    const checkInterval = setInterval(async () => {
-      const latestSettings = await readSettings();
-      if (latestSettings.httpProxy !== lastProxy) {
-        lastProxy = latestSettings.httpProxy;
-        if (latestSettings.httpProxy) {
-          const masked = latestSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
-          console.log(`[Settings] HTTP/SOCKS proxy changed (detected via polling): ${masked}`);
-        } else {
-          console.log('[Settings] HTTP/SOCKS proxy removed (detected via polling)');
-        }
-      }
-    }, 2000); // Check every 2 seconds
-    
+
     window.addEventListener('storage', handleStorageChange);
     return () => {
+      mounted = false;
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkInterval);
     };
-  }, [isStashEnvironment, httpProxy]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStashEnvironment]);
 
   // Check for yt-dlp on component mount
   useEffect(() => {
