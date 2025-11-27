@@ -45,21 +45,8 @@ export class ScraperRegistry {
     // - YtDlpScraper uses CORS proxy
     // - All scrapers available (CORS proxy required)
 
-    try {
-      const ytdlp = new YtDlpScraper();
-      this.register(ytdlp);
-      console.log('[ScraperRegistry] ✓ YtDlpScraper registered');
-    } catch (e) {
-      console.error('[ScraperRegistry] ✗ Failed to create YtDlpScraper:', e);
-    }
-
-    try {
-      const stash = new StashScraper();
-      this.register(stash);
-      console.log('[ScraperRegistry] ✓ StashScraper registered');
-    } catch (e) {
-      console.error('[ScraperRegistry] ✗ Failed to create StashScraper:', e);
-    }
+    this.register(new YtDlpScraper());
+    this.register(new StashScraper());
 
     if (!isStashEnv) {
       // Client-side scrapers only work in test-app with CORS proxy
@@ -132,12 +119,8 @@ export class ScraperRegistry {
 
     let lastErrorMsg = 'Unknown error';
 
-    console.log(`[ScraperRegistry] Scrapers array length: ${this.scrapers.length}`);
-    console.log(`[ScraperRegistry] Scraper names: ${this.scrapers.map(s => s.name).join(', ')}`);
-
     // Try each registered scraper in order
     for (const scraper of this.scrapers) {
-      console.log(`[ScraperRegistry] Checking scraper: ${scraper.name}`);
       if (!scraper.canHandle(url)) {
         console.log(`[ScraperRegistry] ${scraper.name} cannot handle this URL, skipping`);
         continue;

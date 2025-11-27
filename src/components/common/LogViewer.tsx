@@ -108,34 +108,42 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       {isExpanded && (
         <>
           {showFilters && (
-            <div className="card-body" style={{ borderBottom: '1px solid #243340' }}>
+            <div className="card-body" style={{ borderBottom: '1px solid #394b59' }}>
               <div className="row g-2">
                 <div className="col-12 col-md-6">
                   <label className="form-label small" style={{ color: '#8b9fad' }}>Filter by Level</label>
                   <select
-                    className="form-select form-select-sm text-light"
-                    style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
+                    className="form-select form-select-sm"
+                    style={{
+                      backgroundColor: '#243340',
+                      borderColor: '#394b59',
+                      color: '#fff',
+                    }}
                     value={selectedLevel}
                     onChange={(e) => setSelectedLevel(e.target.value as LogLevel | 'all')}
                   >
-                    <option value="all">All Levels</option>
-                    <option value="info">Info</option>
-                    <option value="success">Success</option>
-                    <option value="warning">Warning</option>
-                    <option value="error">Error</option>
+                    <option value="all" style={{ backgroundColor: '#243340', color: '#fff' }}>All Levels</option>
+                    <option value="info" style={{ backgroundColor: '#243340', color: '#fff' }}>Info</option>
+                    <option value="success" style={{ backgroundColor: '#243340', color: '#fff' }}>Success</option>
+                    <option value="warning" style={{ backgroundColor: '#243340', color: '#fff' }}>Warning</option>
+                    <option value="error" style={{ backgroundColor: '#243340', color: '#fff' }}>Error</option>
                   </select>
                 </div>
                 <div className="col-12 col-md-6">
                   <label className="form-label small" style={{ color: '#8b9fad' }}>Filter by Category</label>
                   <select
-                    className="form-select form-select-sm text-light"
-                    style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
+                    className="form-select form-select-sm"
+                    style={{
+                      backgroundColor: '#243340',
+                      borderColor: '#394b59',
+                      color: '#fff',
+                    }}
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                   >
-                    <option value="all">All Categories</option>
+                    <option value="all" style={{ backgroundColor: '#243340', color: '#fff' }}>All Categories</option>
                     {categories.map((cat) => (
-                      <option key={cat} value={cat}>
+                      <option key={cat} value={cat} style={{ backgroundColor: '#243340', color: '#fff' }}>
                         {cat}
                       </option>
                     ))}
@@ -166,7 +174,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                     {filteredLogs.map((log) => (
                       <tr key={log.id}>
                         <td>
-                          <span className="text-secondary small">
+                          <span className="small" style={{ color: '#8b9fad' }}>
                             {formatTimestamp(log.timestamp)}
                           </span>
                         </td>
@@ -176,13 +184,13 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                           </span>
                         </td>
                         <td>
-                          <span className="badge bg-secondary">{log.category}</span>
+                          <span className="badge" style={{ backgroundColor: '#394b59' }}>{log.category}</span>
                         </td>
-                        <td>{log.message}</td>
+                        <td style={{ color: '#fff' }}>{log.message}</td>
                         <td>
                           <button
                             type="button"
-                            className="btn btn-sm btn-link p-0"
+                            className="btn btn-sm btn-link p-0 text-info"
                             onClick={() => setSelectedLog(log)}
                             title="View full details"
                           >

@@ -95,13 +95,23 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
     <div className="card text-light mb-3" style={{ backgroundColor: '#30404d' }}>
       <div className="card-body">
         <div className="d-flex gap-3 align-items-start">
-          {/* Thumbnail preview or skeleton */}
+          {/* Thumbnail preview, skeleton, or placeholder */}
           {isScrapingMetadata ? (
+            // Loading skeleton with spinner
             <div
-              className="placeholder-glow"
-              style={{ width: '120px', height: '80px', flexShrink: 0 }}
+              className="d-flex align-items-center justify-content-center"
+              style={{
+                width: '120px',
+                height: '80px',
+                flexShrink: 0,
+                backgroundColor: '#243340',
+                borderRadius: '4px',
+                border: '1px solid #394b59',
+              }}
             >
-              <div className="placeholder bg-dark w-100 h-100 rounded"></div>
+              <div className="spinner-border spinner-border-sm text-secondary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
             </div>
           ) : item.metadata?.thumbnailUrl ? (
             <img
@@ -113,7 +123,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 objectFit: 'cover',
                 cursor: 'pointer',
                 borderRadius: '4px',
-                border: '1px solid #495057',
+                border: '1px solid #394b59',
                 flexShrink: 0,
                 transition: 'transform 0.2s',
               }}
@@ -130,31 +140,49 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                     console.log('[QueueItem] Thumbnail failed, trying CORS proxy:', proxiedUrl);
                     img.src = proxiedUrl;
                   } else {
-                    // Hide broken images if no proxy
+                    // Show placeholder instead of hiding
                     img.style.display = 'none';
+                    const placeholder = img.parentElement?.querySelector('.thumbnail-placeholder');
+                    if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
                   }
                 } else {
                   img.style.display = 'none';
+                  const placeholder = img.parentElement?.querySelector('.thumbnail-placeholder');
+                  if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
                 }
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               title="Click to view full size"
             />
-          ) : null}
+          ) : (
+            // Default placeholder when no thumbnail
+            <div
+              className="d-flex align-items-center justify-content-center thumbnail-placeholder"
+              style={{
+                width: '120px',
+                height: '80px',
+                flexShrink: 0,
+                backgroundColor: '#243340',
+                borderRadius: '4px',
+                border: '1px solid #394b59',
+              }}
+            >
+              <span style={{ fontSize: '24px', opacity: 0.5 }}>
+                {item.metadata?.contentType === ContentType.Image ? '🖼️' : '🎬'}
+              </span>
+            </div>
+          )}
           <div className="flex-grow-1">
             {/* Title section */}
             <div className="d-flex gap-2 align-items-center mb-2">
               {isScrapingMetadata ? (
                 <div className="w-100">
                   <div className="d-flex gap-2 align-items-center">
-                    <div className="spinner-border spinner-border-sm text-light" role="status">
+                    <div className="spinner-border spinner-border-sm text-info" role="status">
                       <span className="visually-hidden">Loading...</span>
                     </div>
-                    <small className="text-muted">Scraping metadata...</small>
-                  </div>
-                  <div className="placeholder-glow mt-2">
-                    <div className="placeholder bg-dark w-50" style={{ height: '32px' }}></div>
+                    <small style={{ color: '#8b9fad' }}>Scraping metadata...</small>
                   </div>
                 </div>
               ) : item.metadata?.title ? (
@@ -174,16 +202,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             {/* Status and metadata chips */}
             <div className="d-flex gap-2 align-items-center mb-2">
               {getStatusChip()}
-              {isScrapingMetadata ? (
-                <>
-                  <div className="placeholder-glow">
-                    <span className="placeholder bg-dark" style={{ width: '80px', height: '24px', borderRadius: '12px' }}></span>
-                  </div>
-                  <div className="placeholder-glow">
-                    <span className="placeholder bg-dark" style={{ width: '60px', height: '24px', borderRadius: '12px' }}></span>
-                  </div>
-                </>
-              ) : (
+              {isScrapingMetadata ? null : (
                 item.metadata?.contentType && (
                   <span className={`badge ${item.metadata.contentType === ContentType.Image ? 'bg-secondary' : 'bg-primary'} bg-opacity-10 text-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'} border border-${item.metadata.contentType === ContentType.Image ? 'secondary' : 'primary'}`}>
                     {item.metadata.contentType === ContentType.Image ? '🖼️ Image' : '🎥 Video'}

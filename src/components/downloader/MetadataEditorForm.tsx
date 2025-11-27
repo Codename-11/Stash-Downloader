@@ -114,8 +114,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   };
 
   return (
-    <div className="card">
-      <div className="card-header">
+    <div className="card text-light" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
+      <div className="card-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
         <h6 className="mb-0">Edit Metadata</h6>
       </div>
       <div className="card-body">
@@ -133,7 +133,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                       maxWidth: '100%',
                       cursor: 'pointer',
                       borderRadius: '4px',
-                      border: '1px solid #dee2e6',
+                      border: '1px solid #394b59',
                       transition: 'transform 0.2s, box-shadow 0.2s',
                     }}
                     onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
@@ -177,17 +177,18 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
             {/* Source URL with Scrape button */}
             <div className="mb-3">
-              <label className="form-label">Source URL</label>
+              <label className="form-label" style={{ color: '#8b9fad' }}>Source URL</label>
               <div className="input-group">
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control text-light"
+                  style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                   value={item.url}
                   disabled
                 />
                 <button
                   type="button"
-                  className="btn btn-outline-secondary"
+                  className="btn btn-outline-light"
                   onClick={handleScrapeMetadata}
                   disabled={isScraping}
                 >
@@ -206,23 +207,24 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   {scrapeError}
                 </div>
               )}
-              <div className="text-muted small mt-1">
+              <small className="mt-1" style={{ color: '#8b9fad' }}>
                 Click "Scrape Metadata" to fetch title, description, and other data from the website.
                 {!localStorage.getItem('corsProxyEnabled') && (
                   <span className="text-warning">
                     {' '}Enable CORS proxy for better results!
                   </span>
                 )}
-              </div>
+              </small>
             </div>
 
             {/* Title */}
             <div className="mb-3">
-              <label htmlFor="title" className="form-label">Title *</label>
+              <label htmlFor="title" className="form-label" style={{ color: '#8b9fad' }}>Title *</label>
               <input
                 id="title"
                 type="text"
-                className="form-control"
+                className="form-control text-light"
+                style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
@@ -231,10 +233,11 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
             {/* Description */}
             <div className="mb-3">
-              <label htmlFor="description" className="form-label">Description</label>
+              <label htmlFor="description" className="form-label" style={{ color: '#8b9fad' }}>Description</label>
               <textarea
                 id="description"
-                className="form-control"
+                className="form-control text-light"
+                style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -243,11 +246,12 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
             {/* Date */}
             <div className="mb-3">
-              <label htmlFor="date" className="form-label">Date</label>
+              <label htmlFor="date" className="form-label" style={{ color: '#8b9fad' }}>Date</label>
               <input
                 id="date"
                 type="date"
-                className="form-control"
+                className="form-control text-light"
+                style={{ backgroundColor: '#243340', borderColor: '#394b59', colorScheme: 'dark' }}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
@@ -255,7 +259,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
             {/* Rating */}
             <div className="mb-3">
-              <label className="form-label d-block">Rating</label>
+              <label className="form-label d-block" style={{ color: '#8b9fad' }}>Rating</label>
               <div className="d-flex gap-2 align-items-center">
                 <div className="d-flex gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -264,7 +268,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                       style={{
                         cursor: 'pointer',
                         fontSize: '1.5rem',
-                        color: star <= rating / 20 ? '#ffc107' : '#dee2e6',
+                        color: star <= rating / 20 ? '#ffc107' : '#394b59',
                       }}
                       onClick={() => setRating(star * 20)}
                       title={`${star} star${star > 1 ? 's' : ''}`}
@@ -276,14 +280,14 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                 {rating > 0 && (
                   <button
                     type="button"
-                    className="btn btn-sm btn-outline-secondary"
+                    className="btn btn-sm btn-outline-light"
                     onClick={() => setRating(0)}
                   >
                     Clear
                   </button>
                 )}
               </div>
-              <small className="text-muted">Rating: {rating}/100</small>
+              <small style={{ color: '#8b9fad' }}>Rating: {rating}/100</small>
             </div>
 
             {/* Performers */}
@@ -300,10 +304,10 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
             {/* Actions */}
             <div className="d-flex gap-2">
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-success">
                 💾 Save & Import to Stash
               </button>
-              <button type="button" className="btn btn-outline-secondary" onClick={onCancel}>
+              <button type="button" className="btn btn-outline-light" onClick={onCancel}>
                 Cancel
               </button>
             </div>

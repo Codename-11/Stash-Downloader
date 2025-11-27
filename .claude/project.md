@@ -18,7 +18,7 @@ Streamline the process of importing content into Stash by:
 - **State Management**: React Context + Hooks
 - **Plugin API**: Stash PluginApi (window.PluginApi)
 - **Backend**: Python scripts with yt-dlp for server-side downloads
-- **Scraping**: Dual-mode (server-side via Stash GraphQL, client-side with CORS proxy)
+- **Scraping**: Server-side via yt-dlp Python backend (Stash), client-side with CORS proxy (test-app)
 
 ## Plugin Type
 JavaScript Extension / Web-UI Plugin for Stash
@@ -32,8 +32,8 @@ JavaScript Extension / Web-UI Plugin for Stash
 
 2. **Metadata Intelligence**
    - Automatic metadata extraction from sources
-   - Server-side scraping via Stash's built-in scrapers (no CORS issues)
-   - Site-specific scrapers (Pornhub, YouPorn, etc.)
+   - Server-side scraping via yt-dlp Python backend (no CORS issues)
+   - Extracts video URLs, thumbnails, descriptions, etc.
    - Smart matching against existing Stash data
    - Manual override and editing capabilities
 

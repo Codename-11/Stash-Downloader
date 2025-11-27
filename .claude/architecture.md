@@ -49,6 +49,7 @@ All external interactions go through dedicated services:
 - Uses direct `fetch` to `/graphql` endpoint (community plugin pattern)
 - **IMPORTANT**: Do NOT use `PluginApi.GQL.query()` - it doesn't exist
 - Provides typed methods for all Stash operations
+- Plugin settings: `getPluginSettings()` - queries `configuration { plugins }` (PluginConfigMap scalar)
 - Server-side scraping: `scrapeSceneURL()`, `scrapeGalleryURL()`, `scrapeImageURL()`
 - Plugin task execution: `runPluginTask()`, `runPluginOperation()`
 - Job management: `stopJob()`
@@ -70,6 +71,19 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 }
 ```
 
+**Plugin Settings Query**:
+```graphql
+# PluginConfigMap is a SCALAR type - do NOT select subfields
+query GetPluginSettings($include: [ID!]) {
+  configuration {
+    plugins(include: $include)  # Returns { "plugin-id": { setting: value, ... } }
+  }
+}
+```
+- `plugins` field returns `PluginConfigMap` scalar (pluginId → settings map)
+- Do NOT try to query `plugin(id:)` or `findPlugin(id:)` - these don't exist
+- Do NOT add subfields like `{ id name settings }` - it's a scalar
+
 **DownloadService**
 - Manages HTTP requests to external sources
 - Implements queue with concurrency limits
@@ -80,11 +94,10 @@ private async gqlRequest<T>(query: string, variables?: Record<string, unknown>) 
 
 **MetadataService (ScraperRegistry)**
 - Pluggable scraper architecture with priority ordering
-- **YtDlpScraper**: yt-dlp metadata extraction (PRIMARY - always extracts video URLs)
-- **StashScraper**: Server-side via Stash GraphQL (NO CORS, fallback only - kept in code but not used by default)
-- **Site-specific**: PornhubScraper, YouPornScraper
-- **HTMLScraper**: Generic Open Graph tag parser
-- **GenericScraper**: Fallback for basic URL parsing
+- **YtDlpScraper**: PRIMARY - Server-side yt-dlp via Python backend (extracts video URLs)
+- **StashScraper**: DISABLED - `canHandle()` returns false (kept in code for potential future use)
+- **GenericScraper**: FALLBACK - URL parsing only (last resort)
+- In test-app mode: PornhubScraper, YouPornScraper, HTMLScraper also enabled
 - Common `IScrapedMetadata` interface
 
 **Python Backend (scripts/download.py)**
@@ -313,17 +326,19 @@ class ScraperRegistry {
 }
 ```
 
-### Scraper Fallback Chain
-1. **YtDlpScraper** - PRIMARY: Always extracts video URLs via yt-dlp (server-side in Stash, CORS proxy in test-app)
-   - Server-side: Uses `runPluginTask` + `runPluginOperation` to call Python backend
-   - Client-side (test-app): Uses CORS proxy's `/api/extract` endpoint
+### Scraper Fallback Chain (Stash Environment)
+1. **YtDlpScraper** - PRIMARY: Server-side yt-dlp via Python backend
+   - Uses `runPluginTask` to extract metadata (saves to temp file)
+   - Uses `runPluginOperation` to read result from temp file
    - Supports HTTP/SOCKS proxy via `httpProxy` setting (passed to yt-dlp via `--proxy` flag)
-   - SSL certificate verification disabled when proxy is used (`--no-check-certificate`)
    - Extracts best quality video URL from formats array or top-level URL
-2. **StashScraper** - FALLBACK: Kept in code but only used if yt-dlp fails (server-side, no CORS)
-3. **Site-Specific** - Custom scrapers for known sites
-4. **HTMLScraper** - Parses Open Graph meta tags
-5. **GenericScraper** - Extracts filename from URL (last resort)
+2. **StashScraper** - DISABLED: `canHandle()` returns false (kept for potential future use)
+3. **GenericScraper** - FALLBACK: Extracts filename from URL (last resort)
+
+In test-app mode, additional scrapers are enabled:
+- **YtDlpScraper** via CORS proxy's `/api/extract` endpoint
+- **PornhubScraper**, **YouPornScraper** - Site-specific scrapers
+- **HTMLScraper** - Parses Open Graph meta tags
 
 If a scraper throws an error, the registry tries the next one.
 
@@ -355,6 +370,8 @@ If a scraper throws an error, the registry tries the next one.
 | CORS errors (scraping) | Browser security restrictions | Use `YtDlpScraper` (server-side) or CORS proxy |
 | Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
 | `runPluginOperation` returns null | Python script output doesn't match PluginOutput format | Output must be `{error?: string, output?: {...data...}}` - Stash extracts `output` field and returns it directly |
+| `exit status 1` from Python | Python syntax error or crash | Run `python -m py_compile scripts/download.py` to check syntax |
+| Plugin settings query fails | Wrong GraphQL query structure | Use `configuration { plugins }` - PluginConfigMap is a scalar, not an object type |
 
 ## Performance Optimizations
 
@@ -438,9 +455,9 @@ interface: raw
 - `default` field NOT supported (causes parse errors)
 - `enum` field NOT supported (put options in description)
 - Must use `ui.javascript` not root-level `js`
-- `interface: js` required for JS plugins
+- `interface: raw` required for Python exec (NOT `interface: js`)
 - `exec` defines the Python script for server-side tasks
-- `tasks` defines available plugin operations
+- `tasks` defines available plugin operations (must match Python task handlers)
 
 ### Version Management
 - Single source of truth in `package.json`

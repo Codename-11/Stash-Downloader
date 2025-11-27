@@ -42,7 +42,8 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const [viewingLogsForItem, setViewingLogsForItem] = useState<IDownloadItem | null>(null);
   const [urlFieldValue, setUrlFieldValue] = useState('');
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
-  
+  const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
+
   // Get proxy info for display
   const httpProxy = settings.httpProxy;
   const serverDownloadPath = settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
@@ -388,55 +389,69 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
           {/* Proxy and Server Status (Stash mode only) */}
           {!isTestMode && isStashEnvironment && (
             <div className="card text-light mb-3" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
-              <div className="card-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
+              <div
+                className="card-header d-flex justify-content-between align-items-center"
+                style={{ backgroundColor: '#243340', borderColor: '#394b59', cursor: 'pointer' }}
+                onClick={() => setServerConfigExpanded(!serverConfigExpanded)}
+              >
                 <h6 className="mb-0">Server Configuration</h6>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-light p-0"
+                  style={{ textDecoration: 'none' }}
+                >
+                  {serverConfigExpanded ? '▲' : '▼'}
+                </button>
               </div>
-              <div className="card-body">
-                <div className="d-flex flex-column gap-2">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span style={{ color: '#8b9fad' }}>Server Download Path:</span>
-                    <code className="text-light">{serverDownloadPath}</code>
-                  </div>
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span style={{ color: '#8b9fad' }}>HTTP/SOCKS Proxy:</span>
-                    {httpProxy ? (
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="badge bg-success">Enabled</span>
-                        <code className="text-light" style={{ fontSize: '0.85em' }}>
-                          {httpProxy.replace(/:[^:@]*@/, ':****@')}
-                        </code>
-                      </div>
-                    ) : (
-                      <span className="badge bg-secondary">Not Configured</span>
+              {serverConfigExpanded && (
+                <div className="card-body">
+                  <div className="d-flex flex-column gap-2">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: '#8b9fad' }}>Server Download Path:</span>
+                      <code className="text-light">{serverDownloadPath}</code>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: '#8b9fad' }}>HTTP/SOCKS Proxy:</span>
+                      {httpProxy ? (
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-success">Enabled</span>
+                          <code className="text-light" style={{ fontSize: '0.85em' }}>
+                            {httpProxy.replace(/:[^:@]*@/, ':****@')}
+                          </code>
+                        </div>
+                      ) : (
+                        <span className="badge bg-secondary">Not Configured</span>
+                      )}
+                    </div>
+                    {httpProxy && (
+                      <>
+                        <div className="d-flex gap-2 mt-2">
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const { testHttpProxy } = await import('@/utils/systemCheck');
+                              const result = await testHttpProxy(httpProxy, isStashEnvironment);
+                              if (result.success) {
+                                toast.showToast('success', 'Proxy Test', result.message);
+                                log.addLog('success', 'proxy', result.message, result.details);
+                              } else {
+                                toast.showToast('error', 'Proxy Test Failed', result.message);
+                                log.addLog('error', 'proxy', result.message, result.details);
+                              }
+                            }}
+                          >
+                            Test Proxy
+                          </button>
+                        </div>
+                        <small style={{ color: '#8b9fad' }}>
+                          Proxy will be used for server-side downloads and metadata extraction. SSL certificate verification is disabled when using proxy.
+                        </small>
+                      </>
                     )}
                   </div>
-                  {httpProxy && (
-                    <>
-                      <div className="d-flex gap-2 mt-2">
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={async () => {
-                            const { testHttpProxy } = await import('@/utils/systemCheck');
-                            const result = await testHttpProxy(httpProxy, isStashEnvironment);
-                            if (result.success) {
-                              toast.showToast('success', 'Proxy Test', result.message);
-                              log.addLog('success', 'proxy', result.message, result.details);
-                            } else {
-                              toast.showToast('error', 'Proxy Test Failed', result.message);
-                              log.addLog('error', 'proxy', result.message, result.details);
-                            }
-                          }}
-                        >
-                          Test Proxy
-                        </button>
-                      </div>
-                      <small className="text-muted" style={{ color: '#8b9fad' }}>
-                        ℹ️ Proxy will be used for server-side downloads and metadata extraction. SSL certificate verification is disabled when using proxy.
-                      </small>
-                    </>
-                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
 

@@ -48,13 +48,13 @@ Muted text: #8b9fad
 
 The plugin registers via `PluginApi.register.route()` and adds navbar link via MutationObserver (community plugin pattern). This avoids issues with `patch.after` receiving empty/null output.
 
-## Scraper Priority
+## Scraper Priority (Stash Environment)
 
-1. **StashScraper** - Server-side via Stash GraphQL (NO CORS)
-2. **YtDlpScraper** - Video URL extraction
-3. **Site-specific** - PornhubScraper, YouPornScraper
-4. **HTMLScraper** - Generic Open Graph tags
-5. **GenericScraper** - Fallback URL parsing
+1. **YtDlpScraper** - PRIMARY: Server-side yt-dlp via Python backend (extracts video URLs)
+2. **StashScraper** - DISABLED: Kept in code but `canHandle()` returns false
+3. **GenericScraper** - FALLBACK: URL parsing only (last resort)
+
+In test-app mode, additional client-side scrapers are enabled (PornhubScraper, YouPornScraper, HTMLScraper).
 
 # Documentation Instructions
 Keep the documentation concise and to the point. Use markdown formatting for the documentation.

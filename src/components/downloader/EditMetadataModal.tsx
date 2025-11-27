@@ -173,15 +173,15 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       <div className="modal-backdrop fade show"></div>
       <div className="modal fade show d-block" tabIndex={-1} role="dialog">
         <div className="modal-dialog modal-lg modal-dialog-scrollable" role="document">
-          <div className="modal-content">
+          <div className="modal-content" style={{ backgroundColor: '#30404d', color: '#fff' }}>
             {/* Modal Header */}
-            <div className="modal-header">
-              <h5 className="modal-title">
+            <div className="modal-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
+              <h5 className="modal-title text-light">
                 {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
               </h5>
               <button
                 type="button"
-                className="btn-close"
+                className="btn-close btn-close-white"
                 onClick={handleCancel}
                 aria-label="Close"
               ></button>
@@ -239,9 +239,9 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                   )}
 
                   {/* URL display */}
-                  <div className="alert alert-info">
+                  <div className="alert" style={{ backgroundColor: '#243340', borderColor: '#394b59', color: '#8b9fad' }}>
                     <small style={{ wordBreak: 'break-all' }}>
-                      <strong>URL:</strong> {item.url}
+                      <strong style={{ color: '#fff' }}>URL:</strong> {item.url}
                     </small>
                   </div>
 
@@ -256,8 +256,8 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="modal-footer">
-              <small className="text-muted flex-grow-1">
+            <div className="modal-footer" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
+              <small className="flex-grow-1" style={{ color: '#8b9fad' }}>
                 {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
               </small>
             </div>
