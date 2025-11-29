@@ -269,15 +269,6 @@ export class BrowserDownloadService {
     const blob = new Blob([json], { type: 'application/json' });
     await this.downloadBlob(blob, filename);
   }
-
-  /**
-   * Download entire queue as ZIP (future enhancement)
-   * This would require a zip library like JSZip
-   */
-  async downloadQueueAsZip(_items: IDownloadItem[]): Promise<void> {
-    // TODO: Implement batch download as ZIP
-    throw new Error('Batch ZIP download not yet implemented');
-  }
 }
 
 // Singleton instance

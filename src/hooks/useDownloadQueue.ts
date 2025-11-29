@@ -10,7 +10,32 @@ import { generateId } from '@/utils';
 export function useDownloadQueue() {
   const [items, setItems] = useState<IDownloadItem[]>([]);
 
-  const addToQueue = useCallback((url: string, metadata?: IScrapedMetadata) => {
+  /**
+   * Check if a URL is already in the queue
+   */
+  const isUrlInQueue = useCallback((url: string): boolean => {
+    return items.some((item) => item.url === url);
+  }, [items]);
+
+  /**
+   * Find an existing item by URL
+   */
+  const findByUrl = useCallback((url: string): IDownloadItem | undefined => {
+    return items.find((item) => item.url === url);
+  }, [items]);
+
+  /**
+   * Add a URL to the queue
+   * Returns the item ID if added, null if duplicate
+   */
+  const addToQueue = useCallback((url: string, metadata?: IScrapedMetadata): string | null => {
+    // Check for duplicate URL in queue
+    const existing = items.find((item) => item.url === url);
+    if (existing) {
+      console.log('[DownloadQueue] Duplicate URL detected:', url, '(existing ID:', existing.id, ')');
+      return null; // Indicate duplicate
+    }
+
     const newItem: IDownloadItem = {
       id: generateId(),
       url,
@@ -21,7 +46,7 @@ export function useDownloadQueue() {
 
     setItems((prev) => [...prev, newItem]);
     return newItem.id;
-  }, []);
+  }, [items]);
 
   const removeFromQueue = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -60,6 +85,8 @@ export function useDownloadQueue() {
     updateItem,
     clearCompleted,
     clearAll,
+    isUrlInQueue,
+    findByUrl,
     stats,
   };
 }

@@ -2,6 +2,8 @@
  * Downloader-specific types
  */
 
+import type { IStashPerformer, IStashTag, IStashStudio } from './stash';
+
 export enum DownloadStatus {
   Pending = 'pending',
   Downloading = 'downloading',
@@ -41,6 +43,20 @@ export interface IScrapedMetadata {
   contentType: ContentType;
 }
 
+/**
+ * User-edited metadata with full Stash entity objects.
+ * Stores full objects so we can create new entities if they have temp IDs.
+ */
+export interface IEditedMetadata {
+  title?: string;
+  description?: string;
+  date?: string;
+  performers?: IStashPerformer[]; // Full objects (may include temp-* IDs for new entities)
+  tags?: IStashTag[]; // Full objects (may include temp-* IDs for new entities)
+  studio?: IStashStudio; // Full object (may include temp-* ID for new entity)
+  rating?: number;
+}
+
 export interface IItemLogEntry {
   timestamp: Date;
   level: 'info' | 'success' | 'warning' | 'error';
@@ -59,15 +75,7 @@ export interface IDownloadItem {
   metadata?: IScrapedMetadata;
 
   // User-edited metadata
-  editedMetadata?: {
-    title?: string;
-    description?: string;
-    date?: string;
-    performerIds?: string[];
-    tagIds?: string[];
-    studioId?: string;
-    rating?: number;
-  };
+  editedMetadata?: IEditedMetadata;
 
   // File info
   filePath?: string;

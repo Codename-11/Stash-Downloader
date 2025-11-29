@@ -142,9 +142,37 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const handleAddUrl = async (url: string) => {
     // Clear URL field after adding
     setUrlFieldValue('');
-    
-    // Add to queue immediately for better UX
+
+    // Check for duplicate in queue
+    if (queue.isUrlInQueue(url)) {
+      const existing = queue.findByUrl(url);
+      log.addLog('warning', 'scrape', `Duplicate URL: ${url} (already in queue as "${existing?.metadata?.title || 'Pending'}")`);
+      toast.showToast('warning', 'Duplicate URL', 'This URL is already in the queue.');
+      return;
+    }
+
+    // Check for existing scene in Stash database
+    if (isStashEnvironment) {
+      try {
+        const existingScene = await stashService.findSceneByURL(url);
+        if (existingScene) {
+          log.addLog('warning', 'scrape', `Scene already exists in Stash: "${existingScene.title || existingScene.id}"`);
+          toast.showToast('warning', 'Scene Exists', `This scene already exists in Stash: "${existingScene.title || 'ID: ' + existingScene.id}". Adding anyway.`);
+          // Continue adding - user can choose to skip manually
+        }
+      } catch (error) {
+        // Log but don't block if duplicate check fails
+        console.warn('[QueuePage] Failed to check for existing scene:', error);
+      }
+    }
+
+    // Add to queue
     const itemId = queue.addToQueue(url);
+    if (!itemId) {
+      // This shouldn't happen if our duplicate check worked, but handle it
+      toast.showToast('error', 'Add Failed', 'Failed to add URL to queue.');
+      return;
+    }
     log.addLog('info', 'scrape', `Added URL to queue: ${url}`);
     
     // Scrape metadata in background and update the item

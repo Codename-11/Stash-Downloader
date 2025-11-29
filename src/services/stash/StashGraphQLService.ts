@@ -191,6 +191,35 @@ export class StashGraphQLService {
   }
 
   /**
+   * Find a scene by URL - used for duplicate detection
+   */
+  async findSceneByURL(url: string): Promise<IStashScene | null> {
+    const query = `
+      query FindSceneByURL($url: String!) {
+        findScenes(
+          scene_filter: { url: { value: $url, modifier: EQUALS } }
+          filter: { per_page: 1 }
+        ) {
+          scenes {
+            id
+            title
+            url
+            date
+            created_at
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ findScenes: { scenes: IStashScene[] } }>(
+      query,
+      { url }
+    );
+    const scenes = result.data?.findScenes?.scenes || [];
+    return scenes.length > 0 ? scenes[0]! : null;
+  }
+
+  /**
    * Create a new scene
    */
   async createScene(input: ISceneCreateInput): Promise<IStashScene> {
@@ -879,6 +908,99 @@ export class StashGraphQLService {
    */
   isStashEnvironment(): boolean {
     return !!(window.PluginApi && !(window as any).__TEST_APP__);
+  }
+
+  /**
+   * Get Stash library paths (watched folders)
+   * These are the directories Stash scans for content
+   */
+  async getLibraryPaths(): Promise<{ path: string; excludeVideo: boolean; excludeImage: boolean }[]> {
+    const query = `
+      query GetConfiguration {
+        configuration {
+          general {
+            stashes {
+              path
+              excludeVideo
+              excludeImage
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{
+        configuration: {
+          general: {
+            stashes: { path: string; excludeVideo: boolean; excludeImage: boolean }[];
+          };
+        };
+      }>(query);
+
+      const stashes = result.data?.configuration?.general?.stashes || [];
+      console.log('[StashGraphQL] Library paths:', stashes);
+      return stashes;
+    } catch (error) {
+      console.error('[StashGraphQL] Failed to get library paths:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the first video-enabled library path (for downloading videos)
+   */
+  async getVideoLibraryPath(): Promise<string | null> {
+    const stashes = await this.getLibraryPaths();
+    const videoPath = stashes.find(s => !s.excludeVideo);
+    return videoPath?.path || null;
+  }
+
+  /**
+   * Get the first image-enabled library path (for downloading images)
+   */
+  async getImageLibraryPath(): Promise<string | null> {
+    const stashes = await this.getLibraryPaths();
+    const imagePath = stashes.find(s => !s.excludeImage);
+    return imagePath?.path || null;
+  }
+
+  /**
+   * Trigger a metadata scan for specific paths
+   * If no paths provided, scans all library paths
+   */
+  async triggerScan(paths?: string[]): Promise<string | null> {
+    const mutation = `
+      mutation MetadataScan($input: ScanMetadataInput!) {
+        metadataScan(input: $input)
+      }
+    `;
+
+    try {
+      const input: { paths?: string[] } = {};
+      if (paths && paths.length > 0) {
+        input.paths = paths;
+      }
+
+      const result = await this.gqlRequest<{ metadataScan: string }>(mutation, { input });
+      const jobId = result.data?.metadataScan;
+      console.log('[StashGraphQL] Scan triggered, job ID:', jobId);
+      return jobId || null;
+    } catch (error) {
+      console.error('[StashGraphQL] Failed to trigger scan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Trigger a scan for a specific file path (parent directory)
+   */
+  async triggerScanForFile(filePath: string): Promise<string | null> {
+    // Get parent directory of the file
+    const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+    const directory = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
+    console.log('[StashGraphQL] Triggering scan for directory:', directory);
+    return this.triggerScan([directory]);
   }
 }
 

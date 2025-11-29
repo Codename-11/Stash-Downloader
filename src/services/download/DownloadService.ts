@@ -518,16 +518,47 @@ export class DownloadService {
     // Use requiresYtDlpDomain (not shouldUseYtDlp) because server-side doesn't need CORS proxy
     if (this.isStashEnvironment() && this.requiresYtDlpDomain(url)) {
       console.log('[DownloadService] Stash environment: using server-side download for yt-dlp');
-      const serverResult = await this.downloadServerSide(url, options);
-      if (serverResult.success && serverResult.file_path) {
-        // Server-side download succeeded! File is saved to server's filesystem.
-        // Stash will index it automatically. Throw a special error to signal success.
-        const successError = new Error('SERVER_DOWNLOAD_SUCCESS');
-        (successError as any).serverResult = serverResult;
-        (successError as any).isServerSuccess = true;
-        throw successError;
-      } else {
-        throw new Error(serverResult.error || 'Server-side download failed');
+      try {
+        // Try to get Stash library path for automatic indexing
+        const stashService = getStashService();
+        let libraryPath = await stashService.getVideoLibraryPath();
+
+        if (libraryPath) {
+          console.log('[DownloadService] Using Stash library path:', libraryPath);
+          options.outputDir = libraryPath;
+        } else {
+          console.log('[DownloadService] No library path found, using default download path');
+        }
+
+        const serverResult = await this.downloadServerSide(url, options);
+        if (serverResult.success && serverResult.file_path) {
+          console.log('[DownloadService] Server-side download complete:', serverResult.file_path);
+
+          // Trigger Stash scan for the downloaded file
+          let scanJobId: string | null = null;
+          if (libraryPath) {
+            console.log('[DownloadService] Triggering Stash scan for:', serverResult.file_path);
+            scanJobId = await stashService.triggerScanForFile(serverResult.file_path);
+            if (scanJobId) {
+              console.log('[DownloadService] Scan job started:', scanJobId);
+            }
+          }
+
+          // Return empty blob with metadata - caller should use file_path for Stash import
+          // This is a workaround since we can't return the actual file data from server
+          const emptyBlob = new Blob([], { type: 'application/octet-stream' });
+          (emptyBlob as any).__serverFilePath = serverResult.file_path;
+          (emptyBlob as any).__libraryPath = libraryPath;
+          (emptyBlob as any).__scanJobId = scanJobId;
+          return emptyBlob;
+        } else {
+          throw new Error(serverResult.error || 'Server-side download failed');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[DownloadService] Server-side download failed:', errorMessage);
+        // Fall through to client-side yt-dlp as last resort (will fail with CORS, but at least we tried)
+        console.warn('[DownloadService] Falling back to client-side yt-dlp (may fail with CORS)');
       }
     }
 

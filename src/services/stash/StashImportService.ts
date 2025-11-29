@@ -110,6 +110,46 @@ export class StashImportService {
       },
     });
 
+    // Check if this was a server-side download (file already on disk)
+    const serverFilePath = (blob as any).__serverFilePath;
+    const libraryPath = (blob as any).__libraryPath;
+    const scanJobId = (blob as any).__scanJobId;
+
+    if (serverFilePath) {
+      console.log('[StashImport] Server-side download detected, file at:', serverFilePath);
+
+      // Log library path usage
+      if (libraryPath) {
+        if (onLog) onLog('success', `Downloaded to Stash library: ${libraryPath}`);
+      } else {
+        if (onLog) onLog('warning', 'No Stash library found - file saved to default location');
+      }
+
+      if (onLog) onLog('success', `File saved: ${serverFilePath}`);
+
+      // Log scan status
+      if (scanJobId) {
+        if (onLog) onLog('info', `Stash scan triggered (Job: ${scanJobId})`);
+        if (onLog) onLog('success', 'Scene will be indexed automatically');
+      } else if (libraryPath) {
+        if (onLog) onLog('warning', 'Scan not triggered - run manual scan in Stash');
+      }
+
+      // For server-side downloads, return a placeholder result
+      // The file is on disk and Stash scan will index it
+      // Metadata can be applied after scan finds the scene
+      return {
+        id: `pending-scan-${Date.now()}`,
+        title: item.editedMetadata?.title || 'Pending scan',
+        path: serverFilePath,
+        organized: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        files: [],
+        paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
+      } as IStashScene;
+    }
+
     console.log('[StashImport] Download complete, file size:', blob.size, 'bytes');
     if (onLog) onLog('success', `Download complete (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
@@ -123,11 +163,11 @@ export class StashImportService {
     if (onStatusChange) onStatusChange('Resolving metadata...');
     if (onLog) onLog('info', 'Resolving performers, tags, and studio...');
     const performerIds = await this.resolvePerformers(
-      item.editedMetadata.performerIds || []
+      item.editedMetadata.performers || []
     );
-    const tagIds = await this.resolveTags(item.editedMetadata.tagIds || []);
-    const studioId = item.editedMetadata.studioId
-      ? await this.resolveStudio(item.editedMetadata.studioId)
+    const tagIds = await this.resolveTags(item.editedMetadata.tags || []);
+    const studioId = item.editedMetadata.studio
+      ? await this.resolveStudio(item.editedMetadata.studio)
       : undefined;
 
     if (onLog) onLog('info', `Resolved ${performerIds.length} performers, ${tagIds.length} tags, ${studioId ? '1 studio' : '0 studios'}`);
@@ -182,48 +222,88 @@ export class StashImportService {
   }
 
   /**
-   * Resolve performer IDs (create new ones if needed)
+   * Resolve performer IDs - creates new performers in Stash for temp IDs
    */
-  private async resolvePerformers(performerIds: string[]): Promise<string[]> {
+  private async resolvePerformers(performers: IStashPerformer[]): Promise<string[]> {
     const resolvedIds: string[] = [];
 
-    for (const id of performerIds) {
-      // If ID starts with "temp-", it's a new performer that needs to be created
-      if (id.startsWith('temp-')) {
-        // This is a placeholder - in real implementation, we'd need the performer name
-        // For now, skip temp IDs (they should be resolved in the component)
-        continue;
+    for (const performer of performers) {
+      if (performer.id.startsWith('temp-')) {
+        // Create new performer in Stash
+        console.log('[StashImport] Creating new performer:', performer.name);
+        try {
+          const created = await this.stashService.createPerformer({
+            name: performer.name,
+            disambiguation: performer.disambiguation,
+            aliases: performer.aliases,
+          });
+          console.log('[StashImport] Created performer:', created.id, created.name);
+          resolvedIds.push(created.id);
+        } catch (error) {
+          console.error('[StashImport] Failed to create performer:', performer.name, error);
+          // Continue with other performers even if one fails
+        }
+      } else {
+        // Use existing performer ID
+        resolvedIds.push(performer.id);
       }
-      resolvedIds.push(id);
     }
 
     return resolvedIds;
   }
 
   /**
-   * Resolve tag IDs (create new ones if needed)
+   * Resolve tag IDs - creates new tags in Stash for temp IDs
    */
-  private async resolveTags(tagIds: string[]): Promise<string[]> {
+  private async resolveTags(tags: IStashTag[]): Promise<string[]> {
     const resolvedIds: string[] = [];
 
-    for (const id of tagIds) {
-      if (id.startsWith('temp-')) {
-        continue;
+    for (const tag of tags) {
+      if (tag.id.startsWith('temp-')) {
+        // Create new tag in Stash
+        console.log('[StashImport] Creating new tag:', tag.name);
+        try {
+          const created = await this.stashService.createTag({
+            name: tag.name,
+            aliases: tag.aliases,
+            description: tag.description,
+          });
+          console.log('[StashImport] Created tag:', created.id, created.name);
+          resolvedIds.push(created.id);
+        } catch (error) {
+          console.error('[StashImport] Failed to create tag:', tag.name, error);
+          // Continue with other tags even if one fails
+        }
+      } else {
+        // Use existing tag ID
+        resolvedIds.push(tag.id);
       }
-      resolvedIds.push(id);
     }
 
     return resolvedIds;
   }
 
   /**
-   * Resolve studio ID (create new one if needed)
+   * Resolve studio ID - creates new studio in Stash for temp ID
    */
-  private async resolveStudio(studioId: string): Promise<string | undefined> {
-    if (studioId.startsWith('temp-')) {
-      return undefined;
+  private async resolveStudio(studio: IStashStudio): Promise<string | undefined> {
+    if (studio.id.startsWith('temp-')) {
+      // Create new studio in Stash
+      console.log('[StashImport] Creating new studio:', studio.name);
+      try {
+        const created = await this.stashService.createStudio({
+          name: studio.name,
+          url: studio.url,
+          aliases: studio.aliases,
+        });
+        console.log('[StashImport] Created studio:', created.id, created.name);
+        return created.id;
+      } catch (error) {
+        console.error('[StashImport] Failed to create studio:', studio.name, error);
+        return undefined;
+      }
     }
-    return studioId;
+    return studio.id;
   }
 
   /**
@@ -262,24 +342,6 @@ export class StashImportService {
     });
   }
 
-  /**
-   * Resolve all temporary IDs before import
-   */
-  async resolveTemporaryEntities(_item: IDownloadItem): Promise<{
-    performers: IStashPerformer[];
-    tags: IStashTag[];
-    studio: IStashStudio | null;
-  }> {
-    const performers: IStashPerformer[] = [];
-    const tags: IStashTag[] = [];
-    let studio: IStashStudio | null = null;
-
-    // This would need access to the actual performer/tag/studio objects
-    // to create them if they have temp IDs
-    // For now, return empty arrays
-
-    return { performers, tags, studio };
-  }
 }
 
 // Singleton instance

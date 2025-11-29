@@ -11,7 +11,7 @@ import { StudioSelector } from '@/components/common/StudioSelector';
 import { MediaPreviewModal } from '@/components/common';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
-import { getScraperRegistry } from '@/services/metadata';
+import { getScraperRegistry, getMetadataMatchingService } from '@/services/metadata';
 
 interface MetadataEditorFormProps {
   item: IDownloadItem;
@@ -35,6 +35,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [studio, setStudio] = useState<IStashStudio | null>(null);
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [isMatching, setIsMatching] = useState(false);
+  const [matchError, setMatchError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = useState('');
@@ -59,6 +61,16 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       setDescription(item.editedMetadata.description || '');
       setDate(item.editedMetadata.date || '');
       setRating(item.editedMetadata.rating || 0);
+      // Load full objects if they exist
+      if (item.editedMetadata.performers) {
+        setPerformers(item.editedMetadata.performers);
+      }
+      if (item.editedMetadata.tags) {
+        setTags(item.editedMetadata.tags);
+      }
+      if (item.editedMetadata.studio) {
+        setStudio(item.editedMetadata.studio);
+      }
     }
   }, [item]);
 
@@ -79,16 +91,14 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       if (metadata.description) setDescription(metadata.description);
       if (metadata.date) setDate(metadata.date);
 
-      // TODO: Convert performer/tag/studio names to IStashPerformer/IStashTag/IStashStudio objects
-      // For now, these would need to be matched against Stash database
-      // or created as new entries
+      // After scraping, use "Match to Stash" button to convert names to Stash entities
 
       toast.showToast('success', 'Metadata Scraped', `Successfully scraped: ${metadata.title || item.url}`);
       setScrapeError(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to scrape metadata';
       const errorStack = error instanceof Error ? error.stack : undefined;
-      
+
       log.addLog('error', 'scrape', `Scraping failed: ${errorMessage}`, errorStack);
       toast.showToast('error', 'Scrape Failed', errorMessage);
       setScrapeError(errorMessage);
@@ -97,16 +107,77 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     }
   };
 
+  /**
+   * Match scraped metadata names against Stash database
+   */
+  const handleMatchToStash = async () => {
+    if (!item.metadata) {
+      toast.showToast('warning', 'No Metadata', 'Please scrape metadata first before matching.');
+      return;
+    }
+
+    setIsMatching(true);
+    setMatchError(null);
+
+    try {
+      log.addLog('info', 'match', `Matching metadata to Stash for: ${item.url}`);
+
+      const matchingService = getMetadataMatchingService();
+      const result = await matchingService.matchMetadataToStash(item.metadata);
+
+      // Combine matched and unmatched into the selectors
+      const allPerformers: IStashPerformer[] = [
+        ...result.matchedPerformers,
+        ...matchingService.createTempPerformers(result.unmatchedPerformers),
+      ];
+      const allTags: IStashTag[] = [
+        ...result.matchedTags,
+        ...matchingService.createTempTags(result.unmatchedTags),
+      ];
+
+      setPerformers(allPerformers);
+      setTags(allTags);
+
+      if (result.matchedStudio) {
+        setStudio(result.matchedStudio);
+      } else if (result.unmatchedStudio) {
+        setStudio(matchingService.createTempStudio(result.unmatchedStudio));
+      }
+
+      const matchSummary = [
+        `${result.matchedPerformers.length} performers matched`,
+        `${result.unmatchedPerformers.length} new performers`,
+        `${result.matchedTags.length} tags matched`,
+        `${result.unmatchedTags.length} new tags`,
+        result.matchedStudio ? '1 studio matched' : (result.unmatchedStudio ? '1 new studio' : ''),
+      ].filter(Boolean).join(', ');
+
+      log.addLog('success', 'match', `Matching complete: ${matchSummary}`);
+      toast.showToast('success', 'Matching Complete', matchSummary);
+      setMatchError(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to match metadata';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      log.addLog('error', 'match', `Matching failed: ${errorMessage}`, errorStack);
+      toast.showToast('error', 'Match Failed', errorMessage);
+      setMatchError(errorMessage);
+    } finally {
+      setIsMatching(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Pass full objects so StashImportService can create new entities with temp IDs
     const editedMetadata = {
       title: title.trim() || undefined,
       description: description.trim() || undefined,
       date: date || undefined,
-      performerIds: performers.map((p) => p.id),
-      tagIds: tags.map((t) => t.id),
-      studioId: studio?.id || undefined,
+      performers: performers.length > 0 ? performers : undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      studio: studio || undefined,
       rating: rating > 0 ? rating : undefined,
     };
 
@@ -211,6 +282,48 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                 Click "Scrape Metadata" to fetch title, description, and other data from the website.
               </small>
             </div>
+
+            {/* Match to Stash Button */}
+            {item.metadata && (item.metadata.performers?.length || item.metadata.tags?.length || item.metadata.studio) && (
+              <div className="mb-3 p-3 rounded" style={{ backgroundColor: '#243340', border: '1px solid #394b59' }}>
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <strong>Scraped Entities</strong>
+                    <div className="text-muted small">
+                      {[
+                        item.metadata.performers?.length ? `${item.metadata.performers.length} performers` : null,
+                        item.metadata.tags?.length ? `${item.metadata.tags.length} tags` : null,
+                        item.metadata.studio ? `1 studio` : null,
+                      ].filter(Boolean).join(', ') || 'None found'}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline-info"
+                    onClick={handleMatchToStash}
+                    disabled={isMatching || isScraping}
+                  >
+                    {isMatching ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                        Matching...
+                      </>
+                    ) : (
+                      <>🔗 Match to Stash</>
+                    )}
+                  </button>
+                </div>
+                {matchError && (
+                  <div className="text-danger small">
+                    {matchError}
+                  </div>
+                )}
+                <div className="text-muted small">
+                  Click "Match to Stash" to find existing performers, tags, and studios in your Stash database.
+                  Unmatched names will be shown as "new" and can be created during import.
+                </div>
+              </div>
+            )}
 
             {/* Title */}
             <div className="mb-3">
