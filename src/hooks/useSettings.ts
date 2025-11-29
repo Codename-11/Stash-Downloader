@@ -8,9 +8,11 @@ import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/constants';
 import { getStorageItem, setStorageItem } from '@/utils';
 
 export function useSettings() {
-  const [settings, setSettings] = useState<IPluginSettings>(() =>
-    getStorageItem(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS)
-  );
+  const [settings, setSettings] = useState<IPluginSettings>(() => {
+    // Merge stored settings with defaults to ensure new properties have values
+    const stored = getStorageItem<Partial<IPluginSettings>>(STORAGE_KEYS.SETTINGS, {});
+    return { ...DEFAULT_SETTINGS, ...stored };
+  });
 
   // Persist settings to localStorage
   useEffect(() => {

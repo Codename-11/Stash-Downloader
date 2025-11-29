@@ -7,7 +7,8 @@ export interface IStashPerformer {
   id: string;
   name: string;
   disambiguation?: string;
-  aliases?: string[];
+  aliases?: string[];       // For internal use
+  alias_list?: string[];    // From Stash API
   image_path?: string;
   tags?: IStashTag[];
 }

@@ -114,7 +114,7 @@ export class StashGraphQLService {
    */
   async findPerformersByName(name: string): Promise<IStashPerformer[]> {
     const query = `
-      query FindPerformers($filter: String) {
+      query FindPerformers($filter: String!) {
         findPerformers(
           performer_filter: { name: { value: $filter, modifier: INCLUDES } }
         ) {
@@ -122,7 +122,7 @@ export class StashGraphQLService {
             id
             name
             disambiguation
-            aliases
+            alias_list
             image_path
           }
         }
@@ -141,7 +141,7 @@ export class StashGraphQLService {
    */
   async findTagsByName(name: string): Promise<IStashTag[]> {
     const query = `
-      query FindTags($filter: String) {
+      query FindTags($filter: String!) {
         findTags(
           tag_filter: { name: { value: $filter, modifier: INCLUDES } }
         ) {
@@ -167,7 +167,7 @@ export class StashGraphQLService {
    */
   async findStudioByName(name: string): Promise<IStashStudio | null> {
     const query = `
-      query FindStudios($filter: String) {
+      query FindStudios($filter: String!) {
         findStudios(
           studio_filter: { name: { value: $filter, modifier: EQUALS } }
         ) {

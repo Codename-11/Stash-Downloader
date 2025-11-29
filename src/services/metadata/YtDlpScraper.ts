@@ -225,6 +225,10 @@ export class YtDlpScraper implements IMetadataScraper {
     }
 
     // Convert to our metadata format
+    // yt-dlp provides: tags (array), categories (array), and sometimes cast/actors
+    const tags = readResult.tags || readResult.categories || [];
+    const performers = this.extractPerformers(readResult);
+
     return {
       url: url,
       videoUrl: videoUrl,
@@ -233,9 +237,9 @@ export class YtDlpScraper implements IMetadataScraper {
       date: readResult.upload_date ? this.formatDate(readResult.upload_date) : undefined,
       duration: readResult.duration || undefined,
       thumbnailUrl: readResult.thumbnail || undefined,
-      performers: readResult.uploader ? [readResult.uploader] : [],
-      tags: [],
-      studio: readResult.uploader || undefined,
+      performers: performers,
+      tags: tags,
+      studio: readResult.uploader || readResult.channel || undefined,
       quality: quality,
       contentType: 'video' as ContentType,
     };
@@ -324,6 +328,10 @@ export class YtDlpScraper implements IMetadataScraper {
     // Find the best video format and quality
     const { videoUrl, quality } = this.selectBestVideoFormat(ytdlp);
 
+    // Extract tags and performers from yt-dlp metadata
+    const tags = ytdlp.tags || ytdlp.categories || [];
+    const performers = this.extractPerformers(ytdlp);
+
     // Build base metadata
     const metadata: IScrapedMetadata = {
       url: originalUrl,
@@ -333,8 +341,8 @@ export class YtDlpScraper implements IMetadataScraper {
       date: ytdlp.upload_date ? this.formatDate(ytdlp.upload_date) : undefined,
       duration: ytdlp.duration || undefined,
       thumbnailUrl: ytdlp.thumbnail || undefined,
-      performers: ytdlp.artist ? [ytdlp.artist] : ytdlp.uploader ? [ytdlp.uploader] : [],
-      tags: ytdlp.tags || ytdlp.categories || [],
+      performers: performers,
+      tags: tags,
       studio: ytdlp.uploader || ytdlp.channel || undefined,
       quality: quality,
       contentType: 'video' as ContentType,
@@ -433,5 +441,40 @@ export class YtDlpScraper implements IMetadataScraper {
       return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
     }
     return dateStr;
+  }
+
+  /**
+   * Extract performers from yt-dlp metadata
+   * yt-dlp returns performers in different fields depending on the site:
+   * - cast: array of cast members (Pornhub, some sites)
+   * - actors: array of actors (some sites)
+   * - artist: artist name (music videos)
+   * - uploader: channel/uploader name (fallback)
+   */
+  private extractPerformers(ytdlp: any): string[] {
+    const performers: string[] = [];
+
+    // Try cast first (common for adult sites)
+    if (ytdlp.cast && Array.isArray(ytdlp.cast)) {
+      performers.push(...ytdlp.cast);
+    }
+
+    // Try actors
+    if (ytdlp.actors && Array.isArray(ytdlp.actors)) {
+      performers.push(...ytdlp.actors);
+    }
+
+    // Try artist (music videos)
+    if (ytdlp.artist && typeof ytdlp.artist === 'string') {
+      performers.push(ytdlp.artist);
+    }
+
+    // Fallback to uploader if no performers found
+    if (performers.length === 0 && ytdlp.uploader) {
+      performers.push(ytdlp.uploader);
+    }
+
+    // Deduplicate
+    return [...new Set(performers)];
   }
 }

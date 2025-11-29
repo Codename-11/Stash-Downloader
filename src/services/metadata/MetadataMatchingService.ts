@@ -38,12 +38,11 @@ function findMatchingPerformer(
     if (normalizeForMatch(performer.name) === normalizedSearch) {
       return performer;
     }
-    // Check aliases
-    if (performer.aliases) {
-      for (const alias of performer.aliases) {
-        if (normalizeForMatch(alias) === normalizedSearch) {
-          return performer;
-        }
+    // Check aliases (internal) and alias_list (from Stash API)
+    const allAliases = [...(performer.aliases || []), ...(performer.alias_list || [])];
+    for (const alias of allAliases) {
+      if (normalizeForMatch(alias) === normalizedSearch) {
+        return performer;
       }
     }
   }

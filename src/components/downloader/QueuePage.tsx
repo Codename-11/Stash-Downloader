@@ -577,17 +577,15 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
 
           {/* Queue Toolbar - Preview toggle and Log level */}
           <div className="d-flex justify-content-between align-items-center mb-2 px-2">
-            <div className="form-check form-switch">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="thumbnailPreviewToggle"
-                checked={settings.showThumbnailPreviews}
-                onChange={(e) => updateSettings({ showThumbnailPreviews: e.target.checked })}
-              />
-              <label className="form-check-label text-light" htmlFor="thumbnailPreviewToggle">
-                Show Thumbnails
-              </label>
+            <div className="d-flex align-items-center gap-2">
+              <button
+                type="button"
+                className={`btn btn-sm ${settings.showThumbnailPreviews ? 'btn-success' : 'btn-outline-secondary'}`}
+                onClick={() => updateSettings({ showThumbnailPreviews: !settings.showThumbnailPreviews })}
+                style={{ minWidth: '140px' }}
+              >
+                {settings.showThumbnailPreviews ? '🖼️ Thumbnails On' : '🖼️ Thumbnails Off'}
+              </button>
             </div>
             <div className="d-flex align-items-center gap-2">
               <label className="form-label mb-0 text-light" htmlFor="logLevelSelect" style={{ fontSize: '0.85em' }}>
