@@ -261,6 +261,45 @@ export class ScraperRegistry {
   getScrapers(): IMetadataScraper[] {
     return [...this.scrapers, this.fallbackScraper];
   }
+
+  /**
+   * Get scrapers that can handle a specific URL
+   * Returns array of {name, canHandle} for UI display
+   */
+  getAvailableScrapersForUrl(url: string, contentType?: ContentType): Array<{ name: string; canHandle: boolean; supportsContentType: boolean }> {
+    const allScrapers = this.getScrapers();
+    return allScrapers.map(scraper => ({
+      name: scraper.name,
+      canHandle: scraper.canHandle(url),
+      supportsContentType: contentType ? scraper.contentTypes.includes(contentType) : true,
+    }));
+  }
+
+  /**
+   * Scrape using a specific scraper by name
+   */
+  async scrapeWithScraper(url: string, scraperName: string): Promise<IScrapedMetadata> {
+    const allScrapers = this.getScrapers();
+    const scraper = allScrapers.find(s => s.name === scraperName);
+
+    if (!scraper) {
+      throw new Error(`Scraper not found: ${scraperName}`);
+    }
+
+    if (!scraper.canHandle(url)) {
+      console.warn(`[ScraperRegistry] Scraper "${scraperName}" cannot handle URL: ${url}, but will try anyway`);
+    }
+
+    console.log(`[ScraperRegistry] Manually scraping with "${scraperName}" for: ${url}`);
+    const metadata = await scraper.scrape(url);
+    console.log(`[ScraperRegistry] [Scraper] ${scraperName} succeeded - extracted:`,
+      Object.entries(metadata)
+        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => Array.isArray(v) ? `${v.length} ${k}` : k)
+        .join(', ')
+    );
+    return metadata;
+  }
 }
 
 // Singleton instance

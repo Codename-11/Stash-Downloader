@@ -690,6 +690,26 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                       setViewingLogsForItem(itemToView);
                     }
                   }}
+                  onRescrape={async (id, scraperName) => {
+                    const itemToRescrape = queue.items.find((i) => i.id === id);
+                    if (!itemToRescrape) return;
+
+                    log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${itemToRescrape.url}`);
+                    toast.showToast('info', 'Re-scraping', `Trying ${scraperName}...`);
+
+                    try {
+                      const metadata = await scraperRegistry.scrapeWithScraper(itemToRescrape.url, scraperName);
+                      queue.updateItem(id, { metadata, error: undefined });
+                      log.addLog('success', 'scrape', `Re-scrape successful with ${scraperName}: ${metadata.title || itemToRescrape.url}`);
+                      toast.showToast('success', 'Re-scrape Complete', `${scraperName} extracted: ${metadata.title || 'metadata'}`);
+                    } catch (error) {
+                      const errorMsg = error instanceof Error ? error.message : String(error);
+                      log.addLog('error', 'scrape', `Re-scrape failed with ${scraperName}: ${errorMsg}`);
+                      toast.showToast('error', 'Re-scrape Failed', errorMsg);
+                      queue.updateItem(id, { error: `${scraperName} failed: ${errorMsg}` });
+                    }
+                  }}
+                  availableScrapers={scraperRegistry.getAvailableScrapersForUrl(item.url, item.metadata?.contentType)}
                   showThumbnail={settings.showThumbnailPreviews}
                 />
               ))}

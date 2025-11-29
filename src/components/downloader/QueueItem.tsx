@@ -14,13 +14,16 @@ interface QueueItemProps {
   onEdit?: (id: string) => void;
   onDownload?: (id: string) => void;
   onViewLogs?: (id: string) => void;
+  onRescrape?: (id: string, scraperName: string) => void;
+  availableScrapers?: Array<{ name: string; canHandle: boolean; supportsContentType: boolean }>;
   showThumbnail?: boolean;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, showThumbnail = true }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, onRescrape, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
+  const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = React.useState(false);
 
   const handlePreview = (url: string, type: 'image' | 'video') => {
     setPreviewUrl(url);
@@ -380,6 +383,56 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                   </span>
                 )}
               </button>
+            )}
+            {/* Re-scrape dropdown */}
+            {onRescrape && availableScrapers && availableScrapers.length > 0 && item.status === DownloadStatus.Pending && (
+              <div className="dropdown" style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-sm btn-outline-info"
+                  onClick={() => setRescrapeDropdownOpen(!rescrapeDropdownOpen)}
+                  title="Re-scrape metadata with a different scraper"
+                >
+                  🔄 Re-scrape
+                </button>
+                {rescrapeDropdownOpen && (
+                  <div
+                    className="dropdown-menu show"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      zIndex: 1000,
+                      backgroundColor: '#243340',
+                      border: '1px solid #394b59',
+                      minWidth: '180px',
+                    }}
+                  >
+                    <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem' }}>
+                      Select scraper:
+                    </div>
+                    {availableScrapers.map((scraper) => (
+                      <button
+                        key={scraper.name}
+                        className={`dropdown-item ${!scraper.canHandle ? 'text-muted' : ''}`}
+                        style={{
+                          color: scraper.canHandle ? '#fff' : '#6c757d',
+                          backgroundColor: 'transparent',
+                        }}
+                        onClick={() => {
+                          setRescrapeDropdownOpen(false);
+                          onRescrape(item.id, scraper.name);
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#394b59'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        {scraper.name}
+                        {!scraper.canHandle && <small className="ms-1">(may fail)</small>}
+                        {!scraper.supportsContentType && <small className="ms-1">(wrong type)</small>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             <button
               className="btn btn-sm btn-link text-danger p-1"
