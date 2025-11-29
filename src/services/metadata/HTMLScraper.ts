@@ -8,12 +8,14 @@
  * 4. Extracting structured data from the page
  */
 
-import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
 
 export class HTMLScraper implements IMetadataScraper {
   name = 'HTML Meta Tags';
   supportedDomains = ['*']; // Works for any site with meta tags
+  contentTypes = [ContentType.Video, ContentType.Image]; // Can extract both video and image meta tags
   private readonly timeoutMs = 30000; // 30 seconds for HTML fetch
 
   canHandle(url: string): boolean {

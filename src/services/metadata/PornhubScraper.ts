@@ -11,12 +11,14 @@
  * - Thumbnail
  */
 
-import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
 
 export class PornhubScraper implements IMetadataScraper {
   name = 'Pornhub';
   supportedDomains = ['pornhub.com', 'www.pornhub.com'];
+  contentTypes = [ContentType.Video];
   private readonly timeoutMs = 30000; // 30 seconds for HTML fetch
 
   canHandle(url: string): boolean {

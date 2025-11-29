@@ -18,6 +18,7 @@ import { getStashService } from '@/services/stash/StashGraphQLService';
 export class StashScraper implements IMetadataScraper {
   name = 'Stash Built-in';
   supportedDomains = ['*']; // Can potentially handle any URL if Stash has a scraper
+  contentTypes = [ContentType.Video, ContentType.Image, ContentType.Gallery]; // Stash can handle all types
 
   /**
    * Check if this scraper can handle the URL

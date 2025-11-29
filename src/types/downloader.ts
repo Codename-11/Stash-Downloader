@@ -27,6 +27,30 @@ export interface IDownloadProgress {
   timeRemaining?: number; // seconds
 }
 
+/**
+ * Gallery image for multi-image downloads
+ */
+export interface IGalleryImage {
+  url: string;
+  thumbnailUrl?: string;
+  filename?: string;
+  width?: number;
+  height?: number;
+  order?: number;
+}
+
+/**
+ * Capability flags indicating what the scraper was able to extract
+ */
+export interface IScraperCapabilities {
+  hasPerformers?: boolean;
+  hasTags?: boolean;
+  hasStudio?: boolean;
+  hasDescription?: boolean;
+  hasDate?: boolean;
+  hasRating?: boolean;
+}
+
 export interface IScrapedMetadata {
   title?: string;
   description?: string;
@@ -41,6 +65,18 @@ export interface IScrapedMetadata {
   duration?: number; // seconds
   quality?: string; // Video quality (e.g., "1080p", "720p", "4K")
   contentType: ContentType;
+
+  // Gallery support (multiple images from one URL)
+  galleryImages?: IGalleryImage[];
+
+  // Scraper capability flags
+  capabilities?: IScraperCapabilities;
+
+  // Source-specific metadata (e.g., booru sites)
+  sourceId?: string; // Post ID for deduplication
+  sourceRating?: string; // e.g., "safe", "questionable", "explicit"
+  sourceScore?: number; // Community score/votes
+  artist?: string; // Primary artist (maps to performer or studio)
 }
 
 /**
@@ -64,6 +100,15 @@ export interface IItemLogEntry {
   details?: string;
 }
 
+/**
+ * Gallery download progress tracking
+ */
+export interface IGalleryProgress {
+  totalImages: number;
+  downloadedImages: number;
+  currentImageUrl?: string;
+}
+
 export interface IDownloadItem {
   id: string;
   url: string;
@@ -80,6 +125,10 @@ export interface IDownloadItem {
   // File info
   filePath?: string;
   fileSize?: number;
+
+  // Gallery support
+  galleryProgress?: IGalleryProgress;
+  filePaths?: string[]; // Array of downloaded file paths (for galleries)
 
   // Stash integration
   stashId?: string; // Scene/Image/Gallery ID after creation
@@ -121,6 +170,7 @@ export interface IPluginSettings {
 export interface IMetadataScraper {
   name: string;
   supportedDomains: string[];
+  contentTypes: ContentType[]; // What content types this scraper supports
   canHandle(url: string): boolean;
   scrape(url: string): Promise<IScrapedMetadata>;
 }

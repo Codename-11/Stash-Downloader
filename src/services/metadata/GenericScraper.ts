@@ -4,11 +4,13 @@
  * Can be extended with site-specific scrapers
  */
 
-import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
 
 export class GenericScraper implements IMetadataScraper {
   name = 'Generic';
   supportedDomains = ['*']; // Fallback for all domains
+  contentTypes = [ContentType.Video, ContentType.Image, ContentType.Gallery]; // Handles all types as fallback
 
   canHandle(_url: string): boolean {
     return true; // Generic scraper handles everything as fallback

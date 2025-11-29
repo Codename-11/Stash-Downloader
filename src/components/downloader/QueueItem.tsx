@@ -51,6 +51,39 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
       return null;
     }
 
+    // Gallery progress
+    if (item.galleryProgress) {
+      const { downloadedImages, totalImages, currentImageUrl } = item.galleryProgress;
+      const overallPercentage = totalImages > 0 ? (downloadedImages / totalImages) * 100 : 0;
+
+      return (
+        <div className="mt-2">
+          <div className="d-flex justify-content-between mb-1">
+            <small className="text-muted">Gallery Progress</small>
+            <small className="text-muted">{downloadedImages} / {totalImages} images</small>
+          </div>
+          <div className="progress" style={{ height: '8px' }}>
+            <div
+              className="progress-bar"
+              role="progressbar"
+              style={{
+                width: `${overallPercentage}%`,
+                backgroundColor: '#6f42c1',
+              }}
+              aria-valuenow={overallPercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            ></div>
+          </div>
+          {currentImageUrl && downloadedImages < totalImages && (
+            <small className="text-muted d-block mt-1" style={{ fontSize: '0.7rem' }}>
+              Downloading: {currentImageUrl.split('/').pop()?.substring(0, 30)}...
+            </small>
+          )}
+        </div>
+      );
+    }
+
     // If we have progress data, show it
     if (item.progress) {
       const { percentage, bytesDownloaded, totalBytes, speed } = item.progress;
@@ -111,7 +144,11 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               }}
             >
               <span style={{ fontSize: '20px', opacity: 0.6 }}>
-                {item.metadata?.contentType === ContentType.Image ? '🖼️' : '🎬'}
+                {item.metadata?.contentType === ContentType.Gallery
+                  ? '📁'
+                  : item.metadata?.contentType === ContentType.Image
+                    ? '🖼️'
+                    : '🎬'}
               </span>
             </div>
           ) : isScrapingMetadata ? (
@@ -128,6 +165,50 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               }}
             >
               <div className="spinner-border spinner-border-sm text-info" role="status" aria-label="Loading"></div>
+            </div>
+          ) : item.metadata?.contentType === ContentType.Gallery && item.metadata?.galleryImages?.length ? (
+            // Gallery thumbnail grid
+            <div
+              style={{
+                width: '120px',
+                height: '80px',
+                flexShrink: 0,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateRows: 'repeat(2, 1fr)',
+                gap: '2px',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                border: '1px solid #394b59',
+                backgroundColor: '#243340',
+              }}
+            >
+              {item.metadata.galleryImages.slice(0, 4).map((img, idx) => (
+                <img
+                  key={idx}
+                  src={img.thumbnailUrl || img.url}
+                  alt={`Gallery ${idx + 1}`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => handlePreview(img.url, 'image')}
+                  onError={(e) => {
+                    const imgEl = e.target as HTMLImageElement;
+                    imgEl.style.display = 'none';
+                  }}
+                />
+              ))}
+              {item.metadata.galleryImages.length < 4 &&
+                Array.from({ length: 4 - item.metadata.galleryImages.length }).map((_, idx) => (
+                  <div
+                    key={`empty-${idx}`}
+                    style={{ backgroundColor: '#1a252f' }}
+                  />
+                ))
+              }
             </div>
           ) : item.metadata?.thumbnailUrl ? (
             <img
@@ -185,7 +266,11 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               }}
             >
               <span style={{ fontSize: '24px', opacity: 0.5 }}>
-                {item.metadata?.contentType === ContentType.Image ? '🖼️' : '🎬'}
+                {item.metadata?.contentType === ContentType.Gallery
+                  ? '📁'
+                  : item.metadata?.contentType === ContentType.Image
+                    ? '🖼️'
+                    : '🎬'}
               </span>
             </div>
           )}
@@ -219,12 +304,30 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                   <span
                     className="badge"
                     style={{
-                      backgroundColor: item.metadata.contentType === ContentType.Image ? 'rgba(108, 117, 125, 0.2)' : 'rgba(13, 110, 253, 0.2)',
-                      color: item.metadata.contentType === ContentType.Image ? '#adb5bd' : '#6ea8fe',
-                      border: `1px solid ${item.metadata.contentType === ContentType.Image ? '#6c757d' : '#0d6efd'}`,
+                      backgroundColor: item.metadata.contentType === ContentType.Gallery
+                        ? 'rgba(111, 66, 193, 0.2)'
+                        : item.metadata.contentType === ContentType.Image
+                          ? 'rgba(108, 117, 125, 0.2)'
+                          : 'rgba(13, 110, 253, 0.2)',
+                      color: item.metadata.contentType === ContentType.Gallery
+                        ? '#a78bfa'
+                        : item.metadata.contentType === ContentType.Image
+                          ? '#adb5bd'
+                          : '#6ea8fe',
+                      border: `1px solid ${
+                        item.metadata.contentType === ContentType.Gallery
+                          ? '#6f42c1'
+                          : item.metadata.contentType === ContentType.Image
+                            ? '#6c757d'
+                            : '#0d6efd'
+                      }`,
                     }}
                   >
-                    {item.metadata.contentType === ContentType.Image ? '🖼️ Image' : '🎥 Video'}
+                    {item.metadata.contentType === ContentType.Gallery
+                      ? `📁 Gallery (${item.metadata.galleryImages?.length || 0} images)`
+                      : item.metadata.contentType === ContentType.Image
+                        ? '🖼️ Image'
+                        : '🎥 Video'}
                   </span>
                 )
               )}

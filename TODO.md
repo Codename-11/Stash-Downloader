@@ -34,6 +34,7 @@
 
 ### Content Type & Image Support
 - [ ] Add `contentTypes` property to `IMetadataScraper` interface (video/image/both)
+- [ ] Add tags, performers, studios, etc. to `IScrapedMetadata` interface if available (optional) to indicate if the scraper supports it
 - [ ] Update `ScraperRegistry` to filter scrapers by content type
 - [ ] Add `BooruScraper` for image booru sites (Rule34, Gelbooru, Danbooru, etc.)
   - [ ] Parse booru API/HTML for image posts

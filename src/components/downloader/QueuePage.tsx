@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
-import { URLInputForm } from './URLInputForm';
+import { URLInputForm, type ContentTypeOption } from './URLInputForm';
 import { QueueItem } from './QueueItem';
 import { BatchImport } from './BatchImport';
 import { EditMetadataModal } from './EditMetadataModal';
@@ -139,9 +139,12 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
     checkYtDlp();
   }, []);
 
-  const handleAddUrl = async (url: string) => {
+  const handleAddUrl = async (url: string, contentTypeOption: ContentTypeOption = 'auto') => {
     // Clear URL field after adding
     setUrlFieldValue('');
+
+    // Convert content type option to actual ContentType (undefined for auto)
+    const preferredContentType = contentTypeOption === 'auto' ? undefined : contentTypeOption;
 
     // Check for duplicate in queue
     if (queue.isUrlInQueue(url)) {
@@ -188,9 +191,9 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         // Note: We don't need to find the item - React state updates are async
         // We can update it directly using the itemId
         
-        // Scrape metadata from URL
-        console.log(`[QueuePage] Calling scraperRegistry.scrape()...`);
-        const metadata = await scraperRegistry.scrape(url);
+        // Scrape metadata from URL (use enhancement flow for better fallback)
+        console.log(`[QueuePage] Calling scraperRegistry.scrapeWithEnhancement() (preferredContentType: ${preferredContentType || 'auto'})...`);
+        const metadata = await scraperRegistry.scrapeWithEnhancement(url, preferredContentType);
         console.log(`[QueuePage] Scraping completed, metadata:`, {
           title: metadata.title,
           hasVideoUrl: !!metadata.videoUrl,
@@ -205,16 +208,68 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         });
         console.log(`[QueuePage] Item updated successfully`);
         
-        log.addLog('success', 'scrape', `Successfully scraped metadata: ${metadata.title || url}`, 
-          `Title: ${metadata.title || 'N/A'}\n` +
-          `Description: ${metadata.description ? metadata.description.substring(0, 100) + '...' : 'N/A'}\n` +
-          `Thumbnail: ${metadata.thumbnailUrl || 'N/A'}\n` +
-          `Duration: ${metadata.duration ? metadata.duration + 's' : 'N/A'}\n` +
-          `Performers: ${metadata.performers?.length || 0}\n` +
-          `Tags: ${metadata.tags?.length || 0}\n` +
-          `Content Type: ${metadata.contentType}\n` +
-          `Video URL: ${metadata.videoUrl ? 'Extracted ✓' : 'Not available'}\n` +
-          `Image URL: ${metadata.imageUrl ? 'Extracted ✓' : 'Not available'}`
+        // Build detailed log message with all available metadata
+        const logDetails: string[] = [
+          `Title: ${metadata.title || 'N/A'}`,
+          `Content Type: ${metadata.contentType}`,
+          `Description: ${metadata.description ? metadata.description.substring(0, 100) + '...' : 'N/A'}`,
+          `Thumbnail: ${metadata.thumbnailUrl ? 'Available ✓' : 'N/A'}`,
+        ];
+
+        // Video/Image URL info
+        if (metadata.videoUrl) {
+          logDetails.push(`Video URL: Extracted ✓`);
+        }
+        if (metadata.imageUrl) {
+          logDetails.push(`Image URL: Extracted ✓`);
+        }
+
+        // Duration for videos
+        if (metadata.duration) {
+          logDetails.push(`Duration: ${metadata.duration}s`);
+        }
+
+        // Performers/Tags/Studio
+        logDetails.push(`Performers: ${metadata.performers?.length || 0}`);
+        logDetails.push(`Tags: ${metadata.tags?.length || 0}`);
+        if (metadata.studio) {
+          logDetails.push(`Studio: ${metadata.studio}`);
+        }
+
+        // Booru-specific metadata
+        if (metadata.artist) {
+          logDetails.push(`Artist: ${metadata.artist}`);
+        }
+        if (metadata.sourceId) {
+          logDetails.push(`Source ID: ${metadata.sourceId}`);
+        }
+        if (metadata.sourceRating) {
+          logDetails.push(`Rating: ${metadata.sourceRating}`);
+        }
+        if (metadata.sourceScore !== undefined) {
+          logDetails.push(`Score: ${metadata.sourceScore}`);
+        }
+
+        // Gallery info
+        if (metadata.galleryImages?.length) {
+          logDetails.push(`Gallery Images: ${metadata.galleryImages.length}`);
+        }
+
+        // Capabilities
+        if (metadata.capabilities) {
+          const caps = metadata.capabilities;
+          const capsList: string[] = [];
+          if (caps.hasPerformers) capsList.push('performers');
+          if (caps.hasTags) capsList.push('tags');
+          if (caps.hasStudio) capsList.push('studio');
+          if (caps.hasRating) capsList.push('rating');
+          if (capsList.length > 0) {
+            logDetails.push(`Capabilities: ${capsList.join(', ')}`);
+          }
+        }
+
+        log.addLog('success', 'scrape', `Successfully scraped metadata: ${metadata.title || url}`,
+          logDetails.join('\n')
         );
         
         if (metadata.videoUrl) {

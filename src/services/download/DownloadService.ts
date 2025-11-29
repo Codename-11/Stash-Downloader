@@ -8,7 +8,8 @@
  * 4. Direct fetch with CORS proxy
  */
 
-import type { IDownloadProgress } from '@/types';
+import type { IDownloadProgress, IGalleryProgress } from '@/types';
+import { ContentType } from '@/types';
 import { fetchWithTimeout, getStorageItem, createLogger } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { PLUGIN_ID, STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
@@ -28,6 +29,13 @@ export interface IServerDownloadResult {
   success: boolean;
   file_path?: string;
   file_size?: number;
+  error?: string;
+}
+
+export interface IGalleryDownloadResult {
+  success: boolean;
+  filePaths: string[];
+  totalImages: number;
   error?: string;
 }
 
@@ -469,21 +477,190 @@ export class DownloadService {
   }
 
   /**
+   * Download an image file directly (simple HTTP fetch, no yt-dlp needed)
+   * Images are simpler than videos - just direct fetch with progress tracking
+   *
+   * @param imageUrl Direct image URL to download
+   * @param options Download options (progress callback, abort signal)
+   */
+  async downloadImage(
+    imageUrl: string,
+    options: IDownloadOptions = {}
+  ): Promise<Blob> {
+    const { onProgress, signal } = options;
+    const fetchUrl = this.wrapWithProxy(imageUrl);
+
+    log.info(`Downloading image: ${imageUrl}`);
+
+    let response: Response;
+    try {
+      // 1 minute timeout for images (usually much smaller than videos)
+      response = await fetchWithTimeout(fetchUrl, { signal }, 60000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
+
+      if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
+        const corsEnabled = this.isCorsProxyEnabled();
+        if (!corsEnabled) {
+          throw new Error(
+            'CORS Error: This site blocks direct browser requests. ' +
+            'Please enable CORS proxy in settings to download images from this site.'
+          );
+        } else {
+          throw new Error(
+            'Network Error: Failed to fetch image. ' +
+            `The CORS proxy may not be running. Proxy URL: ${this.getCorsProxyUrl()}`
+          );
+        }
+      }
+      throw error;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Image download failed: ${response.statusText} (${response.status})`);
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const contentLength = response.headers.get('content-length');
+    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+
+    log.debug(`Image download: ${contentType}, ${totalBytes} bytes`);
+
+    if (!response.body) {
+      throw new Error('Response body is null');
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytesDownloaded = 0;
+    const startTime = Date.now();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      chunks.push(value);
+      bytesDownloaded += value.length;
+
+      if (onProgress) {
+        const elapsedTime = (Date.now() - startTime) / 1000;
+        const speed = bytesDownloaded / elapsedTime;
+
+        onProgress({
+          bytesDownloaded,
+          totalBytes,
+          percentage: totalBytes > 0 ? (bytesDownloaded / totalBytes) * 100 : 0,
+          speed,
+          timeRemaining: totalBytes > 0 ? (totalBytes - bytesDownloaded) / speed : undefined,
+        });
+      }
+    }
+
+    log.success(`Image download complete: ${bytesDownloaded} bytes`);
+    return new Blob(chunks as BlobPart[], { type: contentType });
+  }
+
+  /**
+   * Download a gallery (multiple images from one URL)
+   * Downloads each image sequentially with progress tracking
+   *
+   * @param images Array of gallery image objects with URLs
+   * @param options Download options
+   * @param onGalleryProgress Callback for gallery-level progress
+   */
+  async downloadGallery(
+    images: Array<{ url: string; filename?: string }>,
+    options: IDownloadOptions = {},
+    onGalleryProgress?: (progress: IGalleryProgress) => void
+  ): Promise<{ blobs: Blob[]; filePaths: string[] }> {
+    const downloadedBlobs: Blob[] = [];
+    const filePaths: string[] = [];
+
+    log.info(`Starting gallery download: ${images.length} images`);
+
+    for (let i = 0; i < images.length; i++) {
+      const image = images[i]!;
+
+      // Update gallery progress
+      if (onGalleryProgress) {
+        onGalleryProgress({
+          totalImages: images.length,
+          downloadedImages: i,
+          currentImageUrl: image.url,
+        });
+      }
+
+      try {
+        log.info(`Downloading gallery image ${i + 1}/${images.length}: ${image.url}`);
+        const blob = await this.downloadImage(image.url, options);
+        downloadedBlobs.push(blob);
+
+        // Generate filename from URL if not provided
+        const filename = image.filename ?? this.getFilenameFromUrl(image.url, i);
+        filePaths.push(filename);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        log.error(`Failed to download gallery image ${i + 1}: ${errorMsg}`);
+        // Continue with remaining images
+      }
+    }
+
+    // Final progress update
+    if (onGalleryProgress) {
+      onGalleryProgress({
+        totalImages: images.length,
+        downloadedImages: images.length,
+        currentImageUrl: undefined,
+      });
+    }
+
+    log.success(`Gallery download complete: ${downloadedBlobs.length}/${images.length} images`);
+    return { blobs: downloadedBlobs, filePaths };
+  }
+
+  /**
+   * Get filename from URL for gallery images
+   */
+  private getFilenameFromUrl(url: string, index: number): string {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      const filename = pathname.split('/').pop();
+      if (filename && filename.includes('.')) {
+        return filename;
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+    // Fallback: generate filename with index
+    const ext = this.getFileExtension(url) || 'jpg';
+    return `image_${index + 1}.${ext}`;
+  }
+
+  /**
    * Download file from URL and return as Blob (for browser downloads)
-   * 
+   *
    * NOTE: This method returns Blobs for browser downloads.
    * For server-side downloads (which save to server filesystem), use downloadServerSide().
    * Server-side downloads are better suited for direct Stash import (future enhancement).
-   * 
+   *
    * @param videoUrl Optional direct video URL from scraper (preferred over yt-dlp)
    * @param imageUrl Optional direct image URL from scraper (for image downloads)
+   * @param contentType Optional content type to route download appropriately
    */
   async download(
     url: string,
     options: IDownloadOptions = {},
     videoUrl?: string,
-    imageUrl?: string
+    imageUrl?: string,
+    contentType?: ContentType
   ): Promise<Blob> {
+    // Route image downloads through simpler path (no yt-dlp needed)
+    if (contentType === ContentType.Image) {
+      const targetUrl = imageUrl || url;
+      log.info('Routing to image download path');
+      return this.downloadImage(targetUrl, options);
+    }
     // PRIORITY 1: If we have a direct imageUrl from scraper, use it (never use yt-dlp for images)
     if (imageUrl && imageUrl !== url && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
       console.log('[DownloadService] Using direct imageUrl from scraper');

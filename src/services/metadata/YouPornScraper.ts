@@ -12,12 +12,14 @@
  * - Video URL (actual video file)
  */
 
-import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
 
 export class YouPornScraper implements IMetadataScraper {
   name = 'YouPorn';
   supportedDomains = ['youporn.com', 'www.youporn.com'];
+  contentTypes = [ContentType.Video];
   private readonly timeoutMs = 30000; // 30 seconds for HTML fetch
 
   canHandle(url: string): boolean {

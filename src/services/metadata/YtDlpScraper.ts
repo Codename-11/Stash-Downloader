@@ -15,7 +15,8 @@
  * 5. Cleanup temp file
  */
 
-import type { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
 import { fetchWithTimeout } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 
@@ -25,6 +26,7 @@ const PLUGIN_ID = 'stash-downloader';
 export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
   supportedDomains = ['*']; // Supports all domains
+  contentTypes = [ContentType.Video]; // Primarily for video extraction
   private readonly timeoutMs = 60000; // 60 seconds for yt-dlp (can be slow)
 
   canHandle(url: string): boolean {
