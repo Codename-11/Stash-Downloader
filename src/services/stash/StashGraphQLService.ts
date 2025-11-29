@@ -129,11 +129,15 @@ export class StashGraphQLService {
       }
     `;
 
+    console.log(`[StashGraphQL] findPerformersByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findPerformers: { performers: IStashPerformer[] } }>(
       query,
       { filter: name }
     );
-    return result.data?.findPerformers?.performers || [];
+    const performers = result.data?.findPerformers?.performers || [];
+    console.log(`[StashGraphQL] findPerformersByName: found ${performers.length} results for "${name}"`,
+      performers.length > 0 ? performers.map(p => ({ id: p.id, name: p.name, aliases: p.alias_list })) : '(none)');
+    return performers;
   }
 
   /**
@@ -155,11 +159,15 @@ export class StashGraphQLService {
       }
     `;
 
+    console.log(`[StashGraphQL] findTagsByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findTags: { tags: IStashTag[] } }>(
       query,
       { filter: name }
     );
-    return result.data?.findTags?.tags || [];
+    const tags = result.data?.findTags?.tags || [];
+    console.log(`[StashGraphQL] findTagsByName: found ${tags.length} results for "${name}"`,
+      tags.length > 0 ? tags.map(t => ({ id: t.id, name: t.name, aliases: t.aliases })) : '(none)');
+    return tags;
   }
 
   /**
@@ -182,11 +190,14 @@ export class StashGraphQLService {
       }
     `;
 
+    console.log(`[StashGraphQL] findStudioByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findStudios: { studios: IStashStudio[] } }>(
       query,
       { filter: name }
     );
     const studios = result.data?.findStudios?.studios || [];
+    console.log(`[StashGraphQL] findStudioByName: found ${studios.length} results for "${name}"`,
+      studios.length > 0 ? studios.map(s => ({ id: s.id, name: s.name, aliases: s.aliases })) : '(none)');
     return studios.length > 0 ? studios[0]! : null;
   }
 
