@@ -1,5 +1,8 @@
 # TODO
 
+## Ideas
+- [ ] Add a way to add a custom scraper for a specific site
+
 ## In Progress
 
 ### Logger Migration
@@ -26,7 +29,22 @@
 
 ### Scrapers
 - [ ] Add more site-specific scrapers
+- [ ] Verify scrapers are properly retrieving metadata
 - [ ] Scraper enable/disable settings UI
+
+### Content Type & Image Support
+- [ ] Add `contentTypes` property to `IMetadataScraper` interface (video/image/both)
+- [ ] Update `ScraperRegistry` to filter scrapers by content type
+- [ ] Add `BooruScraper` for image booru sites (Rule34, Gelbooru, Danbooru, etc.)
+  - [ ] Parse booru API/HTML for image posts
+  - [ ] Extract full-size image URL (not thumbnail)
+  - [ ] Map booru tags → Stash tags
+  - [ ] Extract artist/source metadata → performers/studios
+  - [ ] Handle post ID for deduplication
+- [ ] Add `Rule34VideoScraper` for rule34video.com (if yt-dlp doesn't cover it)
+- [ ] Support image galleries (multiple images per URL)
+- [ ] Add content type indicator in queue UI (video/image/gallery icons)
+- [ ] Update download service to handle image downloads (simpler than video)
 
 ### UI/UX
 - [ ] Keyboard shortcuts (using Mousetrap from PluginApi)

@@ -563,8 +563,16 @@ def task_extract_metadata(args: dict) -> dict:
             'description': metadata.get('description'),
             'duration': metadata.get('duration'),
             'uploader': metadata.get('uploader'),
+            'channel': metadata.get('channel'),  # Channel name (fallback for studio)
             'upload_date': metadata.get('upload_date'),
             'thumbnail': metadata.get('thumbnail'),
+            # Tags and categories (site-specific, may be empty)
+            'tags': metadata.get('tags', []),  # List of tags
+            'categories': metadata.get('categories', []),  # List of categories
+            # Performers (site-specific, may be empty)
+            'cast': metadata.get('cast', []),  # List of cast members (Pornhub, etc.)
+            'creators': metadata.get('creators', []),  # List of creators
+            'artist': metadata.get('artist'),  # Artist name (music videos)
             # Include direct video URL (important for download service)
             # For HLS streams, this is typically the best quality manifest URL
             # yt-dlp's top-level 'url' is usually the best quality available

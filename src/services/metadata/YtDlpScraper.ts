@@ -446,7 +446,8 @@ export class YtDlpScraper implements IMetadataScraper {
   /**
    * Extract performers from yt-dlp metadata
    * yt-dlp returns performers in different fields depending on the site:
-   * - cast: array of cast members (Pornhub, some sites)
+   * - cast: array of cast members (Pornhub, some adult sites)
+   * - creators: array of creators
    * - actors: array of actors (some sites)
    * - artist: artist name (music videos)
    * - uploader: channel/uploader name (fallback)
@@ -454,9 +455,14 @@ export class YtDlpScraper implements IMetadataScraper {
   private extractPerformers(ytdlp: any): string[] {
     const performers: string[] = [];
 
-    // Try cast first (common for adult sites)
+    // Try cast first (common for adult sites like Pornhub)
     if (ytdlp.cast && Array.isArray(ytdlp.cast)) {
       performers.push(...ytdlp.cast);
+    }
+
+    // Try creators
+    if (ytdlp.creators && Array.isArray(ytdlp.creators)) {
+      performers.push(...ytdlp.creators);
     }
 
     // Try actors
