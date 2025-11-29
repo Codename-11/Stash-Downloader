@@ -9,10 +9,12 @@
  */
 
 import type { IDownloadProgress } from '@/types';
-import { fetchWithTimeout, getStorageItem } from '@/utils';
+import { fetchWithTimeout, getStorageItem, createLogger } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { PLUGIN_ID, STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
 import type { IPluginSettings } from '@/types';
+
+const log = createLogger('DownloadService');
 
 export interface IDownloadOptions {
   onProgress?: (progress: IDownloadProgress) => void;
@@ -80,7 +82,7 @@ export class DownloadService {
     url: string,
     options: IDownloadOptions = {}
   ): Promise<IServerDownloadResult> {
-    console.log('[DownloadService] Attempting server-side download via plugin task');
+    log.info('Attempting server-side download via plugin task');
 
     try {
       const stashService = getStashService();
@@ -99,9 +101,9 @@ export class DownloadService {
       
       // Log proxy configuration for troubleshooting
       if (httpProxy) {
-        console.log(`[DownloadService] Using HTTP proxy for server-side download: ${httpProxy}`);
+        log.info(`Using HTTP proxy for server-side download: ${httpProxy}`);
       } else {
-        console.log('[DownloadService] No HTTP proxy configured - using direct connection');
+        log.info('No HTTP proxy configured - using direct connection');
       }
 
       // Run the download task and wait for completion
@@ -138,7 +140,7 @@ export class DownloadService {
         return { success: false, error: taskResult.error || 'Download task failed' };
       }
 
-      console.log('[DownloadService] Server-side download task completed, reading result...');
+      log.info('Server-side download task completed, reading result...');
 
       // Read the result to get file_path
       // Stash extracts the 'output' field from PluginOutput and returns it directly
@@ -164,14 +166,14 @@ export class DownloadService {
         return { success: false, error: 'Download completed but no file_path in result' };
       }
 
-      console.log('[DownloadService] Server-side download succeeded:', filePath);
+      log.success('Server-side download succeeded', filePath);
 
       // Cleanup result file
       stashService.runPluginTask(PLUGIN_ID, 'Cleanup Result', {
         mode: 'cleanup_result',
         result_id: resultId,
       }).catch((err) => {
-        console.warn('[DownloadService] Cleanup error (ignored):', err);
+        log.warn('Cleanup error (ignored)', String(err));
       });
 
       return {
@@ -181,7 +183,7 @@ export class DownloadService {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error('[DownloadService] Server-side download failed:', errorMsg);
+      log.error('Server-side download failed', errorMsg);
       return { success: false, error: errorMsg };
     }
   }
@@ -263,13 +265,13 @@ export class DownloadService {
    * Validate and normalize URL for yt-dlp
    */
   private validateUrl(url: string): string {
-    console.log('[DownloadService] validateUrl called:', {
+    log.debug('validateUrl called', JSON.stringify({
       url: url,
       type: typeof url,
       length: url?.length,
       isString: typeof url === 'string',
       isEmpty: !url || url.trim() === '',
-    });
+    }));
 
     if (!url || typeof url !== 'string') {
       const error = `Invalid URL: URL is empty or not a string. Received: ${JSON.stringify(url)} (type: ${typeof url})`;
@@ -437,7 +439,7 @@ export class DownloadService {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let bytesDownloaded = 0;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -521,7 +523,7 @@ export class DownloadService {
       try {
         // Try to get Stash library path for automatic indexing
         const stashService = getStashService();
-        let libraryPath = await stashService.getVideoLibraryPath();
+        const libraryPath = await stashService.getVideoLibraryPath();
 
         if (libraryPath) {
           console.log('[DownloadService] Using Stash library path:', libraryPath);
@@ -635,7 +637,7 @@ export class DownloadService {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let bytesDownloaded = 0;
-    let startTime = Date.now();
+    const startTime = Date.now();
 
     while (true) {
       const { done, value } = await reader.read();

@@ -575,6 +575,40 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
             </div>
           )}
 
+          {/* Queue Toolbar - Preview toggle and Log level */}
+          <div className="d-flex justify-content-between align-items-center mb-2 px-2">
+            <div className="form-check form-switch">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="thumbnailPreviewToggle"
+                checked={settings.showThumbnailPreviews}
+                onChange={(e) => updateSettings({ showThumbnailPreviews: e.target.checked })}
+              />
+              <label className="form-check-label text-light" htmlFor="thumbnailPreviewToggle">
+                Show Thumbnails
+              </label>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+              <label className="form-label mb-0 text-light" htmlFor="logLevelSelect" style={{ fontSize: '0.85em' }}>
+                Log Level:
+              </label>
+              <select
+                id="logLevelSelect"
+                className="form-select form-select-sm"
+                style={{ backgroundColor: '#243340', borderColor: '#394b59', color: '#fff', width: 'auto' }}
+                value={settings.logLevel}
+                onChange={(e) => updateSettings({ logLevel: e.target.value as IPluginSettings['logLevel'] })}
+              >
+                <option value="off">Off</option>
+                <option value="error">Error</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+              </select>
+            </div>
+          </div>
+
           {/* Queue Items */}
           {queue.items.length === 0 ? (
             <div className="text-center py-5">
@@ -603,6 +637,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                       setViewingLogsForItem(itemToView);
                     }
                   }}
+                  showThumbnail={settings.showThumbnailPreviews}
                 />
               ))}
             </div>

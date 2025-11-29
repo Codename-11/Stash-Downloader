@@ -5,6 +5,7 @@
 import React from 'react';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { LogProvider } from '@/contexts/LogContext';
+import { useLoggerBridge } from '@/hooks';
 import { ToastContainer } from '@/components/common';
 import { QueuePage } from './QueuePage';
 
@@ -13,14 +14,24 @@ interface DownloaderMainProps {
   testSettingsPanel?: React.ReactNode;
 }
 
-export const DownloaderMain: React.FC<DownloaderMainProps> = ({ isTestMode, testSettingsPanel }) => {
+/** Inner component that sets up the logger bridge (must be inside LogProvider) */
+const DownloaderContent: React.FC<DownloaderMainProps> = ({ isTestMode, testSettingsPanel }) => {
+  // Connect global Logger to LogContext
+  useLoggerBridge();
+
+  return (
+    <div className="stash-downloader-plugin" style={{ minHeight: '100vh' }}>
+      <ToastContainer />
+      <QueuePage isTestMode={isTestMode} testSettingsPanel={testSettingsPanel} />
+    </div>
+  );
+};
+
+export const DownloaderMain: React.FC<DownloaderMainProps> = (props) => {
   return (
     <ToastProvider>
       <LogProvider>
-        <div className="stash-downloader-plugin" style={{ minHeight: '100vh' }}>
-          <ToastContainer />
-          <QueuePage isTestMode={isTestMode} testSettingsPanel={testSettingsPanel} />
-        </div>
+        <DownloaderContent {...props} />
       </LogProvider>
     </ToastProvider>
   );

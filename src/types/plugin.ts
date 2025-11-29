@@ -3,6 +3,8 @@
  * These types describe the globally available window.PluginApi object
  */
 
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
+
 import type React from 'react';
 import type ReactDOM from 'react-dom';
 

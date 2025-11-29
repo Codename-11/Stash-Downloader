@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS = {
   downloadQuality: 'best' as const,
   filenameTemplate: '{title}',
   enableNotifications: true,
+  logLevel: 'info' as const,
+  showThumbnailPreviews: true,
 };
 
 export const STORAGE_KEYS = {

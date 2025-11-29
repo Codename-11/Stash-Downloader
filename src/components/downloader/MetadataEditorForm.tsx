@@ -11,6 +11,7 @@ import { StudioSelector } from '@/components/common/StudioSelector';
 import { MediaPreviewModal } from '@/components/common';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
+import { useSettings } from '@/hooks';
 import { getScraperRegistry, getMetadataMatchingService } from '@/services/metadata';
 
 interface MetadataEditorFormProps {
@@ -26,6 +27,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 }) => {
   const toast = useToast();
   const log = useLog();
+  const { settings } = useSettings();
   const [title, setTitle] = useState(item.metadata?.title || '');
   const [description, setDescription] = useState(item.metadata?.description || '');
   const [date, setDate] = useState(item.metadata?.date || '');
@@ -192,8 +194,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       <div className="card-body">
         <form onSubmit={handleSubmit}>
           <div className="d-flex flex-column gap-3">
-            {/* Preview thumbnail if available */}
-            {item.metadata?.thumbnailUrl && (
+            {/* Preview thumbnail if available and enabled */}
+            {item.metadata?.thumbnailUrl && settings.showThumbnailPreviews ? (
               <div className="text-center">
                 <div className="d-flex gap-2 align-items-center justify-content-center">
                   <img
@@ -244,7 +246,37 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   )}
                 </div>
               </div>
-            )}
+            ) : item.metadata?.thumbnailUrl && !settings.showThumbnailPreviews ? (
+              // Show placeholder when thumbnails are disabled
+              <div className="text-center">
+                <div
+                  className="d-inline-flex align-items-center justify-content-center"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    backgroundColor: '#243340',
+                    borderRadius: '4px',
+                    border: '1px solid #394b59',
+                  }}
+                >
+                  <span style={{ fontSize: '32px', opacity: 0.6 }}>
+                    {item.metadata?.contentType === ContentType.Image ? '🖼️' : '🎬'}
+                  </span>
+                </div>
+                {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
+                      title="Preview video"
+                    >
+                      ▶ Preview Video
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {/* Source URL with Scrape button */}
             <div className="mb-3">

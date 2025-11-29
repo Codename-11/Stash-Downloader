@@ -313,32 +313,45 @@ interface IMetadataScraper {
   scrape(url: string): Promise<IScrapedMetadata>;
 }
 
-// Scrapers registered in priority order (first match wins)
+// Scrapers registered conditionally based on environment
 class ScraperRegistry {
   constructor() {
-    this.register(new YtDlpScraper());    // PRIMARY: Always extracts video URLs
-    this.register(new StashScraper());    // FALLBACK: Kept in code but only used if yt-dlp fails
-    this.register(new PornhubScraper());  // Site-specific
-    this.register(new YouPornScraper());
-    this.register(new HTMLScraper());     // Generic OG tags
-    // GenericScraper is fallback (always last)
+    // Always registered (both Stash and test-app)
+    this.register(new YtDlpScraper());    // PRIMARY: Extracts video URLs via yt-dlp
+    this.register(new StashScraper());    // FALLBACK: Server-side Stash scraper
+
+    // Test-app only (require CORS proxy)
+    if (!isStashEnvironment) {
+      this.register(new PornhubScraper());  // Site-specific
+      this.register(new YouPornScraper());
+      this.register(new HTMLScraper());     // Generic OG tags
+    }
+    // GenericScraper is always fallback (last resort)
   }
 }
 ```
 
-### Scraper Fallback Chain (Stash Environment)
+### Scraper Fallback Chain
+
+**Stash Environment (server-side, no CORS issues):**
 1. **YtDlpScraper** - PRIMARY: Server-side yt-dlp via Python backend
    - Uses `runPluginTask` to extract metadata (saves to temp file)
    - Uses `runPluginOperation` to read result from temp file
    - Supports HTTP/SOCKS proxy via `httpProxy` setting (passed to yt-dlp via `--proxy` flag)
    - Extracts best quality video URL from formats array or top-level URL
-2. **StashScraper** - DISABLED: `canHandle()` returns false (kept for potential future use)
-3. **GenericScraper** - FALLBACK: Extracts filename from URL (last resort)
+2. **StashScraper** - FALLBACK: Uses Stash's built-in scraper API
+3. **GenericScraper** - LAST RESORT: Extracts filename from URL
 
-In test-app mode, additional scrapers are enabled:
-- **YtDlpScraper** via CORS proxy's `/api/extract` endpoint
-- **PornhubScraper**, **YouPornScraper** - Site-specific scrapers
-- **HTMLScraper** - Parses Open Graph meta tags
+**Test-app Environment (client-side, requires CORS proxy):**
+1. **YtDlpScraper** - via CORS proxy's `/api/extract` endpoint
+2. **StashScraper** - via CORS proxy (if Stash API accessible)
+3. **PornhubScraper** - Site-specific HTML parsing
+4. **YouPornScraper** - Site-specific HTML parsing
+5. **HTMLScraper** - Generic Open Graph meta tag extraction
+   - Extracts `imageUrl` from `og:image` (works for images)
+   - Extracts `videoUrl` from `og:video` (rarely available on video sites)
+   - Main value: metadata (title, description, thumbnail)
+6. **GenericScraper** - LAST RESORT: Extracts filename from URL
 
 If a scraper throws an error, the registry tries the next one.
 

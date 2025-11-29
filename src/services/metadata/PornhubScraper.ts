@@ -703,7 +703,7 @@ export class PornhubScraper implements IMetadataScraper {
     try {
       // Match common quality patterns in URLs
       // Pattern 1: Direct quality indicator like "_720p" or "_1080p"
-      const qualityMatch = url.match(/[_\-](\d{3,4})p/i);
+      const qualityMatch = url.match(/[_-](\d{3,4})p/i);
       if (qualityMatch) {
         return `${qualityMatch[1]}p`;
       }

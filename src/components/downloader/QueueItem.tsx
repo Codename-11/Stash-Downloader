@@ -14,9 +14,10 @@ interface QueueItemProps {
   onEdit?: (id: string) => void;
   onDownload?: (id: string) => void;
   onViewLogs?: (id: string) => void;
+  showThumbnail?: boolean;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
@@ -96,7 +97,24 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
       <div className="card-body">
         <div className="d-flex gap-3 align-items-start">
           {/* Thumbnail preview, skeleton, or placeholder */}
-          {isScrapingMetadata ? (
+          {!showThumbnail ? (
+            // Thumbnails disabled - show compact placeholder with icon
+            <div
+              className="d-flex align-items-center justify-content-center"
+              style={{
+                width: '48px',
+                height: '48px',
+                flexShrink: 0,
+                backgroundColor: '#243340',
+                borderRadius: '4px',
+                border: '1px solid #394b59',
+              }}
+            >
+              <span style={{ fontSize: '20px', opacity: 0.6 }}>
+                {item.metadata?.contentType === ContentType.Image ? '🖼️' : '🎬'}
+              </span>
+            </div>
+          ) : isScrapingMetadata ? (
             // Loading skeleton with spinner
             <div
               className="d-flex align-items-center justify-content-center"

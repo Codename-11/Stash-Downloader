@@ -315,7 +315,7 @@ export class HTMLScraper implements IMetadataScraper {
     try {
       // Match common quality patterns
       // Pattern 1: "_1080p" or "-720p"
-      const qualityMatch = url.match(/[_\-](\d{3,4})p/i);
+      const qualityMatch = url.match(/[_-](\d{3,4})p/i);
       if (qualityMatch) {
         return `${qualityMatch[1]}p`;
       }

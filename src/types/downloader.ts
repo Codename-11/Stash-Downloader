@@ -100,6 +100,8 @@ export interface IDownloadQueueState {
   totalFailed: number;
 }
 
+export type LogLevelSetting = 'off' | 'error' | 'warning' | 'info' | 'debug';
+
 export interface IPluginSettings {
   defaultDownloadPath?: string;
   serverDownloadPath?: string;
@@ -111,6 +113,8 @@ export interface IPluginSettings {
   downloadQuality: 'best' | '1080p' | '720p' | '480p';
   filenameTemplate: string;
   enableNotifications: boolean;
+  logLevel: LogLevelSetting;
+  showThumbnailPreviews: boolean;
 }
 
 // Metadata scraper interface

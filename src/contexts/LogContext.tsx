@@ -53,17 +53,8 @@ export const LogProvider: React.FC<LogProviderProps> = ({
         return newLogs.slice(0, maxLogs);
       });
 
-      // Also log to console for debugging
-      const consoleMethod =
-        level === 'error'
-          ? console.error
-          : level === 'warning'
-            ? console.warn
-            : level === 'success'
-              ? console.log
-              : console.info;
-
-      consoleMethod(`[${category}] ${message}`, details || '');
+      // Note: Console output is now handled by Logger utility (via useLoggerBridge)
+      // This prevents double-logging when using the centralized Logger
     },
     [maxLogs]
   );
