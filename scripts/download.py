@@ -32,8 +32,8 @@ from typing import Any, Optional
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='[stash-downloader] %(levelname)s: %(message)s',
-    handlers=[logging.StreamHandler(sys.stderr)]
+    format="[stash-downloader] %(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stderr)],
 )
 log = logging.getLogger(__name__)
 
@@ -42,28 +42,31 @@ log = logging.getLogger(__name__)
 # Fall back to temp directory if plugin directory detection fails
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_DIR = os.path.dirname(SCRIPT_DIR)  # Parent of scripts/
-RESULT_DIR = os.path.join(PLUGIN_DIR, 'results')  # {pluginDir}/results/
+RESULT_DIR = os.path.join(PLUGIN_DIR, "results")  # {pluginDir}/results/
 
 # Ensure results directory exists at startup
 os.makedirs(RESULT_DIR, exist_ok=True)
 log.info(f"Results directory: {RESULT_DIR}")
 
+
 def ensure_result_dir():
     """Ensure the result directory exists."""
     os.makedirs(RESULT_DIR, exist_ok=True)
 
+
 def get_result_path(result_id: str) -> str:
     """Get the path for a result file."""
     # Sanitize result_id to prevent path traversal
-    safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', result_id)
-    return os.path.join(RESULT_DIR, f'{safe_id}.json')
+    safe_id = re.sub(r"[^a-zA-Z0-9_-]", "", result_id)
+    return os.path.join(RESULT_DIR, f"{safe_id}.json")
+
 
 def save_result(result_id: str, data: dict) -> bool:
     """Save a result to a file for later retrieval."""
     try:
         ensure_result_dir()
         result_path = get_result_path(result_id)
-        with open(result_path, 'w') as f:
+        with open(result_path, "w") as f:
             json.dump(data, f)
         log.info(f"Saved result to: {result_path}")
         return True
@@ -71,12 +74,13 @@ def save_result(result_id: str, data: dict) -> bool:
         log.error(f"Failed to save result: {e}")
         return False
 
+
 def load_result(result_id: str) -> Optional[dict]:
     """Load a result from file."""
     try:
         result_path = get_result_path(result_id)
         if os.path.exists(result_path):
-            with open(result_path, 'r') as f:
+            with open(result_path, "r") as f:
                 return json.load(f)
         else:
             log.warning(f"Result file not found: {result_path}")
@@ -84,6 +88,7 @@ def load_result(result_id: str) -> Optional[dict]:
     except Exception as e:
         log.error(f"Failed to load result: {e}")
         return None
+
 
 def delete_result(result_id: str) -> bool:
     """Delete a result file."""
@@ -96,6 +101,7 @@ def delete_result(result_id: str) -> bool:
     except Exception as e:
         log.error(f"Failed to delete result: {e}")
         return False
+
 
 # Read input from stdin (Stash passes JSON)
 def read_input() -> dict:
@@ -111,16 +117,16 @@ def read_input() -> dict:
 
 def write_output(result: dict) -> None:
     """Write JSON output to stdout.
-    
+
     IMPORTANT: Stash expects output in PluginOutput format:
     {
         "error": "optional error string",
         "output": { ... actual result data ... }
     }
-    
+
     If the result has a 'result_error' field, we put it in 'error'.
     Otherwise, we wrap the entire result in 'output'.
-    
+
     Based on Stash source code (pkg/plugin/common/msg.go):
     - PluginOutput struct has Error (*string) and Output (interface{})
     - If JSON doesn't match this structure, Stash may return null
@@ -130,22 +136,22 @@ def write_output(result: dict) -> None:
     try:
         # Wrap result in Stash's PluginOutput format
         plugin_output = {}
-        
+
         # If there's a result_error, put it in the 'error' field
-        if 'result_error' in result:
-            plugin_output['error'] = result['result_error']
+        if "result_error" in result:
+            plugin_output["error"] = result["result_error"]
             # Still include the rest of the result in 'output' for context
-            result_without_error = {k: v for k, v in result.items() if k != 'result_error'}
+            result_without_error = {k: v for k, v in result.items() if k != "result_error"}
             if result_without_error:
-                plugin_output['output'] = result_without_error
+                plugin_output["output"] = result_without_error
         else:
             # No error, wrap entire result in 'output' field
-            plugin_output['output'] = result
-        
+            plugin_output["output"] = result
+
         # Use ensure_ascii=True to avoid potential Unicode encoding issues
         # Compact JSON (no separators) for maximum compatibility
-        output = json.dumps(plugin_output, ensure_ascii=True, separators=(',', ':'))
-        
+        output = json.dumps(plugin_output, ensure_ascii=True, separators=(",", ":"))
+
         # Validate the JSON can be parsed (catches serialization issues)
         try:
             json.loads(output)
@@ -153,25 +159,26 @@ def write_output(result: dict) -> None:
             log.error(f"Generated invalid JSON: {e}")
             log.error(f"Output that failed: {output[:500]}")
             raise
-        
+
         log.info(f"Writing PluginOutput to stdout: {output[:200]}...")  # Log first 200 chars
         log.info(f"Output length: {len(output)} characters")
-        
+
         # Write directly to stdout and flush to ensure it's sent immediately
         # Don't use print() as it adds a newline which might confuse Stash
         sys.stdout.write(output)
         sys.stdout.flush()
-        
+
         # Verify output was written (debugging)
         log.info("Output written and flushed to stdout")
     except Exception as e:
         log.error(f"Failed to serialize output: {e}", exc_info=True)
         # Fallback: write error in PluginOutput format
         try:
-            error_output = json.dumps({
-                'error': f'Failed to serialize output: {str(e)}',
-                'output': {'success': False}
-            }, ensure_ascii=True, separators=(',', ':'))
+            error_output = json.dumps(
+                {"error": f"Failed to serialize output: {str(e)}", "output": {"success": False}},
+                ensure_ascii=True,
+                separators=(",", ":"),
+            )
             sys.stdout.write(error_output)
             sys.stdout.flush()
         except Exception as fallback_error:
@@ -184,7 +191,7 @@ def write_output(result: dict) -> None:
 def sanitize_filename(filename: str) -> str:
     """Sanitize filename for filesystem."""
     # Remove or replace invalid characters
-    sanitized = re.sub(r'[<>:"/\\|?*]', '', filename)
+    sanitized = re.sub(r'[<>:"/\\|?*]', "", filename)
     # Limit length
     return sanitized[:200] if len(sanitized) > 200 else sanitized
 
@@ -194,10 +201,7 @@ def install_ytdlp() -> bool:
     log.info("Attempting to install yt-dlp...")
     try:
         result = subprocess.run(
-            [sys.executable, '-m', 'pip', 'install', 'yt-dlp'],
-            capture_output=True,
-            text=True,
-            timeout=120
+            [sys.executable, "-m", "pip", "install", "yt-dlp"], capture_output=True, text=True, timeout=120
         )
         if result.returncode == 0:
             log.info("yt-dlp installed successfully")
@@ -213,12 +217,7 @@ def install_ytdlp() -> bool:
 def check_ytdlp() -> bool:
     """Check if yt-dlp is installed, auto-install if missing."""
     try:
-        result = subprocess.run(
-            ['yt-dlp', '--version'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
         log.info(f"yt-dlp version: {result.stdout.strip()}")
         return result.returncode == 0
     except FileNotFoundError:
@@ -226,12 +225,7 @@ def check_ytdlp() -> bool:
         if install_ytdlp():
             # Verify installation worked
             try:
-                result = subprocess.run(
-                    ['yt-dlp', '--version'],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
+                result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
                 if result.returncode == 0:
                     log.info(f"yt-dlp now available: {result.stdout.strip()}")
                     return True
@@ -247,37 +241,32 @@ def check_ytdlp() -> bool:
 def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
     """
     Extract metadata using yt-dlp without downloading.
-    
+
     Args:
         url: URL to extract metadata from
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
     """
     cmd = [
-                'yt-dlp',
-                '--dump-json',
-                '--no-download',
-                '--no-playlist',
+        "yt-dlp",
+        "--dump-json",
+        "--no-download",
+        "--no-playlist",
     ]
-    
+
     # Add proxy if provided
     if proxy:
-        cmd.extend(['--proxy', proxy])
+        cmd.extend(["--proxy", proxy])
         log.info(f"✓ Proxy configured for metadata extraction: {proxy}")
     else:
         log.info("ℹ No proxy configured for metadata extraction - using direct connection")
-    
+
     cmd.append(url)
-    
+
     log.info(f"Extracting metadata from: {url}")
     log.info(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
-    
+
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout:
             log.info("✓ Metadata extraction successful")
@@ -307,13 +296,164 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
         return None
 
 
+def is_direct_file_url(url: str) -> bool:
+    """
+    Check if URL is a direct file URL (video/image) that doesn't need yt-dlp.
+
+    These are URLs that point directly to media files and should be downloaded
+    with a simple HTTP request instead of yt-dlp.
+    """
+    # Common video/image extensions
+    direct_extensions = [
+        ".mp4",
+        ".webm",
+        ".mkv",
+        ".avi",
+        ".mov",
+        ".flv",
+        ".wmv",
+        ".m4v",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+    ]
+
+    try:
+        # Parse URL and check path
+        from urllib.parse import urlparse, unquote
+
+        parsed = urlparse(url)
+        path = unquote(parsed.path).lower()
+
+        # Check if path ends with a known extension
+        for ext in direct_extensions:
+            if path.endswith(ext) or f"{ext}?" in path or f"{ext}/" in path:
+                return True
+
+        # Check query parameters for download hints
+        query = parsed.query.lower()
+        if "download=" in query or "download_filename=" in query:
+            return True
+
+    except Exception:
+        pass
+
+    return False
+
+
+def download_direct_file(
+    url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None
+) -> Optional[str]:
+    """
+    Download a direct file URL using requests (no yt-dlp).
+
+    Args:
+        url: Direct file URL to download
+        output_dir: Directory to save the file
+        filename: Optional custom filename (will extract from URL if not provided)
+        proxy: Optional HTTP/HTTPS/SOCKS proxy
+
+    Returns:
+        Path to downloaded file, or None if failed
+    """
+    import requests
+    from urllib.parse import urlparse, unquote, parse_qs
+
+    log.info(f"Direct file download: {url}")
+
+    try:
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Determine filename
+        if not filename:
+            parsed = urlparse(url)
+
+            # Try to get filename from query params (e.g., download_filename=...)
+            query_params = parse_qs(parsed.query)
+            if "download_filename" in query_params:
+                filename = query_params["download_filename"][0]
+            else:
+                # Extract from path
+                path_filename = unquote(parsed.path.split("/")[-1])
+                # Remove query string artifacts
+                if "?" in path_filename:
+                    path_filename = path_filename.split("?")[0]
+                filename = path_filename if path_filename else "downloaded_file"
+
+        # Sanitize filename
+        filename = sanitize_filename(filename)
+
+        # Ensure filename has an extension
+        if "." not in filename:
+            # Try to determine from Content-Type later, default to .mp4
+            filename += ".mp4"
+
+        output_path = os.path.join(output_dir, filename)
+
+        # Configure proxy
+        proxies = None
+        if proxy:
+            log.info(f"Using proxy for direct download: {proxy}")
+            proxies = {
+                "http": proxy,
+                "https": proxy,
+            }
+
+        # Download with streaming
+        log.info(f"Downloading to: {output_path}")
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate",
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            proxies=proxies,
+            stream=True,
+            timeout=300,  # 5 minute timeout
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+
+        # Get content length for progress
+        total_size = int(response.headers.get("content-length", 0))
+        downloaded = 0
+
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        progress = (downloaded / total_size) * 100
+                        if downloaded % (1024 * 1024) < 8192:  # Log every ~1MB
+                            log.info(f"Download progress: {progress:.1f}% ({downloaded}/{total_size} bytes)")
+
+        log.info(f"Direct download complete: {output_path} ({downloaded} bytes)")
+        return output_path
+
+    except requests.exceptions.RequestException as e:
+        log.error(f"Direct download failed (network error): {e}")
+        return None
+    except Exception as e:
+        log.error(f"Direct download failed: {e}", exc_info=True)
+        return None
+
+
 def download_video(
     url: str,
     output_dir: str,
-    filename_template: str = '%(title)s.%(ext)s',
-    quality: str = 'best',
+    filename_template: str = "%(title)s.%(ext)s",
+    quality: str = "best",
     progress_callback: Optional[callable] = None,
-    proxy: Optional[str] = None
+    proxy: Optional[str] = None,
 ) -> Optional[str]:
     """
     Download video using yt-dlp.
@@ -333,28 +473,31 @@ def download_video(
     os.makedirs(output_dir, exist_ok=True)
 
     # Build format string based on quality preference
-    format_str = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
-    if quality == '1080p':
-        format_str = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best'
-    elif quality == '720p':
-        format_str = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best'
-    elif quality == '480p':
-        format_str = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best'
+    format_str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    if quality == "1080p":
+        format_str = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best"
+    elif quality == "720p":
+        format_str = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
+    elif quality == "480p":
+        format_str = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
 
     output_template = os.path.join(output_dir, filename_template)
 
     cmd = [
-        'yt-dlp',
-        '-f', format_str,
-        '-o', output_template,
-        '--no-playlist',
-        '--newline',  # For progress parsing
-        '--print', 'after_move:filepath',  # Print final path
+        "yt-dlp",
+        "-f",
+        format_str,
+        "-o",
+        output_template,
+        "--no-playlist",
+        "--newline",  # For progress parsing
+        "--print",
+        "after_move:filepath",  # Print final path
     ]
-    
+
     # Add proxy if provided (yt-dlp supports http://, https://, socks4://, socks5://)
     if proxy:
-        cmd.extend(['--proxy', proxy])
+        cmd.extend(["--proxy", proxy])
         log.info(f"✓ Proxy configured: {proxy}")
     else:
         log.info("ℹ No proxy configured - using direct connection")
@@ -371,12 +514,12 @@ def download_video(
             cmd,
             capture_output=True,
             text=True,
-            timeout=3600  # 1 hour timeout
+            timeout=3600,  # 1 hour timeout
         )
 
         if result.returncode == 0:
             # Last line of stdout should be the file path
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             file_path = lines[-1] if lines else None
 
             if file_path and os.path.exists(file_path):
@@ -385,7 +528,7 @@ def download_video(
             else:
                 # Try to find the file in output directory
                 log.warning("Could not determine output path, searching directory...")
-                files = list(Path(output_dir).glob('*'))
+                files = list(Path(output_dir).glob("*"))
                 if files:
                     newest = max(files, key=os.path.getmtime)
                     log.info(f"Found downloaded file: {newest}")
@@ -429,14 +572,14 @@ def task_download(args: dict) -> dict:
         Dict with file_path on success, error on failure.
         If result_id is provided, also saves to file for later retrieval.
     """
-    url = args.get('url')
+    url = args.get("url")
     # Default to /data/StashDownloader (configurable via plugin settings)
-    output_dir = args.get('output_dir', '/data/StashDownloader')
-    filename = args.get('filename')
-    quality = args.get('quality', 'best')
-    proxy = args.get('proxy')  # Optional proxy for bypassing restrictions
-    result_id = args.get('result_id')
-    
+    output_dir = args.get("output_dir", "/data/StashDownloader")
+    filename = args.get("filename")
+    quality = args.get("quality", "best")
+    proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
+    result_id = args.get("result_id")
+
     # Log proxy configuration for troubleshooting
     if proxy:
         log.info(f"[task_download] Proxy configured: {proxy}")
@@ -444,43 +587,57 @@ def task_download(args: dict) -> dict:
         log.info("[task_download] No proxy configured - using direct connection")
 
     if not url:
-        result = {'result_error': 'No URL provided', 'success': False}
+        result = {"result_error": "No URL provided", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
 
-    # Check yt-dlp availability
+    # Check if this is a direct file URL (no yt-dlp needed)
+    if is_direct_file_url(url):
+        log.info(f"[task_download] Detected direct file URL, using direct download")
+        file_path = download_direct_file(url, output_dir, filename, proxy=proxy)
+
+        if file_path:
+            file_size = os.path.getsize(file_path)
+            result = {"file_path": file_path, "file_size": file_size, "success": True}
+            if result_id:
+                save_result(result_id, result)
+                log.info(f"Direct download result saved with result_id: {result_id}")
+            return result
+        else:
+            result = {"result_error": "Direct download failed", "success": False}
+            if result_id:
+                save_result(result_id, result)
+            return result
+
+    # Check yt-dlp availability for non-direct URLs
     if not check_ytdlp():
-        result = {'result_error': 'yt-dlp is not installed or not accessible', 'success': False}
+        result = {"result_error": "yt-dlp is not installed or not accessible", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
 
-    # Build filename template
+    # Build filename template for yt-dlp
     if filename:
         # Sanitize custom filename
         safe_name = sanitize_filename(filename)
-        template = f'{safe_name}.%(ext)s'
+        template = f"{safe_name}.%(ext)s"
     else:
-        template = '%(title)s.%(ext)s'
+        template = "%(title)s.%(ext)s"
 
-    # Download (with proxy if provided)
+    # Download using yt-dlp (with proxy if provided)
     file_path = download_video(url, output_dir, template, quality, proxy=proxy)
 
     if file_path:
         file_size = os.path.getsize(file_path)
-        result = {
-            'file_path': file_path,
-            'file_size': file_size,
-            'success': True
-        }
+        result = {"file_path": file_path, "file_size": file_size, "success": True}
         # Save result if result_id provided (for async retrieval)
         if result_id:
             save_result(result_id, result)
             log.info(f"Download result saved with result_id: {result_id}")
         return result
     else:
-        result = {'result_error': 'Download failed', 'success': False}
+        result = {"result_error": "Download failed", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
@@ -499,10 +656,10 @@ def task_extract_metadata(args: dict) -> dict:
         Dict with metadata on success, error on failure.
         If result_id is provided, also saves to file for later retrieval.
     """
-    url = args.get('url')
-    proxy = args.get('proxy')  # Optional proxy for bypassing restrictions
-    result_id = args.get('result_id')
-    
+    url = args.get("url")
+    proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
+    result_id = args.get("result_id")
+
     # Log proxy configuration for troubleshooting
     if proxy:
         log.info(f"[task_extract_metadata] Proxy configured: {proxy}")
@@ -510,13 +667,13 @@ def task_extract_metadata(args: dict) -> dict:
         log.info("[task_extract_metadata] No proxy configured - using direct connection")
 
     if not url:
-        result = {'result_error': 'No URL provided', 'success': False}
+        result = {"result_error": "No URL provided", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
 
     if not check_ytdlp():
-        result = {'result_error': 'yt-dlp is not installed', 'success': False}
+        result = {"result_error": "yt-dlp is not installed", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
@@ -527,70 +684,74 @@ def task_extract_metadata(args: dict) -> dict:
         # Extract all formats with their URLs (important for HLS streams)
         # For HLS, yt-dlp may include URLs in formats or only at top level
         formats_list = []
-        for f in metadata.get('formats', []):
+        for f in metadata.get("formats", []):
             # Include format if it has video characteristics or is explicitly a video format
             # Don't filter too aggressively - include all formats that might be video
             is_video_format = (
-                f.get('height') or  # Has height = likely video
-                (f.get('vcodec') and f.get('vcodec') != 'none') or  # Has video codec
-                (f.get('format_id') and any(keyword in f.get('format_id', '').lower() 
-                                           for keyword in ['hls', 'mp4', 'video', 'dash', 'http']))  # Format ID suggests video
+                f.get("height")  # Has height = likely video
+                or (f.get("vcodec") and f.get("vcodec") != "none")  # Has video codec
+                or (
+                    f.get("format_id")
+                    and any(
+                        keyword in f.get("format_id", "").lower() for keyword in ["hls", "mp4", "video", "dash", "http"]
+                    )
+                )  # Format ID suggests video
             )
-            
+
             if is_video_format:
                 format_data = {
-                    'format_id': f.get('format_id'),
-                    'ext': f.get('ext'),
-                    'height': f.get('height'),
-                    'width': f.get('width'),
-                    'filesize': f.get('filesize'),
-                    'vcodec': f.get('vcodec'),
-                    'acodec': f.get('acodec'),
+                    "format_id": f.get("format_id"),
+                    "ext": f.get("ext"),
+                    "height": f.get("height"),
+                    "width": f.get("width"),
+                    "filesize": f.get("filesize"),
+                    "vcodec": f.get("vcodec"),
+                    "acodec": f.get("acodec"),
                 }
                 # Include URL if available (for HLS, this might be manifest_url or url)
                 # yt-dlp may provide URLs in various fields for HLS streams
-                if f.get('url'):
-                    format_data['url'] = f.get('url')
-                if f.get('manifest_url'):
-                    format_data['manifest_url'] = f.get('manifest_url')
-                if f.get('fragment_base_url'):
-                    format_data['fragment_base_url'] = f.get('fragment_base_url')
+                if f.get("url"):
+                    format_data["url"] = f.get("url")
+                if f.get("manifest_url"):
+                    format_data["manifest_url"] = f.get("manifest_url")
+                if f.get("fragment_base_url"):
+                    format_data["fragment_base_url"] = f.get("fragment_base_url")
                 formats_list.append(format_data)
-        
+
         result = {
-            'success': True,
-            'title': metadata.get('title'),
-            'description': metadata.get('description'),
-            'duration': metadata.get('duration'),
-            'uploader': metadata.get('uploader'),
-            'channel': metadata.get('channel'),  # Channel name (fallback for studio)
-            'upload_date': metadata.get('upload_date'),
-            'thumbnail': metadata.get('thumbnail'),
+            "success": True,
+            "title": metadata.get("title"),
+            "description": metadata.get("description"),
+            "duration": metadata.get("duration"),
+            "uploader": metadata.get("uploader"),
+            "channel": metadata.get("channel"),  # Channel name (fallback for studio)
+            "upload_date": metadata.get("upload_date"),
+            "thumbnail": metadata.get("thumbnail"),
             # Tags and categories (site-specific, may be empty)
-            'tags': metadata.get('tags', []),  # List of tags
-            'categories': metadata.get('categories', []),  # List of categories
+            "tags": metadata.get("tags", []),  # List of tags
+            "categories": metadata.get("categories", []),  # List of categories
             # Performers (site-specific, may be empty)
-            'cast': metadata.get('cast', []),  # List of cast members (Pornhub, etc.)
-            'creators': metadata.get('creators', []),  # List of creators
-            'artist': metadata.get('artist'),  # Artist name (music videos)
+            "cast": metadata.get("cast", []),  # List of cast members (Pornhub, etc.)
+            "creators": metadata.get("creators", []),  # List of creators
+            "artist": metadata.get("artist"),  # Artist name (music videos)
             # Include direct video URL (important for download service)
             # For HLS streams, this is typically the best quality manifest URL
             # yt-dlp's top-level 'url' is usually the best quality available
-            'url': metadata.get('url'),  # Direct video URL from yt-dlp (best quality for HLS)
-            'webpage_url': metadata.get('webpage_url'),  # Original page URL
-            'original_url': metadata.get('original_url'),  # Fallback URL
-            'height': metadata.get('height'),  # Best quality height (if available)
-            'width': metadata.get('width'),  # Best quality width (if available)
-            'formats': formats_list,  # All video formats with URLs
+            "url": metadata.get("url"),  # Direct video URL from yt-dlp (best quality for HLS)
+            "webpage_url": metadata.get("webpage_url"),  # Original page URL
+            "original_url": metadata.get("original_url"),  # Fallback URL
+            "height": metadata.get("height"),  # Best quality height (if available)
+            "width": metadata.get("width"),  # Best quality width (if available)
+            "formats": formats_list,  # All video formats with URLs
         }
-        
+
         log.info(f"Extracted {len(formats_list)} video formats from yt-dlp output")
-        if result.get('url'):
+        if result.get("url"):
             log.info(f"Top-level URL available: {result['url'][:100]}...")
         else:
             log.warning("No top-level URL found in yt-dlp output")
     else:
-        result = {'result_error': 'Failed to extract metadata', 'success': False}
+        result = {"result_error": "Failed to extract metadata", "success": False}
 
     # Save result for async retrieval if result_id provided
     if result_id:
@@ -609,33 +770,25 @@ def task_read_result(args: dict) -> dict:
 
     Returns:
         The saved result data, or error if not found
-        
+
     Note: When using runPluginOperation, Stash treats any top-level 'error' field
     as a GraphQL error. So we wrap errors in 'result_error' instead and always
     return success: true for the read operation itself.
     """
-    result_id = args.get('result_id')
-    
+    result_id = args.get("result_id")
+
     log.info(f"Reading result for result_id: {result_id}")
     log.info(f"Result directory: {RESULT_DIR}")
 
     if not result_id:
         log.error("No result_id provided to read_result")
         # Don't use 'error' field - Stash treats it as GraphQL error
-        return {
-            'success': False,
-            'result_error': 'No result_id provided',
-            'retrieved': False
-        }
+        return {"success": False, "result_error": "No result_id provided", "retrieved": False}
 
     # Check if result directory exists
     if not os.path.exists(RESULT_DIR):
         log.error(f"Result directory does not exist: {RESULT_DIR}")
-        return {
-            'success': False,
-            'result_error': f'Result directory not found: {RESULT_DIR}',
-            'retrieved': False
-        }
+        return {"success": False, "result_error": f"Result directory not found: {RESULT_DIR}", "retrieved": False}
 
     # List all files in result directory for debugging
     try:
@@ -649,36 +802,32 @@ def task_read_result(args: dict) -> dict:
         log.info(f"Successfully loaded result for {result_id}")
         log.info(f"Loaded data keys: {list(data.keys())}")
         log.info(f"Loaded data (first 500 chars): {json.dumps(data, default=str)[:500]}")
-        
+
         # Return the data as-is, but ensure we don't have a top-level 'error' field
         # that Stash will interpret as a GraphQL error
-        result = {**data, 'retrieved': True}
-        
+        result = {**data, "retrieved": True}
+
         # If the saved data has an 'error' field, rename it to 'result_error'
         # to prevent Stash from treating it as a GraphQL error
-        if 'error' in result:
-            result['result_error'] = result.pop('error')
+        if "error" in result:
+            result["result_error"] = result.pop("error")
             log.info(f"Renamed 'error' to 'result_error' to avoid GraphQL error interpretation")
-        
+
         # Ensure we always have a 'success' field for consistency
-        if 'success' not in result:
+        if "success" not in result:
             # If there's a result_error, success should be False, otherwise True
-            result['success'] = 'result_error' not in result
-        
+            result["success"] = "result_error" not in result
+
         log.info(f"Final result keys: {list(result.keys())}")
         log.info(f"Final result (first 500 chars): {json.dumps(result, default=str)[:500]}")
-        
+
         return result
     else:
         log.error(f"Result not found for result_id: {result_id}")
         result_path = get_result_path(result_id)
         log.error(f"Expected result file path: {result_path}")
         log.error(f"File exists: {os.path.exists(result_path)}")
-        return {
-            'success': False,
-            'result_error': f'Result not found for result_id: {result_id}',
-            'retrieved': False
-        }
+        return {"success": False, "result_error": f"Result not found for result_id: {result_id}", "retrieved": False}
 
 
 def task_cleanup_result(args: dict) -> dict:
@@ -691,24 +840,21 @@ def task_cleanup_result(args: dict) -> dict:
     Returns:
         Success status
     """
-    result_id = args.get('result_id')
+    result_id = args.get("result_id")
 
     if not result_id:
-        return {'result_error': 'No result_id provided', 'success': False}
+        return {"result_error": "No result_id provided", "success": False}
 
     if delete_result(result_id):
-        return {'success': True, 'deleted': True}
+        return {"success": True, "deleted": True}
     else:
-        return {'result_error': 'Failed to delete result', 'success': False}
+        return {"result_error": "Failed to delete result", "success": False}
 
 
 def task_check_ytdlp(args: dict) -> dict:
     """Check if yt-dlp is available."""
     available = check_ytdlp()
-    return {
-        'available': available,
-        'success': available
-    }
+    return {"available": available, "success": available}
 
 
 def task_test_proxy(args: dict) -> dict:
@@ -722,66 +868,52 @@ def task_test_proxy(args: dict) -> dict:
     Returns:
         Dict with success status and response info
     """
-    url = args.get('url', 'https://www.google.com')
-    proxy = args.get('proxy')
+    url = args.get("url", "https://www.google.com")
+    proxy = args.get("proxy")
 
     if not proxy:
-        return {'result_error': 'No proxy URL provided', 'success': False}
+        return {"result_error": "No proxy URL provided", "success": False}
 
     log.info(f"Testing proxy {proxy} with URL {url}")
 
     try:
         # Use yt-dlp to test the proxy (it handles SOCKS proxies natively)
         cmd = [
-            'yt-dlp',
-            '--proxy', proxy,
-            '--no-download',
-            '--no-playlist',
-            '--dump-json',
-            '--no-check-certificate',  # Skip SSL verification for proxy
-            url
+            "yt-dlp",
+            "--proxy",
+            proxy,
+            "--no-download",
+            "--no-playlist",
+            "--dump-json",
+            "--no-check-certificate",  # Skip SSL verification for proxy
+            url,
         ]
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         if result.returncode == 0:
             log.info(f"✓ Proxy test successful for {url}")
-            return {
-                'success': True,
-                'url': url,
-                'proxy': proxy,
-                'message': f'Successfully connected through proxy'
-            }
+            return {"success": True, "url": url, "proxy": proxy, "message": f"Successfully connected through proxy"}
         else:
-            error_msg = result.stderr or result.stdout or 'Unknown error'
+            error_msg = result.stderr or result.stdout or "Unknown error"
             log.error(f"Proxy test failed: {error_msg}")
             return {
-                'result_error': f'Proxy connection failed: {error_msg[:200]}',
-                'success': False,
-                'url': url,
-                'proxy': proxy
+                "result_error": f"Proxy connection failed: {error_msg[:200]}",
+                "success": False,
+                "url": url,
+                "proxy": proxy,
             }
     except subprocess.TimeoutExpired:
         log.error("Proxy test timed out")
         return {
-            'result_error': 'Proxy connection timed out after 30 seconds',
-            'success': False,
-            'url': url,
-            'proxy': proxy
+            "result_error": "Proxy connection timed out after 30 seconds",
+            "success": False,
+            "url": url,
+            "proxy": proxy,
         }
     except Exception as e:
         log.error(f"Proxy test error: {e}")
-        return {
-            'result_error': f'Proxy test error: {str(e)}',
-            'success': False,
-            'url': url,
-            'proxy': proxy
-        }
+        return {"result_error": f"Proxy test error: {str(e)}", "success": False, "url": url, "proxy": proxy}
 
 
 def main():
@@ -797,26 +929,26 @@ def main():
         # Using "mode" key matches community plugin patterns (FileMonitor, etc.)
 
         # Check for nested args first (standard Stash format)
-        if 'args' in input_data and isinstance(input_data.get('args'), dict):
-            args = input_data['args']
+        if "args" in input_data and isinstance(input_data.get("args"), dict):
+            args = input_data["args"]
             # Try 'mode' first (community pattern), then 'task' for backwards compat
-            task_name = args.get('mode') or args.get('task', 'download')
+            task_name = args.get("mode") or args.get("task", "download")
         else:
             # Direct format (runPluginOperation or direct call)
             args = input_data
-            task_name = input_data.get('mode') or input_data.get('task', 'download')
+            task_name = input_data.get("mode") or input_data.get("task", "download")
 
         log.info(f"Detected task: {task_name}")
         log.info(f"Arguments: {json.dumps(args, default=str)[:200]}")
 
         # Route to appropriate task handler
         tasks = {
-            'download': task_download,
-            'extract_metadata': task_extract_metadata,
-            'read_result': task_read_result,
-            'cleanup_result': task_cleanup_result,
-            'check_ytdlp': task_check_ytdlp,
-            'test_proxy': task_test_proxy,
+            "download": task_download,
+            "extract_metadata": task_extract_metadata,
+            "read_result": task_read_result,
+            "cleanup_result": task_cleanup_result,
+            "check_ytdlp": task_check_ytdlp,
+            "test_proxy": task_test_proxy,
         }
 
         handler = tasks.get(task_name)
@@ -824,19 +956,16 @@ def main():
             result = handler(args)
         else:
             # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
-            result = {'result_error': f'Unknown task: {task_name}', 'success': False}
+            result = {"result_error": f"Unknown task: {task_name}", "success": False}
 
         write_output(result)
     except Exception as e:
         log.error(f"Unhandled exception in main: {e}", exc_info=True)
         # Use 'result_error' instead of 'error' to prevent Stash from treating it as GraphQL error
-        error_result = {
-            'result_error': f'Internal error: {str(e)}',
-            'success': False
-        }
+        error_result = {"result_error": f"Internal error: {str(e)}", "success": False}
         write_output(error_result)
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
