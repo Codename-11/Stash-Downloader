@@ -195,39 +195,6 @@ export class DownloadService {
     }
   }
 
-  /**
-   * Check if URL is from a domain that requires yt-dlp
-   */
-  private requiresYtDlpDomain(url: string): boolean {
-    // Never use yt-dlp for direct image URLs
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
-    const urlLower = url.toLowerCase();
-    if (imageExtensions.some(ext => urlLower.includes(ext) && (urlLower.endsWith(ext) || urlLower.includes(ext + '?')))) {
-      return false;
-    }
-
-    // Use yt-dlp for known problematic domains
-    const ytDlpDomains = [
-      'youporn.com',
-      'pornhub.com',
-      'xvideos.com',
-      'xhamster.com',
-      'redtube.com',
-      'tube8.com',
-      'spankwire.com',
-      'youjizz.com',
-      'keezmovies.com',
-      'extremetube.com',
-    ];
-
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname.toLowerCase();
-      return ytDlpDomains.some(domain => hostname.includes(domain));
-    } catch {
-      return false;
-    }
-  }
 
   /**
    * Download an image file directly
