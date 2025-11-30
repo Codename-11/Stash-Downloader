@@ -73,8 +73,19 @@ export const QueuePage: React.FC = () => {
             const masked = String(graphqlSettings.httpProxy).replace(/:[^:@]*@/, ':****@');
             debugLog.info(`✓ HTTP/SOCKS proxy: ${masked}`);
           }
-          if (graphqlSettings.serverDownloadPath) {
-            debugLog.debug(`Server download path: ${graphqlSettings.serverDownloadPath}`);
+
+          // Log download path (query Stash library path - the actual destination)
+          try {
+            const libraryPath = await stashService.getVideoLibraryPath();
+            if (libraryPath) {
+              debugLog.info(`✓ Download path (Stash library): ${libraryPath}`);
+            } else if (graphqlSettings.serverDownloadPath) {
+              debugLog.info(`✓ Download path (plugin setting): ${graphqlSettings.serverDownloadPath}`);
+            } else {
+              debugLog.info(`✓ Download path (default): ${DEFAULT_SETTINGS.serverDownloadPath}`);
+            }
+          } catch (pathError) {
+            debugLog.warn('Could not determine download path:', String(pathError));
           }
         } else {
           debugLog.debug('No settings configured in Stash');
