@@ -126,6 +126,12 @@ export class DownloadService {
         return { success: false, error: 'Failed to read download result' };
       }
 
+      // Check for task_error (renamed from result_error/error to avoid GraphQL error interpretation)
+      if (result.task_error) {
+        return { success: false, error: result.task_error };
+      }
+
+      // Legacy check for error field (shouldn't happen with updated Python script)
       if (result.error) {
         return { success: false, error: result.error };
       }

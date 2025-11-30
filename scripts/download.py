@@ -803,20 +803,27 @@ def task_read_result(args: dict) -> dict:
         log.info(f"Loaded data keys: {list(data.keys())}")
         log.info(f"Loaded data (first 500 chars): {json.dumps(data, default=str)[:500]}")
 
-        # Return the data as-is, but ensure we don't have a top-level 'error' field
-        # that Stash will interpret as a GraphQL error
+        # Return the data as-is, but ensure we don't have any field that would
+        # cause write_output to set the 'error' field in PluginOutput
+        # (which Stash interprets as a GraphQL error, returning null)
         result = {**data, "retrieved": True}
 
-        # If the saved data has an 'error' field, rename it to 'result_error'
-        # to prevent Stash from treating it as a GraphQL error
+        # IMPORTANT: Rename 'result_error' to 'task_error' to prevent write_output
+        # from promoting it to PluginOutput.error (which causes GraphQL errors)
+        # The caller should check 'task_error' field instead
+        if "result_error" in result:
+            result["task_error"] = result.pop("result_error")
+            log.info(f"Renamed 'result_error' to 'task_error' to avoid GraphQL error interpretation")
+
+        # Also rename 'error' field if present
         if "error" in result:
-            result["result_error"] = result.pop("error")
-            log.info(f"Renamed 'error' to 'result_error' to avoid GraphQL error interpretation")
+            result["task_error"] = result.pop("error")
+            log.info(f"Renamed 'error' to 'task_error' to avoid GraphQL error interpretation")
 
         # Ensure we always have a 'success' field for consistency
         if "success" not in result:
-            # If there's a result_error, success should be False, otherwise True
-            result["success"] = "result_error" not in result
+            # If there's a task_error, success should be False, otherwise True
+            result["success"] = "task_error" not in result
 
         log.info(f"Final result keys: {list(result.keys())}")
         log.info(f"Final result (first 500 chars): {json.dumps(result, default=str)[:500]}")
