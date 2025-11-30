@@ -58,8 +58,16 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Error handling with actionable messages
    - Preview before finalizing
    - Visual distinction for new vs existing entities (green = new, blue = existing)
+   - **Retry button**: Failed items can be retried without re-adding to queue
+   - **Navbar icon**: Download icon in Stash navbar for quick access
 
-6. **Proxy Support**
+6. **Logging System**
+   - **Activity Log**: UI component showing real-time operation logs
+   - **Log Levels**: Configurable via dropdown (off, error, warning, info, debug)
+   - **Console vs UI**: Debug logs go to browser console only; info/success/warning/error appear in both console and Activity Log
+   - **Per-item logs**: Each queue item tracks its own operation history (viewable via Logs button)
+
+7. **Proxy Support**
    - HTTP/SOCKS proxy support for bypassing geo-restrictions and IP blocks
    - SSL certificate verification automatically disabled when using proxy (handles self-signed certs)
    - Configured via Stash plugin settings

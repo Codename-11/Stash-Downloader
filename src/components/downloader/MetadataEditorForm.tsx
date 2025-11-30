@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { ContentType } from '@/types';
 import { PerformerSelector } from '@/components/common/PerformerSelector';
@@ -17,16 +18,29 @@ import { createLogger } from '@/utils';
 
 const debugLog = createLogger('MetadataEditor');
 
+interface ScraperInfo {
+  name: string;
+  canHandle: boolean;
+  supportsContentType: boolean;
+}
+
 interface MetadataEditorFormProps {
   item: IDownloadItem;
   onSave: (editedMetadata: IDownloadItem['editedMetadata']) => void;
   onCancel: () => void;
+  // Re-scrape props
+  availableScrapers?: ScraperInfo[];
+  onRescrapeClick?: (scraperName: string) => void;
+  isRescraping?: boolean;
 }
 
 export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   item,
   onSave,
   onCancel,
+  availableScrapers,
+  onRescrapeClick,
+  isRescraping,
 }) => {
   const toast = useToast();
   const log = useLog();
@@ -45,6 +59,10 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const rescrapeButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handlePreview = (url: string, type: 'image' | 'video') => {
     setPreviewUrl(url);
@@ -83,6 +101,45 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   }, [item]);
 
   // Note: Auto-match useEffect is defined after handleMatchToStash to avoid hoisting issues
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(target) &&
+        rescrapeButtonRef.current && !rescrapeButtonRef.current.contains(target)
+      ) {
+        setRescrapeDropdownOpen(false);
+      }
+    };
+
+    if (rescrapeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [rescrapeDropdownOpen]);
+
+  // Update dropdown position when opened
+  useEffect(() => {
+    if (rescrapeDropdownOpen && rescrapeButtonRef.current) {
+      const rect = rescrapeButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+  }, [rescrapeDropdownOpen]);
+
+  // Handle re-scrape click
+  const handleRescrapeSelect = (scraperName: string) => {
+    setRescrapeDropdownOpen(false);
+    if (onRescrapeClick) {
+      onRescrapeClick(scraperName);
+    }
+  };
 
   /**
    * Clear all matched metadata (performers, tags, studio)
@@ -404,12 +461,12 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                       ].filter(Boolean).join(', ') || 'None found'}
                     </div>
                   </div>
-                  <div className="d-flex gap-2">
+                  <div className="d-flex gap-2 flex-wrap">
                     <button
                       type="button"
                       className="btn btn-outline-info"
                       onClick={() => handleMatchToStash()}
-                      disabled={isMatching || isScraping}
+                      disabled={isMatching || isScraping || isRescraping}
                     >
                       {isMatching ? (
                         <>
@@ -420,6 +477,68 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                         <>🔗 Re-match</>
                       )}
                     </button>
+                    {/* Re-scrape dropdown */}
+                    {availableScrapers && availableScrapers.length > 0 && onRescrapeClick && (
+                      <div className="position-relative">
+                        <button
+                          ref={rescrapeButtonRef}
+                          type="button"
+                          className="btn btn-outline-warning"
+                          onClick={() => setRescrapeDropdownOpen(!rescrapeDropdownOpen)}
+                          disabled={isMatching || isScraping || isRescraping}
+                          title="Re-scrape metadata with a different scraper"
+                        >
+                          {isRescraping ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                              Scraping...
+                            </>
+                          ) : (
+                            <>🔄 Re-scrape</>
+                          )}
+                        </button>
+                        {rescrapeDropdownOpen && ReactDOM.createPortal(
+                          <div
+                            ref={dropdownRef}
+                            className="dropdown-menu show"
+                            style={{
+                              position: 'fixed',
+                              top: dropdownPosition.top,
+                              left: dropdownPosition.left,
+                              zIndex: 100000,
+                              backgroundColor: '#243340',
+                              border: '1px solid #394b59',
+                              minWidth: '200px',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
+                              Select scraper to compare:
+                            </div>
+                            {availableScrapers.map((scraper) => (
+                              <button
+                                key={scraper.name}
+                                className={`dropdown-item ${!scraper.canHandle ? 'text-muted' : ''}`}
+                                style={{
+                                  color: scraper.canHandle ? '#fff' : '#6c757d',
+                                  backgroundColor: 'transparent',
+                                  padding: '0.5rem 1rem',
+                                }}
+                                onClick={() => handleRescrapeSelect(scraper.name)}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#394b59'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                {scraper.name}
+                                {!scraper.canHandle && <small className="ms-1 text-warning">(may fail)</small>}
+                                {!scraper.supportsContentType && <small className="ms-1 text-warning">(wrong type)</small>}
+                              </button>
+                            ))}
+                          </div>,
+                          document.body
+                        )}
+                      </div>
+                    )}
                     {(performers.length > 0 || tags.length > 0 || studio) && (
                       <button
                         type="button"

@@ -190,7 +190,48 @@ SettingsContext
 ├── settings: PluginSettings
 ├── updateSettings: (partial) => void
 └── resetToDefaults: () => void
+
+LogContext
+├── logs: ILogEntry[]
+├── addLog: (level, category, message, details?) => void
+├── clearLogs: () => void
+└── getLogsByCategory/Level: () => ILogEntry[]
 ```
+
+### Logging Architecture
+
+**Logger Utility (`src/utils/Logger.ts`)**
+- Singleton pattern with scoped loggers per category
+- Connected to LogContext via `useLoggerBridge` hook
+- Log level filtering based on localStorage settings
+
+**Log Level Behavior:**
+| Level | Console | UI LogViewer |
+|-------|---------|--------------|
+| `debug` | ✓ | ✗ (console only for developers) |
+| `info` | ✓ | ✓ |
+| `success` | ✓ | ✓ |
+| `warning` | ✓ | ✓ |
+| `error` | ✓ | ✓ |
+
+**Usage Pattern:**
+```typescript
+import { createLogger } from '@/utils';
+const log = createLogger('MyComponent');
+
+log.debug('Verbose info');     // Console only
+log.info('Operation started'); // Console + UI
+log.success('Done!');          // Console + UI
+log.warn('Potential issue');   // Console + UI
+log.error('Failed');           // Console + UI
+```
+
+**Log Level Priority:**
+- `off` (-1): No logs
+- `error` (0): Errors only
+- `warning` (1): Errors + warnings
+- `info` (2): Default - most messages
+- `debug` (3): Verbose (console only)
 
 ## Styling Architecture
 
@@ -246,17 +287,23 @@ const stashColors = {
 DownloaderPlugin (Route Container)
 ├── URLInputForm
 ├── BatchImport
+├── ServerConfigPanel (proxy/path display)
 ├── QueueStats
+├── QueueToolbar (thumbnails toggle, log level selector)
 ├── DownloadQueue
 │   └── QueueItem (repeat)
-├── LogViewer
-├── EditWorkflowPage (when editing)
+│       ├── Edit button
+│       ├── Logs button (per-item logs)
+│       ├── Retry button (for failed items)
+│       └── Re-scrape dropdown (for pending items)
+├── LogViewer (Activity Log with filters)
+├── EditMetadataModal (when editing)
 │   ├── MetadataEditorForm
 │   │   ├── PerformerSelector
 │   │   ├── TagSelector
 │   │   └── StudioSelector
 │   └── ActionButtons
-└── Modals (InfoModal, ItemLogModal, etc.)
+└── Modals (InfoModal, ItemLogModal, RescrapeModal)
 ```
 
 ### Component Types
