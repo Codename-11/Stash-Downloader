@@ -14,16 +14,33 @@ interface QueueItemProps {
   onEdit?: (id: string) => void;
   onDownload?: (id: string) => void;
   onViewLogs?: (id: string) => void;
-  onRescrape?: (id: string, scraperName: string) => void;
+  onRescrapeClick?: (id: string, scraperName: string) => void;
   availableScrapers?: Array<{ name: string; canHandle: boolean; supportsContentType: boolean }>;
   showThumbnail?: boolean;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, onRescrape, availableScrapers, showThumbnail = true }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, onRescrapeClick, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
   const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setRescrapeDropdownOpen(false);
+      }
+    };
+
+    if (rescrapeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [rescrapeDropdownOpen]);
 
   const handlePreview = (url: string, type: 'image' | 'video') => {
     setPreviewUrl(url);
@@ -385,8 +402,8 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               </button>
             )}
             {/* Re-scrape dropdown */}
-            {onRescrape && availableScrapers && availableScrapers.length > 0 && item.status === DownloadStatus.Pending && (
-              <div className="dropdown" style={{ position: 'relative' }}>
+            {onRescrapeClick && availableScrapers && availableScrapers.length > 0 && item.status === DownloadStatus.Pending && (
+              <div ref={dropdownRef} className="dropup" style={{ position: 'relative' }}>
                 <button
                   className="btn btn-sm btn-outline-info"
                   onClick={() => setRescrapeDropdownOpen(!rescrapeDropdownOpen)}
@@ -399,16 +416,19 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                     className="dropdown-menu show"
                     style={{
                       position: 'absolute',
-                      top: '100%',
+                      bottom: '100%',
                       right: 0,
-                      zIndex: 1000,
+                      top: 'auto',
+                      zIndex: 1050,
                       backgroundColor: '#243340',
                       border: '1px solid #394b59',
-                      minWidth: '180px',
+                      minWidth: '200px',
+                      marginBottom: '4px',
+                      boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.3)',
                     }}
                   >
-                    <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem' }}>
-                      Select scraper:
+                    <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
+                      Select scraper to compare:
                     </div>
                     {availableScrapers.map((scraper) => (
                       <button
@@ -417,17 +437,18 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                         style={{
                           color: scraper.canHandle ? '#fff' : '#6c757d',
                           backgroundColor: 'transparent',
+                          padding: '0.5rem 1rem',
                         }}
                         onClick={() => {
                           setRescrapeDropdownOpen(false);
-                          onRescrape(item.id, scraper.name);
+                          onRescrapeClick(item.id, scraper.name);
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#394b59'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         {scraper.name}
-                        {!scraper.canHandle && <small className="ms-1">(may fail)</small>}
-                        {!scraper.supportsContentType && <small className="ms-1">(wrong type)</small>}
+                        {!scraper.canHandle && <small className="ms-1 text-warning">(may fail)</small>}
+                        {!scraper.supportsContentType && <small className="ms-1 text-warning">(wrong type)</small>}
                       </button>
                     ))}
                   </div>

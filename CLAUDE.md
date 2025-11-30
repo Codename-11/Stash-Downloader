@@ -50,11 +50,14 @@ The plugin registers via `PluginApi.register.route()` and adds navbar link via M
 
 ## Scraper Priority (Stash Environment)
 
-1. **YtDlpScraper** - PRIMARY: Server-side yt-dlp via Python backend (extracts video URLs)
-2. **StashScraper** - DISABLED: Kept in code but `canHandle()` returns false
-3. **GenericScraper** - FALLBACK: URL parsing only (last resort)
+1. **YtDlpScraper** - PRIMARY for Video: Server-side yt-dlp via Python backend (extracts video URLs)
+2. **BooruScraper** - PRIMARY for Image/Gallery: Booru site API scraper (Rule34, Gelbooru, Danbooru)
+3. **StashScraper** - DISABLED: Kept in code but `canHandle()` returns false
+4. **GenericScraper** - FALLBACK: URL parsing only (last resort)
 
 In test-app mode, additional client-side scrapers are enabled (PornhubScraper, YouPornScraper, HTMLScraper).
+
+**Re-scrape**: Users can manually try different scrapers via dropdown menu on queue items.
 
 # Documentation Instructions
 Keep the documentation concise and to the point. Use markdown formatting for the documentation.

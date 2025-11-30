@@ -7,6 +7,24 @@
 import { DownloaderMain } from './components/downloader/DownloaderMain';
 import { ROUTES, PLUGIN_ID } from './constants';
 
+// Import plugin styles as inline string (Stash plugins only load .js files)
+// The ?inline suffix tells Vite to return CSS as a string instead of extracting it
+import pluginStyles from './styles/plugin.css?inline';
+
+// Inject styles into document head
+function injectStyles() {
+  const styleId = 'stash-downloader-styles';
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = pluginStyles;
+  document.head.appendChild(style);
+}
+
+// Inject styles immediately
+injectStyles();
+
 // Ensure PluginApi is available
 if (!window.PluginApi) {
   console.error('PluginApi is not available. This plugin must be loaded within Stash.');

@@ -29,6 +29,7 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Batch download support
    - Progress tracking and queue management
    - Server-side downloads via yt-dlp (bypasses CORS)
+   - **Queue persistence**: Download queue survives navigation and page refresh via localStorage
 
 2. **Metadata Intelligence**
    - Automatic metadata extraction from sources
@@ -36,21 +37,29 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Extracts video URLs, thumbnails, descriptions, etc.
    - Smart matching against existing Stash data
    - Manual override and editing capabilities
+   - **Re-scrape**: Manually try different scrapers via dropdown menu
 
-3. **Stash Integration**
+3. **Content Type Support**
+   - **Video**: Via YtDlpScraper (primary), supports most video sites
+   - **Image**: Via BooruScraper for booru sites (Rule34, Gelbooru, Danbooru)
+   - **Gallery**: Multiple images from a single URL (booru pools, etc.)
+   - Content type selector in URL input form
+
+4. **Stash Integration**
    - GraphQL mutations for scene/image/gallery creation
    - Server-side scraping: `scrapeSceneURL`, `scrapeGalleryURL`
    - Plugin task execution: `runPluginTask`, `runPluginOperation`
    - Performer, tag, and studio association
    - File organization according to Stash library structure
 
-4. **User Experience**
+5. **User Experience**
    - Dark-themed interface matching Stash's UI
    - Real-time progress indicators
    - Error handling with actionable messages
    - Preview before finalizing
+   - Visual distinction for new vs existing entities (green = new, blue = existing)
 
-5. **Dual-Mode Architecture**
+6. **Dual-Mode Architecture**
    - **Production (Stash)**: Server-side scraping/downloading, no CORS issues
    - **Development (test-app)**: Client-side with CORS proxy fallback
    - **Proxy Support**: HTTP/SOCKS proxy support in both modes (for bypassing geo-restrictions, IP blocks)

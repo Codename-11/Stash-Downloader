@@ -31,3 +31,9 @@ declare module '*.webp' {
   const content: string;
   export default content;
 }
+
+// Declare inline CSS imports (Vite ?inline suffix)
+declare module '*.css?inline' {
+  const content: string;
+  export default content;
+}

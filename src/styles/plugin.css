@@ -1,0 +1,418 @@
+/**
+ * Stash Downloader Plugin - Style Enhancements
+ *
+ * These styles enhance Bootstrap 4 (Stash) to look closer to Bootstrap 5,
+ * and provide consistent dark theme styling across both environments.
+ */
+
+/* ==========================================================================
+   CSS Custom Properties (Stash Theme Colors)
+   ========================================================================== */
+
+:root {
+  --stash-card-bg: #30404d;
+  --stash-header-bg: #243340;
+  --stash-input-bg: #243340;
+  --stash-border: #394b59;
+  --stash-muted: #8b9fad;
+  --stash-text: #fff;
+  --stash-hover-bg: #3a4f5f;
+  --stash-focus-ring: rgba(13, 110, 253, 0.25);
+}
+
+/* ==========================================================================
+   Form Controls - Enhanced styling for dark theme
+   ========================================================================== */
+
+/* Text inputs, textareas, selects */
+.form-control.text-light,
+.form-control-dark,
+.stash-downloader .form-control {
+  background-color: var(--stash-input-bg);
+  border-color: var(--stash-border);
+  color: var(--stash-text);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control.text-light:focus,
+.form-control-dark:focus,
+.stash-downloader .form-control:focus {
+  background-color: var(--stash-input-bg);
+  border-color: #0d6efd;
+  color: var(--stash-text);
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
+  outline: none;
+}
+
+.form-control.text-light::placeholder,
+.form-control-dark::placeholder,
+.stash-downloader .form-control::placeholder {
+  color: var(--stash-muted);
+  opacity: 0.7;
+}
+
+/* Select dropdowns */
+.form-select.text-light,
+.stash-downloader .form-select {
+  background-color: var(--stash-input-bg);
+  border-color: var(--stash-border);
+  color: var(--stash-text);
+}
+
+.form-select.text-light:focus,
+.stash-downloader .form-select:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
+}
+
+/* ==========================================================================
+   Buttons - Improved hover states and transitions
+   ========================================================================== */
+
+.stash-downloader .btn {
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+              border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Outline button improvements */
+.btn-outline-light:hover,
+.btn-outline-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-outline-info:hover {
+  background-color: rgba(13, 202, 240, 0.15);
+}
+
+.btn-outline-success:hover {
+  background-color: rgba(25, 135, 84, 0.15);
+}
+
+.btn-outline-danger:hover {
+  background-color: rgba(220, 53, 69, 0.15);
+}
+
+.btn-outline-warning:hover {
+  background-color: rgba(255, 193, 7, 0.15);
+}
+
+/* Small button refinements */
+.btn-sm {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+/* ==========================================================================
+   Cards - Dark theme card styling
+   ========================================================================== */
+
+.stash-downloader .card,
+.card.bg-dark {
+  background-color: var(--stash-card-bg);
+  border-color: var(--stash-border);
+}
+
+.stash-downloader .card-header,
+.card.bg-dark .card-header {
+  background-color: var(--stash-header-bg);
+  border-color: var(--stash-border);
+}
+
+.stash-downloader .card-footer,
+.card.bg-dark .card-footer {
+  background-color: var(--stash-header-bg);
+  border-color: var(--stash-border);
+}
+
+/* ==========================================================================
+   Modals - Dark theme modal styling
+   ========================================================================== */
+
+.modal-content.bg-dark {
+  background-color: var(--stash-card-bg) !important;
+  border-color: var(--stash-border);
+}
+
+.modal-content.bg-dark .modal-header {
+  background-color: var(--stash-header-bg);
+  border-color: var(--stash-border);
+}
+
+.modal-content.bg-dark .modal-footer {
+  background-color: var(--stash-header-bg);
+  border-color: var(--stash-border);
+}
+
+.modal-content.bg-dark .modal-body {
+  background-color: var(--stash-card-bg);
+}
+
+/* ==========================================================================
+   Dropdown Menus - Dark theme dropdowns
+   ========================================================================== */
+
+.dropdown-menu.show,
+.dropup .dropdown-menu.show {
+  background-color: var(--stash-header-bg);
+  border-color: var(--stash-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-item {
+  color: var(--stash-text);
+  transition: background-color 0.15s ease;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--stash-hover-bg);
+  color: var(--stash-text);
+}
+
+.dropdown-item.text-muted {
+  color: var(--stash-muted) !important;
+}
+
+.dropdown-header {
+  color: var(--stash-muted);
+}
+
+.dropdown-divider {
+  border-color: var(--stash-border);
+}
+
+/* ==========================================================================
+   Alerts - Improved alert styling
+   ========================================================================== */
+
+.alert {
+  border-radius: 0.375rem;
+}
+
+.alert-info {
+  background-color: rgba(13, 202, 240, 0.15);
+  border-color: rgba(13, 202, 240, 0.3);
+  color: #6edff6;
+}
+
+.alert-success {
+  background-color: rgba(25, 135, 84, 0.15);
+  border-color: rgba(25, 135, 84, 0.3);
+  color: #75b798;
+}
+
+.alert-warning {
+  background-color: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.3);
+  color: #ffda6a;
+}
+
+.alert-danger {
+  background-color: rgba(220, 53, 69, 0.15);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #ea868f;
+}
+
+/* ==========================================================================
+   Badges - Consistent badge styling
+   ========================================================================== */
+
+.badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  border-radius: 0.375rem;
+}
+
+.badge.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+/* ==========================================================================
+   Progress Bars
+   ========================================================================== */
+
+.progress {
+  background-color: var(--stash-input-bg);
+  border-radius: 0.375rem;
+  height: 0.5rem;
+}
+
+.progress-bar {
+  border-radius: 0.375rem;
+  transition: width 0.3s ease;
+}
+
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
+.table-dark {
+  background-color: var(--stash-card-bg);
+}
+
+.table-dark th,
+.table-dark td {
+  border-color: var(--stash-border);
+}
+
+/* ==========================================================================
+   Accordion - Dark theme accordion
+   ========================================================================== */
+
+.accordion-item.bg-dark {
+  background-color: var(--stash-card-bg);
+  border-color: var(--stash-border);
+}
+
+.accordion-button.bg-dark {
+  background-color: var(--stash-header-bg);
+  color: var(--stash-text);
+}
+
+.accordion-button.bg-dark:not(.collapsed) {
+  background-color: var(--stash-header-bg);
+  color: var(--stash-text);
+}
+
+.accordion-button.bg-dark::after {
+  filter: invert(1);
+}
+
+.accordion-body {
+  background-color: var(--stash-card-bg);
+}
+
+/* ==========================================================================
+   Scrollbar Styling (WebKit browsers)
+   ========================================================================== */
+
+.stash-downloader ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.stash-downloader ::-webkit-scrollbar-track {
+  background: var(--stash-input-bg);
+  border-radius: 4px;
+}
+
+.stash-downloader ::-webkit-scrollbar-thumb {
+  background: var(--stash-border);
+  border-radius: 4px;
+}
+
+.stash-downloader ::-webkit-scrollbar-thumb:hover {
+  background: var(--stash-muted);
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+/* Gap utilities for Bootstrap 4 (BS5 has these built-in) */
+.gap-1 { gap: 0.25rem !important; }
+.gap-2 { gap: 0.5rem !important; }
+.gap-3 { gap: 1rem !important; }
+.gap-4 { gap: 1.5rem !important; }
+.gap-5 { gap: 3rem !important; }
+
+/* Text truncation */
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Queue Item Specific Styles
+   ========================================================================== */
+
+.queue-item {
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.queue-item:hover {
+  border-color: var(--stash-muted);
+}
+
+.queue-item-header {
+  background-color: var(--stash-header-bg);
+  border-bottom: 1px solid var(--stash-border);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+
+/* ==========================================================================
+   Thumbnail Styling
+   ========================================================================== */
+
+.thumbnail-container {
+  background-color: var(--stash-input-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.thumbnail-container img {
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.thumbnail-container:hover img {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   Spinner Enhancements
+   ========================================================================== */
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* ==========================================================================
+   Link Styling
+   ========================================================================== */
+
+a.text-info:hover {
+  color: #6edff6 !important;
+}
+
+a.text-light:hover {
+  color: #f8f9fa !important;
+}
+
+/* ==========================================================================
+   Focus States - Accessibility
+   ========================================================================== */
+
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
+}
+
+/* Remove default focus outline in favor of box-shadow */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}

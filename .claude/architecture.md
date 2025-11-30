@@ -94,10 +94,13 @@ query GetPluginSettings($include: [ID!]) {
 
 **MetadataService (ScraperRegistry)**
 - Pluggable scraper architecture with priority ordering
+- **ContentType support**: Scrapers declare supported content types (Video, Image, Gallery)
 - **YtDlpScraper**: PRIMARY - Server-side yt-dlp via Python backend (extracts video URLs)
+- **BooruScraper**: Image/gallery scraper for booru sites (Rule34, Gelbooru, Danbooru)
 - **StashScraper**: DISABLED - `canHandle()` returns false (kept in code for potential future use)
 - **GenericScraper**: FALLBACK - URL parsing only (last resort)
 - In test-app mode: PornhubScraper, YouPornScraper, HTMLScraper also enabled
+- **Re-scrape support**: `getAvailableScrapersForUrl()` and `scrapeWithScraper()` for manual scraper selection
 - Common `IScrapedMetadata` interface
 
 **Python Backend (scripts/download.py)**
@@ -172,6 +175,7 @@ Component Re-render
 4. **Persistent State** (localStorage)
    - User preferences (download paths, auto-tag rules)
    - UI preferences (layout)
+   - **Download queue**: Survives navigation and page refresh
    - Fallback to defaults if unavailable
 
 ### Context Structure
@@ -309,6 +313,7 @@ async createScene(data: SceneCreateInput): Promise<Scene> {
 interface IMetadataScraper {
   name: string;
   supportedDomains: string[];
+  contentTypes: ContentType[];  // Video, Image, Gallery
   canHandle(url: string): boolean;
   scrape(url: string): Promise<IScrapedMetadata>;
 }
@@ -317,7 +322,8 @@ interface IMetadataScraper {
 class ScraperRegistry {
   constructor() {
     // Always registered (both Stash and test-app)
-    this.register(new YtDlpScraper());    // PRIMARY: Extracts video URLs via yt-dlp
+    this.register(new YtDlpScraper());    // PRIMARY: Video via yt-dlp
+    this.register(new BooruScraper());    // Image/Gallery for booru sites
     this.register(new StashScraper());    // FALLBACK: Server-side Stash scraper
 
     // Test-app only (require CORS proxy)
@@ -328,30 +334,41 @@ class ScraperRegistry {
     }
     // GenericScraper is always fallback (last resort)
   }
+
+  // Get available scrapers for manual re-scrape
+  getAvailableScrapersForUrl(url: string, contentType?: ContentType): ScraperInfo[];
+
+  // Scrape with specific scraper (for re-scrape feature)
+  async scrapeWithScraper(url: string, scraperName: string): Promise<IScrapedMetadata>;
 }
 ```
 
 ### Scraper Fallback Chain
 
 **Stash Environment (server-side, no CORS issues):**
-1. **YtDlpScraper** - PRIMARY: Server-side yt-dlp via Python backend
+1. **YtDlpScraper** - PRIMARY for Video: Server-side yt-dlp via Python backend
    - Uses `runPluginTask` to extract metadata (saves to temp file)
    - Uses `runPluginOperation` to read result from temp file
    - Supports HTTP/SOCKS proxy via `httpProxy` setting (passed to yt-dlp via `--proxy` flag)
    - Extracts best quality video URL from formats array or top-level URL
-2. **StashScraper** - FALLBACK: Uses Stash's built-in scraper API
-3. **GenericScraper** - LAST RESORT: Extracts filename from URL
+2. **BooruScraper** - PRIMARY for Image/Gallery: Booru site API scraper
+   - Supports Rule34, Gelbooru, Danbooru, and other booru sites
+   - Extracts tags, source URLs, and high-resolution images
+   - Parses booru tag categories (artist, character, copyright, general)
+3. **StashScraper** - FALLBACK: Uses Stash's built-in scraper API
+4. **GenericScraper** - LAST RESORT: Extracts filename from URL
 
 **Test-app Environment (client-side, requires CORS proxy):**
 1. **YtDlpScraper** - via CORS proxy's `/api/extract` endpoint
-2. **StashScraper** - via CORS proxy (if Stash API accessible)
-3. **PornhubScraper** - Site-specific HTML parsing
-4. **YouPornScraper** - Site-specific HTML parsing
-5. **HTMLScraper** - Generic Open Graph meta tag extraction
+2. **BooruScraper** - Booru site API scraper (via CORS proxy)
+3. **StashScraper** - via CORS proxy (if Stash API accessible)
+4. **PornhubScraper** - Site-specific HTML parsing
+5. **YouPornScraper** - Site-specific HTML parsing
+6. **HTMLScraper** - Generic Open Graph meta tag extraction
    - Extracts `imageUrl` from `og:image` (works for images)
    - Extracts `videoUrl` from `og:video` (rarely available on video sites)
    - Main value: metadata (title, description, thumbnail)
-6. **GenericScraper** - LAST RESORT: Extracts filename from URL
+7. **GenericScraper** - LAST RESORT: Extracts filename from URL
 
 If a scraper throws an error, the registry tries the next one.
 

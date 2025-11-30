@@ -15,3 +15,4 @@ export * from './InfoModal';
 export * from './ItemLogModal';
 export * from './ImagePreviewModal';
 export { MediaPreviewModal } from './ImagePreviewModal';
+export * from './RescrapeModal';

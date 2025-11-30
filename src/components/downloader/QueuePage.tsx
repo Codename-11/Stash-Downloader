@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
+import { RescrapeModal } from '@/components/common/RescrapeModal';
 import { URLInputForm, type ContentTypeOption } from './URLInputForm';
 import { QueueItem } from './QueueItem';
 import { BatchImport } from './BatchImport';
@@ -17,7 +18,7 @@ import { getScraperRegistry } from '@/services/metadata';
 import { getDownloadService, getBrowserDownloadService } from '@/services/download';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { DownloadStatus, ContentType } from '@/types';
-import type { IDownloadItem } from '@/types';
+import type { IDownloadItem, IScrapedMetadata } from '@/types';
 import { checkYtDlpAvailable } from '@/utils/systemCheck';
 import { formatDownloadError } from '@/utils/helpers';
 import { useSettings } from '@/hooks';
@@ -43,6 +44,13 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   const [urlFieldValue, setUrlFieldValue] = useState('');
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
+
+  // Re-scrape modal state
+  const [rescrapeItem, setRescrapeItem] = useState<IDownloadItem | null>(null);
+  const [rescrapeScraperName, setRescrapeScraperName] = useState('');
+  const [rescrapeNewMetadata, setRescrapeNewMetadata] = useState<IScrapedMetadata | undefined>(undefined);
+  const [rescrapeLoading, setRescrapeLoading] = useState(false);
+  const [rescrapeError, setRescrapeError] = useState<string | undefined>(undefined);
 
   // Get proxy info for display
   const httpProxy = settings.httpProxy;
@@ -458,6 +466,53 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
     }
   };
 
+  // Handle re-scrape click - opens the modal and starts scraping
+  const handleRescrapeClick = async (itemId: string, scraperName: string) => {
+    const item = queue.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    // Reset modal state and open it
+    setRescrapeItem(item);
+    setRescrapeScraperName(scraperName);
+    setRescrapeNewMetadata(undefined);
+    setRescrapeError(undefined);
+    setRescrapeLoading(true);
+
+    log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${item.url}`);
+
+    try {
+      const metadata = await scraperRegistry.scrapeWithScraper(item.url, scraperName);
+      setRescrapeNewMetadata(metadata);
+      setRescrapeLoading(false);
+      log.addLog('success', 'scrape', `Re-scrape with ${scraperName} completed: ${metadata.title || item.url}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      setRescrapeError(errorMsg);
+      setRescrapeLoading(false);
+      log.addLog('error', 'scrape', `Re-scrape failed with ${scraperName}: ${errorMsg}`);
+    }
+  };
+
+  // Handle applying merged metadata from re-scrape modal
+  const handleRescrapeApply = (mergedMetadata: IScrapedMetadata) => {
+    if (!rescrapeItem) return;
+
+    queue.updateItem(rescrapeItem.id, { metadata: mergedMetadata, error: undefined });
+    toast.showToast('success', 'Metadata Updated', `Applied merged metadata from ${rescrapeScraperName}`);
+    log.addLog('success', 'scrape', `Applied merged metadata for: ${mergedMetadata.title || rescrapeItem.url}`);
+
+    // Close modal
+    setRescrapeItem(null);
+  };
+
+  // Handle closing the re-scrape modal
+  const handleRescrapeClose = () => {
+    setRescrapeItem(null);
+    setRescrapeNewMetadata(undefined);
+    setRescrapeError(undefined);
+    setRescrapeLoading(false);
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       {/* Header - only shown in test mode, Stash provides its own header */}
@@ -690,25 +745,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                       setViewingLogsForItem(itemToView);
                     }
                   }}
-                  onRescrape={async (id, scraperName) => {
-                    const itemToRescrape = queue.items.find((i) => i.id === id);
-                    if (!itemToRescrape) return;
-
-                    log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${itemToRescrape.url}`);
-                    toast.showToast('info', 'Re-scraping', `Trying ${scraperName}...`);
-
-                    try {
-                      const metadata = await scraperRegistry.scrapeWithScraper(itemToRescrape.url, scraperName);
-                      queue.updateItem(id, { metadata, error: undefined });
-                      log.addLog('success', 'scrape', `Re-scrape successful with ${scraperName}: ${metadata.title || itemToRescrape.url}`);
-                      toast.showToast('success', 'Re-scrape Complete', `${scraperName} extracted: ${metadata.title || 'metadata'}`);
-                    } catch (error) {
-                      const errorMsg = error instanceof Error ? error.message : String(error);
-                      log.addLog('error', 'scrape', `Re-scrape failed with ${scraperName}: ${errorMsg}`);
-                      toast.showToast('error', 'Re-scrape Failed', errorMsg);
-                      queue.updateItem(id, { error: `${scraperName} failed: ${errorMsg}` });
-                    }
-                  }}
+                  onRescrapeClick={handleRescrapeClick}
                   availableScrapers={scraperRegistry.getAvailableScrapersForUrl(item.url, item.metadata?.contentType)}
                   showThumbnail={settings.showThumbnailPreviews}
                 />
@@ -789,6 +826,18 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
         onClose={() => setViewingLogsForItem(null)}
         title={viewingLogsForItem?.metadata?.title || viewingLogsForItem?.url || ''}
         logs={viewingLogsForItem?.logs || []}
+      />
+
+      {/* Re-scrape Comparison Modal */}
+      <RescrapeModal
+        open={!!rescrapeItem}
+        onClose={handleRescrapeClose}
+        originalMetadata={rescrapeItem?.metadata}
+        newMetadata={rescrapeNewMetadata}
+        scraperName={rescrapeScraperName}
+        onApply={handleRescrapeApply}
+        isLoading={rescrapeLoading}
+        error={rescrapeError}
       />
     </div>
   );
