@@ -102,6 +102,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       }, 100);
       return () => clearTimeout(timer);
     }
+    
+    return undefined;
   }, [item.metadata, item.editedMetadata, hasAutoMatched]);
 
   /**

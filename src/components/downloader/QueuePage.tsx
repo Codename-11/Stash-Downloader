@@ -677,7 +677,6 @@ export const QueuePage: React.FC = () => {
                       setEditingItem(itemToEdit);
                     }
                   }}
-                  onDownload={handleDirectDownload}
                   onViewLogs={(id) => {
                     // Find item and open logs modal
                     const itemToView = queue.items.find((i) => i.id === id);
