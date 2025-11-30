@@ -5,7 +5,9 @@
 import React, { useState } from 'react';
 import type { IStashStudio } from '@/types';
 import { useStashData } from '@/hooks';
-import { debounce } from '@/utils';
+import { debounce, createLogger } from '@/utils';
+
+const log = createLogger('StudioSelector');
 
 interface StudioSelectorProps {
   selectedStudio: IStashStudio | null;
@@ -37,7 +39,7 @@ export const StudioSelector: React.FC<StudioSelectorProps> = ({
         setOptions(studio ? [studio] : []);
         setShowDropdown(!!studio);
       } catch (error) {
-        console.error('Search error:', error);
+        log.error('Search error:', error instanceof Error ? error.message : String(error));
         setOptions([]);
         setShowDropdown(false);
       } finally {

@@ -13,6 +13,9 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { useSettings } from '@/hooks';
 import { getScraperRegistry, getMetadataMatchingService } from '@/services/metadata';
+import { createLogger } from '@/utils';
+
+const debugLog = createLogger('MetadataEditor');
 
 interface MetadataEditorFormProps {
   item: IDownloadItem;
@@ -49,6 +52,9 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     setPreviewOpen(true);
   };
 
+  // Track if auto-match has been triggered
+  const [hasAutoMatched, setHasAutoMatched] = useState(false);
+
   // Initialize with scraped metadata
   useEffect(() => {
     if (item.metadata) {
@@ -75,6 +81,38 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       }
     }
   }, [item]);
+
+  // Auto-trigger "Match to Stash" when opening the form (if metadata has entities)
+  useEffect(() => {
+    // Skip if already matched, no metadata, or already have edited data
+    if (hasAutoMatched || !item.metadata || item.editedMetadata) {
+      return;
+    }
+
+    // Only auto-match if there are entities to match
+    const hasEntities = (item.metadata.performers?.length ?? 0) > 0 ||
+                       (item.metadata.tags?.length ?? 0) > 0 ||
+                       !!item.metadata.studio;
+
+    if (hasEntities) {
+      setHasAutoMatched(true);
+      // Small delay to let the UI render first
+      const timer = setTimeout(() => {
+        handleMatchToStash();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [item.metadata, item.editedMetadata, hasAutoMatched]);
+
+  /**
+   * Clear all matched metadata (performers, tags, studio)
+   */
+  const handleClearAllMatched = () => {
+    setPerformers([]);
+    setTags([]);
+    setStudio(null);
+    toast.showToast('info', 'Cleared', 'All matched entities have been cleared');
+  };
 
   const handleScrapeMetadata = async () => {
     setIsScraping(true);
@@ -219,7 +257,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                         const corsProxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
                         if (corsProxyEnabled) {
                           const proxiedUrl = `${corsProxyUrl}/${originalSrc}`;
-                          console.log('[MetadataEditor] Thumbnail failed, trying CORS proxy:', proxiedUrl);
+                          debugLog.debug(`Thumbnail failed, trying CORS proxy: ${proxiedUrl}`);
                           img.src = proxiedUrl;
                         }
                       }
@@ -329,21 +367,33 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                       ].filter(Boolean).join(', ') || 'None found'}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline-info"
-                    onClick={handleMatchToStash}
-                    disabled={isMatching || isScraping}
-                  >
-                    {isMatching ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                        Matching...
-                      </>
-                    ) : (
-                      <>🔗 Match to Stash</>
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-outline-info"
+                      onClick={handleMatchToStash}
+                      disabled={isMatching || isScraping}
+                    >
+                      {isMatching ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                          Matching...
+                        </>
+                      ) : (
+                        <>🔗 Re-match</>
+                      )}
+                    </button>
+                    {(performers.length > 0 || tags.length > 0 || studio) && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger"
+                        onClick={handleClearAllMatched}
+                        title="Clear all matched performers, tags, and studio"
+                      >
+                        🗑️ Clear All
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
                 {matchError && (
                   <div className="text-danger small">
@@ -351,8 +401,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   </div>
                 )}
                 <div className="text-muted small">
-                  Click "Match to Stash" to find existing performers, tags, and studios in your Stash database.
-                  Unmatched names will be shown as "new" and can be created during import.
+                  Entities are auto-matched when you open this form.
+                  Use "Re-match" to refresh or "Clear All" to remove all matched entities.
                 </div>
               </div>
             )}
@@ -431,16 +481,55 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             </div>
 
             {/* Performers */}
-            <PerformerSelector
-              selectedPerformers={performers}
-              onChange={setPerformers}
-            />
+            <div className="position-relative">
+              {performers.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-danger position-absolute"
+                  style={{ top: 0, right: 0, zIndex: 1 }}
+                  onClick={() => setPerformers([])}
+                  title="Clear all performers"
+                >
+                  Clear
+                </button>
+              )}
+              <PerformerSelector
+                selectedPerformers={performers}
+                onChange={setPerformers}
+              />
+            </div>
 
             {/* Tags */}
-            <TagSelector selectedTags={tags} onChange={setTags} />
+            <div className="position-relative">
+              {tags.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-danger position-absolute"
+                  style={{ top: 0, right: 0, zIndex: 1 }}
+                  onClick={() => setTags([])}
+                  title="Clear all tags"
+                >
+                  Clear
+                </button>
+              )}
+              <TagSelector selectedTags={tags} onChange={setTags} />
+            </div>
 
             {/* Studio */}
-            <StudioSelector selectedStudio={studio} onChange={setStudio} />
+            <div className="position-relative">
+              {studio && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-danger position-absolute"
+                  style={{ top: 0, right: 0, zIndex: 1 }}
+                  onClick={() => setStudio(null)}
+                  title="Clear studio"
+                >
+                  Clear
+                </button>
+              )}
+              <StudioSelector selectedStudio={studio} onChange={setStudio} />
+            </div>
 
             {/* Actions */}
             <div className="d-flex gap-2">

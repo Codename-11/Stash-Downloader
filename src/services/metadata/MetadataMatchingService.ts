@@ -4,6 +4,9 @@
 
 import type { IScrapedMetadata, IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { getStashService } from '@/services/stash/StashGraphQLService';
+import { createLogger } from '@/utils';
+
+const log = createLogger('MetadataMatching');
 
 /**
  * Result of matching scraped metadata against Stash database
@@ -93,14 +96,14 @@ export class MetadataMatchingService {
 
     // Match performers
     if (metadata.performers && metadata.performers.length > 0) {
-      console.log('[MetadataMatching] Matching performers:', metadata.performers);
+      log.debug('Matching performers:', JSON.stringify(metadata.performers));
       for (const performerName of metadata.performers) {
         const matched = await this.findPerformerByName(performerName);
         if (matched) {
-          console.log('[MetadataMatching] Matched performer:', performerName, '→', matched.name);
+          log.debug(`Matched performer: ${performerName} → ${matched.name}`);
           result.matchedPerformers.push(matched);
         } else {
-          console.log('[MetadataMatching] Unmatched performer:', performerName);
+          log.debug('Unmatched performer:', performerName);
           result.unmatchedPerformers.push(performerName);
         }
       }
@@ -108,14 +111,14 @@ export class MetadataMatchingService {
 
     // Match tags
     if (metadata.tags && metadata.tags.length > 0) {
-      console.log('[MetadataMatching] Matching tags:', metadata.tags);
+      log.debug('Matching tags:', JSON.stringify(metadata.tags));
       for (const tagName of metadata.tags) {
         const matched = await this.findTagByName(tagName);
         if (matched) {
-          console.log('[MetadataMatching] Matched tag:', tagName, '→', matched.name);
+          log.debug(`Matched tag: ${tagName} → ${matched.name}`);
           result.matchedTags.push(matched);
         } else {
-          console.log('[MetadataMatching] Unmatched tag:', tagName);
+          log.debug('Unmatched tag:', tagName);
           result.unmatchedTags.push(tagName);
         }
       }
@@ -123,25 +126,25 @@ export class MetadataMatchingService {
 
     // Match studio
     if (metadata.studio) {
-      console.log('[MetadataMatching] Matching studio:', metadata.studio);
+      log.debug('Matching studio:', metadata.studio);
       const matched = await this.findStudioByName(metadata.studio);
       if (matched) {
-        console.log('[MetadataMatching] Matched studio:', metadata.studio, '→', matched.name);
+        log.debug(`Matched studio: ${metadata.studio} → ${matched.name}`);
         result.matchedStudio = matched;
       } else {
-        console.log('[MetadataMatching] Unmatched studio:', metadata.studio);
+        log.debug('Unmatched studio:', metadata.studio);
         result.unmatchedStudio = metadata.studio;
       }
     }
 
-    console.log('[MetadataMatching] Match results:', {
+    log.debug('Match results:', JSON.stringify({
       matchedPerformers: result.matchedPerformers.length,
       matchedTags: result.matchedTags.length,
       matchedStudio: result.matchedStudio?.name,
       unmatchedPerformers: result.unmatchedPerformers.length,
       unmatchedTags: result.unmatchedTags.length,
       unmatchedStudio: result.unmatchedStudio,
-    });
+    }));
 
     return result;
   }
@@ -161,7 +164,7 @@ export class MetadataMatchingService {
       const match = findMatchingPerformer(name, performers);
       return match;
     } catch (error) {
-      console.error('[MetadataMatching] Error finding performer:', name, error);
+      log.error('Error finding performer:', `${name} - ${String(error)}`);
       return undefined;
     }
   }
@@ -181,7 +184,7 @@ export class MetadataMatchingService {
       const match = findMatchingTag(name, tags);
       return match;
     } catch (error) {
-      console.error('[MetadataMatching] Error finding tag:', name, error);
+      log.error('Error finding tag:', `${name} - ${String(error)}`);
       return undefined;
     }
   }
@@ -202,7 +205,7 @@ export class MetadataMatchingService {
       // We could enhance StashGraphQLService to support fuzzy studio matching
       return undefined;
     } catch (error) {
-      console.error('[MetadataMatching] Error finding studio:', name, error);
+      log.error('Error finding studio:', `${name} - ${String(error)}`);
       return undefined;
     }
   }

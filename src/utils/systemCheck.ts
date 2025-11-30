@@ -3,6 +3,10 @@
  * Utilities for checking system dependencies and capabilities
  */
 
+import { createLogger } from './Logger';
+
+const log = createLogger('ProxyTest');
+
 /**
  * Test HTTP/SOCKS proxy connectivity via server-side yt-dlp
  * @param proxyUrl Proxy URL to test (e.g., socks5://user:pass@host:port)
@@ -41,13 +45,13 @@ export async function testHttpProxy(
     const resultId = `proxy-test-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const masked = sanitized.replace(/:[^:@]*@/, ':****@');
 
-    console.log('[Proxy Test] Testing HTTP proxy via server-side yt-dlp...');
+    log.info('Testing HTTP proxy via server-side yt-dlp...');
 
     // Try each test URL until one succeeds
     let lastError: string | undefined;
     for (const testUrl of testUrls) {
       try {
-        console.log(`[Proxy Test] Trying test URL: ${testUrl}`);
+        log.info(`Trying test URL: ${testUrl}`);
 
         // Run extract_metadata task with proxy
         const taskResult = await stashService.runPluginTaskAndWait(
@@ -93,7 +97,7 @@ export async function testHttpProxy(
         }
       } catch (urlError) {
         lastError = urlError instanceof Error ? urlError.message : String(urlError);
-        console.log(`[Proxy Test] Test URL ${testUrl} failed:`, lastError);
+        log.info(`Test URL ${testUrl} failed: ${lastError}`);
         continue;
       }
     }
@@ -106,7 +110,7 @@ export async function testHttpProxy(
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('[Proxy Test] Server-side test error:', error);
+    log.error('Server-side test error:', error instanceof Error ? error.message : String(error));
     return {
       success: false,
       message: 'Proxy test error',

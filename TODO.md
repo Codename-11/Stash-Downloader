@@ -5,16 +5,7 @@
 
 ## In Progress
 
-### Logger Migration
-- [ ] Migrate remaining `console.*` calls to use `createLogger()` pattern
-  - ~200 calls across 20 files need migration
-  - Infrastructure complete: `Logger.ts`, `useLoggerBridge`, log level UI
-  - Pattern: `import { createLogger } from '@/utils'; const log = createLogger('Category');`
-  - Files with most calls:
-    - `src/services/download/DownloadService.ts` (40 calls) - partially done
-    - `src/services/stash/StashGraphQLService.ts` (37 calls)
-    - `src/services/metadata/YtDlpScraper.ts` (36 calls)
-    - `src/components/downloader/QueuePage.tsx` (25 calls)
+(None currently)
 
 ## Backlog
 
@@ -40,6 +31,7 @@
 
 ## Completed
 
+- [x] Logger migration: All `console.*` calls migrated to `createLogger()` pattern (20 files)
 - [x] Remove test-app infrastructure (standalone testing environment)
 - [x] Add `npm run build:stash` script for easy plugin packaging
 - [x] BooruScraper for image booru sites (Rule34, Gelbooru, Danbooru)
@@ -55,3 +47,7 @@
 - [x] Entity creation (performers, tags, studios)
 - [x] Duplicate URL detection in queue
 - [x] Persist download queue to localStorage
+- [x] Remove download button from queue items (users must open edit modal)
+- [x] Auto-trigger metadata matching when opening edit modal
+- [x] Add clear button to each metadata section (Performers, Tags, Studio)
+- [x] Add clear all button for matched metadata

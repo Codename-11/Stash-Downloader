@@ -5,8 +5,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
 import { DownloadStatus } from '@/types';
-import { generateId } from '@/utils';
+import { generateId, createLogger } from '@/utils';
 import { STORAGE_KEYS } from '@/constants';
+
+const log = createLogger('DownloadQueue');
 
 /**
  * Serializes queue items for localStorage storage.
@@ -36,7 +38,7 @@ function deserializeQueue(json: string): IDownloadItem[] {
       return value;
     });
   } catch (e) {
-    console.error('[useDownloadQueue] Failed to deserialize queue:', e);
+    log.error('Failed to deserialize queue:', e instanceof Error ? e.message : String(e));
     return [];
   }
 }
@@ -59,7 +61,7 @@ function loadQueue(): IDownloadItem[] {
       return item;
     });
   } catch (e) {
-    console.error('[useDownloadQueue] Failed to load queue from localStorage:', e);
+    log.error('Failed to load queue from localStorage:', e instanceof Error ? e.message : String(e));
     return [];
   }
 }
@@ -93,7 +95,7 @@ export function useDownloadQueue() {
     // Check for duplicate URL in queue
     const existing = items.find((item) => item.url === url);
     if (existing) {
-      console.log('[DownloadQueue] Duplicate URL detected:', url, '(existing ID:', existing.id, ')');
+      log.debug(`Duplicate URL detected: ${url} (existing ID: ${existing.id})`);
       return null; // Indicate duplicate
     }
 
@@ -140,7 +142,7 @@ export function useDownloadQueue() {
     try {
       localStorage.setItem(STORAGE_KEYS.QUEUE, serializeQueue(items));
     } catch (e) {
-      console.error('[useDownloadQueue] Failed to save queue to localStorage:', e);
+      log.error('Failed to save queue to localStorage:', e instanceof Error ? e.message : String(e));
     }
   }, [items]);
 

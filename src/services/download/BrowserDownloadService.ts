@@ -4,6 +4,9 @@
  */
 
 import type { IDownloadItem, IStashScene, IStashImage } from '@/types';
+import { createLogger } from '@/utils';
+
+const log = createLogger('BrowserDownload');
 
 export interface IStashMetadata {
   title?: string;
@@ -57,7 +60,7 @@ export class BrowserDownloadService {
     // Download the metadata sidecar
     await this.downloadMetadata(metadata, metadataFilename);
 
-    console.log(`[Browser Download] Saved: ${filename} + ${metadataFilename}`);
+    log.info(`Saved: ${filename} + ${metadataFilename}`);
   }
 
   /**
@@ -69,18 +72,18 @@ export class BrowserDownloadService {
 
     // If MIME type detection failed (.bin), try to detect from URL or content type
     if (ext === '.bin') {
-      console.log('[BrowserDownload] MIME type detection failed, blob.type:', blob.type);
+      log.debug('MIME type detection failed, blob.type:', blob.type);
 
       // Try to get extension from URL
       const urlExt = this.getExtensionFromUrl(item.url);
       if (urlExt && urlExt !== '.bin') {
         ext = urlExt;
-        console.log('[BrowserDownload] Using extension from URL:', ext);
+        log.debug('Using extension from URL:', ext);
       } else {
         // Fallback based on content type metadata
         const contentType = item.metadata?.contentType || 'video';
         ext = contentType === 'image' ? '.jpg' : '.mp4';
-        console.log('[BrowserDownload] Using fallback extension:', ext);
+        log.debug('Using fallback extension:', ext);
       }
     }
 
@@ -103,7 +106,7 @@ export class BrowserDownloadService {
     let qualitySuffix = '';
     if (item.metadata?.quality) {
       qualitySuffix = `_${item.metadata.quality}`;
-      console.log('[BrowserDownload] Adding quality suffix:', qualitySuffix);
+      log.debug('Adding quality suffix:', qualitySuffix);
     }
 
     // Sanitize and combine: basename_quality.ext

@@ -7,20 +7,21 @@ import ReactDOM from 'react-dom';
 import { MediaPreviewModal } from '@/components/common';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus, ContentType } from '@/types';
-import { formatBytes } from '@/utils';
+import { formatBytes, createLogger } from '@/utils';
+
+const debugLog = createLogger('QueueItem');
 
 interface QueueItemProps {
   item: IDownloadItem;
   onRemove: (id: string) => void;
   onEdit?: (id: string) => void;
-  onDownload?: (id: string) => void;
   onViewLogs?: (id: string) => void;
   onRescrapeClick?: (id: string, scraperName: string) => void;
   availableScrapers?: Array<{ name: string; canHandle: boolean; supportsContentType: boolean }>;
   showThumbnail?: boolean;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onDownload, onViewLogs, onRescrapeClick, availableScrapers, showThumbnail = true }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
@@ -272,7 +273,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                   const corsProxyUrl = localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
                   if (corsProxyEnabled) {
                     const proxiedUrl = `${corsProxyUrl}/${originalSrc}`;
-                    console.log('[QueueItem] Thumbnail failed, trying CORS proxy:', proxiedUrl);
+                    debugLog.debug(`Thumbnail failed, trying CORS proxy: ${proxiedUrl}`);
                     img.src = proxiedUrl;
                   } else {
                     // Show placeholder instead of hiding
@@ -377,7 +378,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
           </div>
           <div className="d-flex gap-1 flex-wrap">
-            {/* Preview video button - before download */}
+            {/* Preview video button */}
             {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
               <button
                 className="btn btn-sm btn-link text-info p-1"
@@ -385,15 +386,6 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 title="Preview video"
               >
                 ▶️
-              </button>
-            )}
-            {onDownload && item.status === DownloadStatus.Pending && (
-              <button
-                className="btn btn-sm btn-success"
-                onClick={() => onDownload(item.id)}
-                title="Download directly without editing metadata"
-              >
-                ⬇️ Download
               </button>
             )}
             {onEdit && (

@@ -5,7 +5,9 @@
 import { useState, useEffect } from 'react';
 import type { IPluginSettings } from '@/types';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from '@/constants';
-import { getStorageItem, setStorageItem } from '@/utils';
+import { getStorageItem, setStorageItem, createLogger } from '@/utils';
+
+const log = createLogger('Settings');
 
 export function useSettings() {
   const [settings, setSettings] = useState<IPluginSettings>(() => {
@@ -31,19 +33,19 @@ export function useSettings() {
       });
       
       if (changedKeys.length > 0) {
-        console.log('[Settings] Settings updated:', changedKeys);
+        log.info('Settings updated: ' + changedKeys.join(', '));
         changedKeys.forEach(key => {
           const oldValue = prev[key as keyof IPluginSettings];
           const newValue = updated[key as keyof IPluginSettings];
-          console.log(`[Settings]   ${key}:`, oldValue, '→', newValue);
-          
+          log.debug(`  ${key}: ${JSON.stringify(oldValue)} → ${JSON.stringify(newValue)}`);
+
           // Special logging for proxy changes
           if (key === 'httpProxy') {
             if (newValue) {
               const masked = String(newValue).replace(/:[^:@]*@/, ':****@');
-              console.log(`[Settings] ✓ HTTP/SOCKS proxy configured: ${masked}`);
+              log.success(`HTTP/SOCKS proxy configured: ${masked}`);
             } else {
-              console.log('[Settings] ⚠ HTTP/SOCKS proxy removed');
+              log.warn('HTTP/SOCKS proxy removed');
             }
           }
         });

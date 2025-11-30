@@ -5,7 +5,9 @@
 import React, { useState } from 'react';
 import type { IStashTag } from '@/types';
 import { useStashData } from '@/hooks';
-import { debounce } from '@/utils';
+import { debounce, createLogger } from '@/utils';
+
+const log = createLogger('TagSelector');
 
 interface TagSelectorProps {
   selectedTags: IStashTag[];
@@ -37,7 +39,7 @@ export const TagSelector: React.FC<TagSelectorProps> = ({
         setOptions(results);
         setShowDropdown(results.length > 0);
       } catch (error) {
-        console.error('Search error:', error);
+        log.error('Search error:', error instanceof Error ? error.message : String(error));
         setOptions([]);
         setShowDropdown(false);
       } finally {

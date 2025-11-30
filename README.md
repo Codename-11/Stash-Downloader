@@ -602,3 +602,5 @@ MIT License - see LICENSE file for details
 
 - GitHub Issues: https://github.com/Codename-11/Stash-Downloader/issues
 - Stash Discord: https://discord.gg/stash
+
+Built with ❤️ by [Codename-11](https://github.com/Codename-11) and 🤖Claude Code

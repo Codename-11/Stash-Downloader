@@ -4,7 +4,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { debounce } from '@/utils';
+import { debounce, createLogger } from '@/utils';
+
+const log = createLogger('Autocomplete');
 
 interface AutocompleteInputProps<T> {
   value: string;
@@ -47,7 +49,7 @@ export function AutocompleteInput<T>({
         setSuggestions(results);
         setShowDropdown(results.length > 0);
       } catch (error) {
-        console.error('Search error:', error);
+        log.error('Search error:', error instanceof Error ? error.message : String(error));
         setSuggestions([]);
         setShowDropdown(false);
       } finally {

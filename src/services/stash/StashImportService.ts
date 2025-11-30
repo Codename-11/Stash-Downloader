@@ -16,6 +16,9 @@ import { ContentType } from '@/types';
 import { getStashService } from './StashGraphQLService';
 import { getDownloadService } from '@/services/download';
 import { getBrowserDownloadService } from '@/services/download/BrowserDownloadService';
+import { createLogger } from '@/utils';
+
+const log = createLogger('StashImport');
 
 export class StashImportService {
   private stashService = getStashService();
@@ -48,13 +51,12 @@ export class StashImportService {
     }
 
     const itemTitle = item.editedMetadata?.title || item.metadata?.title || item.url;
-    console.log('[StashImport] Starting import for:', {
+    log.info('Starting import for:', JSON.stringify({
       url: item.url,
       title: itemTitle,
       hasMetadata: !!item.metadata,
       hasVideoUrl: !!item.metadata?.videoUrl,
-      videoUrl: item.metadata?.videoUrl,
-    });
+    }));
 
     if (onLog) onLog('info', `Starting import for: ${itemTitle}`);
 
@@ -73,37 +75,35 @@ export class StashImportService {
         );
         if (!isYtDlpSite) {
           downloadUrl = videoUrlObj.href;
-          console.log('[StashImport] Using direct video URL:', downloadUrl);
+          log.debug('Using direct video URL:', downloadUrl);
           if (onLog) onLog('info', 'Using direct video URL for download');
         } else {
-          console.log('[StashImport] Using page URL (yt-dlp will find video):', {
+          log.debug('Using page URL (yt-dlp will find video):', JSON.stringify({
             pageUrl: downloadUrl,
-            videoUrl: item.metadata.videoUrl,
             reason: 'yt-dlp site detected',
-          });
+          }));
           if (onLog) onLog('info', 'Using page URL (yt-dlp will extract video)');
         }
       } catch (error) {
         // videoUrl is not a valid absolute URL, use page URL
-        console.log('[StashImport] videoUrl is invalid, using page URL:', {
+        log.debug('videoUrl is invalid, using page URL:', JSON.stringify({
           pageUrl: downloadUrl,
-          videoUrl: item.metadata.videoUrl,
           error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        }));
         if (onLog) onLog('warning', 'Invalid video URL, falling back to page URL', error instanceof Error ? error.message : undefined);
       }
     } else {
-      console.log('[StashImport] Using page URL (no direct video URL found):', downloadUrl);
+      log.debug('Using page URL (no direct video URL found):', downloadUrl);
       if (onLog) onLog('info', 'No direct video URL found, using page URL');
     }
 
     // Download the file
     if (onStatusChange) onStatusChange('Downloading file...');
     if (onLog) onLog('info', 'Starting file download...');
-    console.log('[StashImport] Downloading file from URL:', downloadUrl);
+    log.debug('Downloading file from URL:', downloadUrl);
     const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
-        console.log('[StashImport] Download progress:',
+        log.debug('Download progress:',
           `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
         );
         if (onProgress) onProgress(progress);
@@ -116,7 +116,7 @@ export class StashImportService {
     const scanJobId = (blob as any).__scanJobId;
 
     if (serverFilePath) {
-      console.log('[StashImport] Server-side download detected, file at:', serverFilePath);
+      log.info('Server-side download detected, file at:', serverFilePath);
 
       // Log library path usage
       if (libraryPath) {
@@ -150,7 +150,7 @@ export class StashImportService {
       } as IStashScene;
     }
 
-    console.log('[StashImport] Download complete, file size:', blob.size, 'bytes');
+    log.info('Download complete, file size:', `${blob.size} bytes`);
     if (onLog) onLog('success', `Download complete (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
     // Convert to base64 for uploading
@@ -210,10 +210,10 @@ export class StashImportService {
 
     // In test mode, save file to user's computer with metadata
     if (this.isTestMode()) {
-      console.log('[StashImport] Test mode: Downloading file with metadata to your computer...');
+      log.debug('Test mode: Downloading file with metadata to your computer...');
       if (onLog) onLog('info', 'Test mode: Saving file to Downloads folder...');
       await this.browserDownloadService.downloadWithMetadata(item, blob, result);
-      console.log('[StashImport] File saved to Downloads folder!');
+      log.debug('File saved to Downloads folder!');
       if (onLog) onLog('success', 'File saved to Downloads folder');
     }
 
@@ -230,17 +230,17 @@ export class StashImportService {
     for (const performer of performers) {
       if (performer.id.startsWith('temp-')) {
         // Create new performer in Stash
-        console.log('[StashImport] Creating new performer:', performer.name);
+        log.debug('Creating new performer:', performer.name);
         try {
           const created = await this.stashService.createPerformer({
             name: performer.name,
             disambiguation: performer.disambiguation,
             aliases: performer.aliases,
           });
-          console.log('[StashImport] Created performer:', created.id, created.name);
+          log.debug('Created performer:', `${created.id} ${created.name}`);
           resolvedIds.push(created.id);
         } catch (error) {
-          console.error('[StashImport] Failed to create performer:', performer.name, error);
+          log.error('Failed to create performer:', `${performer.name} - ${String(error)}`);
           // Continue with other performers even if one fails
         }
       } else {
@@ -261,17 +261,17 @@ export class StashImportService {
     for (const tag of tags) {
       if (tag.id.startsWith('temp-')) {
         // Create new tag in Stash
-        console.log('[StashImport] Creating new tag:', tag.name);
+        log.debug('Creating new tag:', tag.name);
         try {
           const created = await this.stashService.createTag({
             name: tag.name,
             aliases: tag.aliases,
             description: tag.description,
           });
-          console.log('[StashImport] Created tag:', created.id, created.name);
+          log.debug('Created tag:', `${created.id} ${created.name}`);
           resolvedIds.push(created.id);
         } catch (error) {
-          console.error('[StashImport] Failed to create tag:', tag.name, error);
+          log.error('Failed to create tag:', `${tag.name} - ${String(error)}`);
           // Continue with other tags even if one fails
         }
       } else {
@@ -289,17 +289,17 @@ export class StashImportService {
   private async resolveStudio(studio: IStashStudio): Promise<string | undefined> {
     if (studio.id.startsWith('temp-')) {
       // Create new studio in Stash
-      console.log('[StashImport] Creating new studio:', studio.name);
+      log.debug('Creating new studio:', studio.name);
       try {
         const created = await this.stashService.createStudio({
           name: studio.name,
           url: studio.url,
           aliases: studio.aliases,
         });
-        console.log('[StashImport] Created studio:', created.id, created.name);
+        log.debug('Created studio:', `${created.id} ${created.name}`);
         return created.id;
       } catch (error) {
-        console.error('[StashImport] Failed to create studio:', studio.name, error);
+        log.error('Failed to create studio:', `${studio.name} - ${String(error)}`);
         return undefined;
       }
     }

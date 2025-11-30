@@ -12,6 +12,9 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
 import { formatDownloadError } from '@/utils/helpers';
+import { createLogger } from '@/utils';
+
+const debugLog = createLogger('EditWorkflow');
 
 interface EditWorkflowPageProps {
   items: IDownloadItem[];
@@ -77,16 +80,14 @@ export const EditWorkflowPage: React.FC<EditWorkflowPageProps> = ({
       const formattedError = formatDownloadError(err, currentItem.url);
       
       // Log detailed error information
-      console.error('[EditWorkflowPage] Import error details:', {
-        error: err,
-        originalMessage: err instanceof Error ? err.message : String(err),
+      debugLog.error('Import error details: ' + JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
         formattedError,
-        stack: errorStack,
         itemUrl: currentItem.url,
         itemTitle: itemTitle,
         hasMetadata: !!currentItem.metadata,
         videoUrl: currentItem.metadata?.videoUrl,
-      });
+      }));
       
       log.addLog('error', 'download', `Failed to import to Stash: ${formattedError}`, 
         `URL: ${currentItem.url}\nVideo URL: ${currentItem.metadata?.videoUrl || 'none'}\n${errorStack || ''}`

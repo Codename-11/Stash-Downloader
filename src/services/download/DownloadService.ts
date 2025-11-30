@@ -181,6 +181,21 @@ export class DownloadService {
   }
 
   /**
+   * Check if URL is external (not same-origin)
+   * In Stash environment, external URLs must use server-side download to avoid CSP issues
+   */
+  private isExternalUrl(url: string): boolean {
+    try {
+      const urlObj = new URL(url);
+      const currentOrigin = window.location.origin;
+      return urlObj.origin !== currentOrigin;
+    } catch {
+      // If URL parsing fails, assume it's external
+      return true;
+    }
+  }
+
+  /**
    * Check if URL is from a domain that requires yt-dlp
    */
   private requiresYtDlpDomain(url: string): boolean {
@@ -361,50 +376,94 @@ export class DownloadService {
 
     // PRIORITY 1: If we have a direct imageUrl from scraper, use it
     if (imageUrl && imageUrl !== url && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
-      console.log('[DownloadService] Using direct imageUrl from scraper');
+      log.debug('Using direct imageUrl from scraper');
       try {
         return await this.downloadDirect(imageUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn('[DownloadService] Direct imageUrl download failed:', errorMessage);
+        log.warn('Direct imageUrl download failed:', errorMessage);
         throw error;
       }
     }
 
-    // PRIORITY 2: If we have a direct videoUrl from scraper, use it
+    // PRIORITY 2: If we have a direct videoUrl from scraper
     if (videoUrl && videoUrl !== url && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-      console.log('[DownloadService] Using direct videoUrl from scraper');
+      log.debug('Using direct videoUrl from scraper');
+      
+      // In Stash environment, use server-side download for external URLs to avoid CSP issues
+      if (this.isStashEnvironment() && this.isExternalUrl(videoUrl)) {
+        log.debug('Using server-side download for external videoUrl (CSP bypass)');
+        try {
+          const stashService = getStashService();
+          const libraryPath = await stashService.getVideoLibraryPath();
+
+          if (libraryPath) {
+            log.debug('Using Stash library path:', libraryPath);
+            options.outputDir = libraryPath;
+          }
+
+          const serverResult = await this.downloadServerSide(videoUrl, options);
+          if (serverResult.success && serverResult.file_path) {
+            log.debug('Server-side download complete:', serverResult.file_path);
+
+            let scanJobId: string | null = null;
+            if (libraryPath) {
+              log.debug('Triggering Stash scan for:', serverResult.file_path);
+              scanJobId = await stashService.triggerScanForFile(serverResult.file_path);
+              if (scanJobId) {
+                log.debug('Scan job started:', scanJobId);
+              }
+            }
+
+            // Return empty blob with metadata
+            const emptyBlob = new Blob([], { type: 'application/octet-stream' });
+            (emptyBlob as any).__serverFilePath = serverResult.file_path;
+            (emptyBlob as any).__libraryPath = libraryPath;
+            (emptyBlob as any).__scanJobId = scanJobId;
+            return emptyBlob;
+          } else {
+            throw new Error(serverResult.error || 'Server-side download failed');
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          log.error('Server-side download failed:', errorMessage);
+          throw error;
+        }
+      }
+      
+      // Fallback to direct download (for same-origin URLs or non-Stash environments)
       try {
         return await this.downloadDirect(videoUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn('[DownloadService] Direct videoUrl download failed:', errorMessage);
-        // Fall through to server-side yt-dlp
+        log.warn('Direct videoUrl download failed:', errorMessage);
+        // Fall through to server-side download
       }
     }
 
-    // PRIORITY 3: Use server-side download for videos that need yt-dlp
-    if (this.isStashEnvironment() && this.requiresYtDlpDomain(url)) {
-      console.log('[DownloadService] Using server-side download for yt-dlp');
+    // PRIORITY 3: Use server-side download for external URLs in Stash environment
+    // This handles both yt-dlp domains and any other external URLs (CSP bypass)
+    if (this.isStashEnvironment() && this.isExternalUrl(url)) {
+      log.debug('Using server-side download for external URL (CSP bypass)');
       try {
         const stashService = getStashService();
         const libraryPath = await stashService.getVideoLibraryPath();
 
         if (libraryPath) {
-          console.log('[DownloadService] Using Stash library path:', libraryPath);
+          log.debug('Using Stash library path:', libraryPath);
           options.outputDir = libraryPath;
         }
 
         const serverResult = await this.downloadServerSide(url, options);
         if (serverResult.success && serverResult.file_path) {
-          console.log('[DownloadService] Server-side download complete:', serverResult.file_path);
+          log.debug('Server-side download complete:', serverResult.file_path);
 
           let scanJobId: string | null = null;
           if (libraryPath) {
-            console.log('[DownloadService] Triggering Stash scan for:', serverResult.file_path);
+            log.debug('Triggering Stash scan for:', serverResult.file_path);
             scanJobId = await stashService.triggerScanForFile(serverResult.file_path);
             if (scanJobId) {
-              console.log('[DownloadService] Scan job started:', scanJobId);
+              log.debug('Scan job started:', scanJobId);
             }
           }
 
@@ -419,12 +478,12 @@ export class DownloadService {
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[DownloadService] Server-side download failed:', errorMessage);
+        log.error('Server-side download failed:', errorMessage);
         throw error;
       }
     }
 
-    // Otherwise use regular fetch
+    // Otherwise use regular fetch (for same-origin URLs or non-Stash environments)
     return this.downloadDirect(url, options);
   }
 

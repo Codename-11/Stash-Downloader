@@ -12,6 +12,9 @@
 import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from '@/services/stash/StashGraphQLService';
+import { createLogger } from '@/utils';
+
+const log = createLogger('YtDlpScraper');
 
 // Plugin ID for runPluginTask/runPluginOperation calls
 const PLUGIN_ID = 'stash-downloader';
@@ -33,7 +36,7 @@ export class YtDlpScraper implements IMetadataScraper {
   }
 
   async scrape(url: string): Promise<IScrapedMetadata> {
-    console.log('[YtDlpScraper] Using server-side yt-dlp to extract:', url);
+    log.info('Using server-side yt-dlp to extract:', url);
     return this.scrapeServerSide(url);
   }
 
@@ -54,13 +57,13 @@ export class YtDlpScraper implements IMetadataScraper {
     const stashService = getStashService();
     const resultId = this.generateResultId();
 
-    console.log('[YtDlpScraper] Starting server-side extraction with result_id:', resultId);
+    log.debug('Starting server-side extraction with result_id:', resultId);
 
     let taskResult: { success: boolean; error?: string; jobId?: string };
 
     // Step 1: Run extract_metadata task (saves result to temp file)
     try {
-      console.log('[YtDlpScraper] Calling runPluginTaskAndWait...');
+      log.debug('Calling runPluginTaskAndWait...');
 
       // Get proxy setting from localStorage if available
       let proxy: string | undefined;
@@ -78,9 +81,9 @@ export class YtDlpScraper implements IMetadataScraper {
 
       // Log proxy configuration for troubleshooting
       if (proxy) {
-        console.log(`[YtDlpScraper] Using HTTP proxy for metadata extraction: ${proxy}`);
+        log.info(`Using HTTP proxy for metadata extraction: ${proxy}`);
       } else {
-        console.log('[YtDlpScraper] No HTTP proxy configured - using direct connection');
+        log.debug('No HTTP proxy configured - using direct connection');
       }
 
       taskResult = await stashService.runPluginTaskAndWait(
@@ -95,13 +98,13 @@ export class YtDlpScraper implements IMetadataScraper {
         {
           maxWaitMs: this.timeoutMs,
           onProgress: (progress) => {
-            console.log(`[YtDlpScraper] Extraction progress: ${progress}%`);
+            log.debug(`Extraction progress: ${progress}%`);
           },
         }
       );
-      console.log('[YtDlpScraper] runPluginTaskAndWait returned:', JSON.stringify(taskResult));
+      log.debug('runPluginTaskAndWait returned:', JSON.stringify(taskResult));
     } catch (taskError) {
-      console.error('[YtDlpScraper] runPluginTaskAndWait threw error:', taskError);
+      log.error('runPluginTaskAndWait threw error:', String(taskError));
       throw taskError;
     }
 
@@ -110,14 +113,14 @@ export class YtDlpScraper implements IMetadataScraper {
     }
 
     // Step 2: Read the result from temp file
-    console.log('[YtDlpScraper] Task succeeded, reading result...');
+    log.debug('Task succeeded, reading result...');
     let readResult: any;
     try {
       const operationResult = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'read_result',
         result_id: resultId,
       });
-      console.log('[YtDlpScraper] runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
+      log.debug('runPluginOperation returned:', JSON.stringify(operationResult, null, 2));
 
       if (!operationResult) {
         throw new Error('runPluginOperation returned null - check Stash server logs');
@@ -125,7 +128,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
       // Check if operationResult has an 'error' field (from PluginOutput.error)
       if (operationResult.error) {
-        console.error('[YtDlpScraper] Python script returned error:', operationResult.error);
+        log.error('Python script returned error:', operationResult.error);
         throw new Error(`Python script error: ${operationResult.error}`);
       }
 
@@ -137,9 +140,9 @@ export class YtDlpScraper implements IMetadataScraper {
         throw new Error('Invalid result data from Python script - missing title and success is false');
       }
 
-      console.log('[YtDlpScraper] Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
+      log.debug('Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
     } catch (readError) {
-      console.error('[YtDlpScraper] Read result error:', readError);
+      log.error('Read result error:', String(readError));
       throw readError;
     }
 
@@ -148,10 +151,10 @@ export class YtDlpScraper implements IMetadataScraper {
       mode: 'cleanup_result',
       result_id: resultId,
     }).catch((cleanupErr) => {
-      console.warn('[YtDlpScraper] Cleanup error (ignored):', cleanupErr);
+      log.warn('Cleanup error (ignored):', String(cleanupErr));
     });
 
-    console.log('[YtDlpScraper] Parsing result data...');
+    log.debug('Parsing result data...');
 
     // Check for error in result
     if (readResult.result_error || readResult.error) {
@@ -160,11 +163,11 @@ export class YtDlpScraper implements IMetadataScraper {
 
     // Check success flag
     if (readResult.success === false || (readResult.success === undefined && !readResult.title)) {
-      console.error('[YtDlpScraper] Result missing success flag or failed:', readResult);
+      log.error('Result missing success flag or failed:', JSON.stringify(readResult));
       throw new Error(`yt-dlp extraction did not succeed: ${readResult.result_error || readResult.error || 'Unknown error'}`);
     }
 
-    console.log('[YtDlpScraper] Got metadata from server-side yt-dlp:', readResult.title);
+    log.info('Got metadata from server-side yt-dlp:', readResult.title);
 
     // Extract video URL from the result
     let videoUrl: string | undefined;
@@ -177,7 +180,7 @@ export class YtDlpScraper implements IMetadataScraper {
         if (format.url || format.manifest_url) {
           videoUrl = format.url || format.manifest_url;
           quality = format.height ? `${format.height}p` : undefined;
-          console.log(`[YtDlpScraper] Selected format: ${quality || 'unknown'} from ${sortedFormats.length} formats`);
+          log.debug(`Selected format: ${quality || 'unknown'} from ${sortedFormats.length} formats`);
           break;
         }
       }
@@ -187,13 +190,13 @@ export class YtDlpScraper implements IMetadataScraper {
     if (!videoUrl && readResult.url) {
       videoUrl = readResult.url;
       quality = readResult.height ? `${readResult.height}p` : undefined;
-      console.log('[YtDlpScraper] Using top-level URL');
+      log.debug('Using top-level URL');
     }
 
     if (videoUrl) {
-      console.log(`[YtDlpScraper] Video URL extracted: ${videoUrl.substring(0, 100)}...`);
+      log.debug(`Video URL extracted: ${videoUrl.substring(0, 100)}...`);
     } else {
-      console.log('[YtDlpScraper] No video URL found in result');
+      log.debug('No video URL found in result');
     }
 
     // Convert to our metadata format

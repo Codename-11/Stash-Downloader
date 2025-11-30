@@ -25,6 +25,9 @@ import type {
   IPluginTaskResult,
   ScrapeContentType,
 } from '@/types';
+import { createLogger } from '@/utils';
+
+const log = createLogger('StashGraphQL');
 
 // GraphQL response type
 interface GQLResponse<T = unknown> {
@@ -74,7 +77,7 @@ export class StashGraphQLService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[StashGraphQL] HTTP error response:', errorText);
+      log.error('HTTP error response:', errorText);
       throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
     }
 
@@ -83,28 +86,24 @@ export class StashGraphQLService {
     // Check for GraphQL errors and log detailed information
     if (result.errors && result.errors.length > 0) {
       const errorMessages = result.errors.map((e: any) => e.message || JSON.stringify(e));
-      console.error('[StashGraphQL] GraphQL errors:', errorMessages);
+      log.error('GraphQL errors:', JSON.stringify(errorMessages));
 
       // Log full error details for debugging
       result.errors.forEach((error: any, index: number) => {
-        console.error(`[StashGraphQL] Error ${index + 1}:`, {
+        log.error(`Error ${index + 1}:`, JSON.stringify({
           message: error.message,
           path: error.path,
           extensions: error.extensions,
           locations: error.locations,
-        });
+        }));
       });
-      
+
       // Log the query that failed for debugging
-      console.error('[StashGraphQL] Failed query:', query.substring(0, 500));
+      log.error('Failed query:', query.substring(0, 500));
       if (variables) {
-        console.error('[StashGraphQL] Query variables:', JSON.stringify(variables, null, 2));
+        log.error('Query variables:', JSON.stringify(variables, null, 2));
       }
     }
-    
-    // Only log full response in debug mode or for specific queries
-    // Log full GraphQL response for debugging (commented out to reduce noise)
-    // console.log('[StashGraphQL] Full GraphQL response:', JSON.stringify(result, null, 2));
 
     return result;
   }
@@ -129,14 +128,14 @@ export class StashGraphQLService {
       }
     `;
 
-    console.log(`[StashGraphQL] findPerformersByName: searching for "${name}"`);
+    log.debug(`findPerformersByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findPerformers: { performers: IStashPerformer[] } }>(
       query,
       { filter: name }
     );
     const performers = result.data?.findPerformers?.performers || [];
-    console.log(`[StashGraphQL] findPerformersByName: found ${performers.length} results for "${name}"`,
-      performers.length > 0 ? performers.map(p => ({ id: p.id, name: p.name, aliases: p.alias_list })) : '(none)');
+    log.debug(`findPerformersByName: found ${performers.length} results for "${name}"`,
+      performers.length > 0 ? JSON.stringify(performers.map(p => ({ id: p.id, name: p.name, aliases: p.alias_list }))) : '(none)');
     return performers;
   }
 
@@ -159,14 +158,14 @@ export class StashGraphQLService {
       }
     `;
 
-    console.log(`[StashGraphQL] findTagsByName: searching for "${name}"`);
+    log.debug(`findTagsByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findTags: { tags: IStashTag[] } }>(
       query,
       { filter: name }
     );
     const tags = result.data?.findTags?.tags || [];
-    console.log(`[StashGraphQL] findTagsByName: found ${tags.length} results for "${name}"`,
-      tags.length > 0 ? tags.map(t => ({ id: t.id, name: t.name, aliases: t.aliases })) : '(none)');
+    log.debug(`findTagsByName: found ${tags.length} results for "${name}"`,
+      tags.length > 0 ? JSON.stringify(tags.map(t => ({ id: t.id, name: t.name, aliases: t.aliases }))) : '(none)');
     return tags;
   }
 
@@ -190,14 +189,14 @@ export class StashGraphQLService {
       }
     `;
 
-    console.log(`[StashGraphQL] findStudioByName: searching for "${name}"`);
+    log.debug(`findStudioByName: searching for "${name}"`);
     const result = await this.gqlRequest<{ findStudios: { studios: IStashStudio[] } }>(
       query,
       { filter: name }
     );
     const studios = result.data?.findStudios?.studios || [];
-    console.log(`[StashGraphQL] findStudioByName: found ${studios.length} results for "${name}"`,
-      studios.length > 0 ? studios.map(s => ({ id: s.id, name: s.name, aliases: s.aliases })) : '(none)');
+    log.debug(`findStudioByName: found ${studios.length} results for "${name}"`,
+      studios.length > 0 ? JSON.stringify(studios.map(s => ({ id: s.id, name: s.name, aliases: s.aliases }))) : '(none)');
     return studios.length > 0 ? studios[0]! : null;
   }
 
@@ -470,7 +469,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeSceneURL || null;
     } catch (error) {
-      console.error('[StashGraphQL] scrapeSceneURL failed:', error);
+      log.error('scrapeSceneURL failed:', String(error));
       return null;
     }
   }
@@ -517,7 +516,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeGalleryURL || null;
     } catch (error) {
-      console.error('[StashGraphQL] scrapeGalleryURL failed:', error);
+      log.error('scrapeGalleryURL failed:', String(error));
       return null;
     }
   }
@@ -564,7 +563,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeImageURL || null;
     } catch (error) {
-      console.error('[StashGraphQL] scrapeImageURL failed:', error);
+      log.error('scrapeImageURL failed:', String(error));
       return null;
     }
   }
@@ -601,7 +600,7 @@ export class StashGraphQLService {
       );
       return result.data?.listScrapers || [];
     } catch (error) {
-      console.error('[StashGraphQL] listScrapers failed:', error);
+      log.error('listScrapers failed:', String(error));
       return [];
     }
   }
@@ -631,7 +630,7 @@ export class StashGraphQLService {
 
       return false;
     } catch (error) {
-      console.error('[StashGraphQL] canScrapeURL failed:', error);
+      log.error('canScrapeURL failed:', String(error));
       return false;
     }
   }
@@ -663,7 +662,7 @@ export class StashGraphQLService {
       });
       return result.data?.runPluginTask || null;
     } catch (error) {
-      console.error('[StashGraphQL] runPluginTask failed:', error);
+      log.error('runPluginTask failed:', String(error));
       return null;
     }
   }
@@ -687,23 +686,23 @@ export class StashGraphQLService {
         plugin_id: pluginId,
         args: args || {},
       });
-      
+
       // Log the full response for debugging
-      console.log('[StashGraphQL] runPluginOperation full response:', JSON.stringify(result));
-      
+      log.debug('runPluginOperation full response:', JSON.stringify(result));
+
       // If there are GraphQL errors, the data might be null/undefined
       if (result.errors && result.errors.length > 0) {
-        console.error('[StashGraphQL] runPluginOperation has GraphQL errors, data may be null');
+        log.error('runPluginOperation has GraphQL errors, data may be null');
         // Still try to return data if it exists
         if (result.data?.runPluginOperation) {
           return result.data.runPluginOperation;
         }
         return null;
       }
-      
+
       return result.data?.runPluginOperation || null;
     } catch (error) {
-      console.error('[StashGraphQL] runPluginOperation exception:', error);
+      log.error('runPluginOperation exception:', String(error));
       return null;
     }
   }
@@ -722,7 +721,7 @@ export class StashGraphQLService {
       const result = await this.gqlRequest<{ stopJob: boolean }>(mutation, { job_id: jobId });
       return result.data?.stopJob || false;
     } catch (error) {
-      console.error('[StashGraphQL] stopJob failed:', error);
+      log.error('stopJob failed:', String(error));
       return false;
     }
   }
@@ -762,17 +761,17 @@ export class StashGraphQLService {
         const pluginSettings = allPluginSettings[pluginId];
 
         if (pluginSettings && Object.keys(pluginSettings).length > 0) {
-          console.log('[StashGraphQL] Found settings via configuration.plugins:', pluginSettings);
+          log.debug('Found settings via configuration.plugins:', JSON.stringify(pluginSettings));
           return pluginSettings;
         }
 
         // Plugin exists but has no settings configured
-        console.log('[StashGraphQL] Plugin found but no settings configured');
+        log.debug('Plugin found but no settings configured');
         return {};
       }
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      console.warn('[StashGraphQL] configuration.plugins query failed:', errorMsg);
+      log.warn('configuration.plugins query failed:', errorMsg);
     }
 
     // Fallback: try without the include filter (older Stash versions may not support it)
@@ -796,19 +795,19 @@ export class StashGraphQLService {
         const pluginSettings = allPluginSettings[pluginId];
 
         if (pluginSettings && Object.keys(pluginSettings).length > 0) {
-          console.log('[StashGraphQL] Found settings via configuration.plugins (fallback):', pluginSettings);
+          log.debug('Found settings via configuration.plugins (fallback):', JSON.stringify(pluginSettings));
           return pluginSettings;
         }
 
-        console.log('[StashGraphQL] Plugin found but no settings configured (fallback)');
+        log.debug('Plugin found but no settings configured (fallback)');
         return {};
       }
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      console.warn('[StashGraphQL] configuration.plugins fallback query failed:', errorMsg);
+      log.warn('configuration.plugins fallback query failed:', errorMsg);
     }
 
-    console.warn('[StashGraphQL] Could not retrieve plugin settings from Stash');
+    log.warn('Could not retrieve plugin settings from Stash');
     return null;
   }
 
@@ -838,7 +837,7 @@ export class StashGraphQLService {
       const result = await this.gqlRequest<{ findJob: any }>(query, { input: { id: jobId } });
       return result.data?.findJob || null;
     } catch (error) {
-      console.error('[StashGraphQL] findJob failed:', error);
+      log.error('findJob failed:', String(error));
       return null;
     }
   }
@@ -860,7 +859,7 @@ export class StashGraphQLService {
     const pollInterval = options?.pollIntervalMs || 500;
     const maxWait = options?.maxWaitMs || 120000; // 2 minutes default
 
-    console.log(`[StashGraphQL] Starting plugin task: ${pluginId}/${taskName}`);
+    log.info(`Starting plugin task: ${pluginId}/${taskName}`);
 
     // Start the task
     const jobId = await this.runPluginTask(pluginId, taskName, args);
@@ -868,7 +867,7 @@ export class StashGraphQLService {
       return { success: false, error: 'Failed to start plugin task' };
     }
 
-    console.log(`[StashGraphQL] Task started with job ID: ${jobId}`);
+    log.info(`Task started with job ID: ${jobId}`);
 
     // Poll for completion
     const startTime = Date.now();
@@ -877,11 +876,11 @@ export class StashGraphQLService {
 
       const job = await this.findJob(jobId);
       if (!job) {
-        console.warn(`[StashGraphQL] Job ${jobId} not found, may have completed quickly`);
+        log.warn(`Job ${jobId} not found, may have completed quickly`);
         return { success: true, jobId };
       }
 
-      console.log(`[StashGraphQL] Job ${jobId} status: ${job.status}, progress: ${job.progress || 0}`);
+      log.debug(`Job ${jobId} status: ${job.status}, progress: ${job.progress || 0}`);
 
       if (options?.onProgress && job.progress !== undefined) {
         options.onProgress(job.progress);
@@ -889,16 +888,16 @@ export class StashGraphQLService {
 
       switch (job.status) {
         case 'FINISHED':
-          console.log(`[StashGraphQL] Job ${jobId} finished successfully`);
+          log.info(`Job ${jobId} finished successfully`);
           return { success: true, jobId };
 
         case 'FAILED':
-          console.error(`[StashGraphQL] Job ${jobId} failed:`, job.error);
+          log.error(`Job ${jobId} failed:`, job.error);
           return { success: false, error: job.error || 'Job failed', jobId };
 
         case 'CANCELLED':
         case 'STOPPING':
-          console.warn(`[StashGraphQL] Job ${jobId} was cancelled/stopped`);
+          log.warn(`Job ${jobId} was cancelled/stopped`);
           return { success: false, error: 'Job was cancelled', jobId };
 
         case 'READY':
@@ -909,7 +908,7 @@ export class StashGraphQLService {
     }
 
     // Timeout - try to stop the job
-    console.warn(`[StashGraphQL] Job ${jobId} timed out after ${maxWait}ms`);
+    log.warn(`Job ${jobId} timed out after ${maxWait}ms`);
     await this.stopJob(jobId);
     return { success: false, error: 'Job timed out', jobId };
   }
@@ -950,10 +949,10 @@ export class StashGraphQLService {
       }>(query);
 
       const stashes = result.data?.configuration?.general?.stashes || [];
-      console.log('[StashGraphQL] Library paths:', stashes);
+      log.debug('Library paths:', JSON.stringify(stashes));
       return stashes;
     } catch (error) {
-      console.error('[StashGraphQL] Failed to get library paths:', error);
+      log.error('Failed to get library paths:', String(error));
       return [];
     }
   }
@@ -995,10 +994,10 @@ export class StashGraphQLService {
 
       const result = await this.gqlRequest<{ metadataScan: string }>(mutation, { input });
       const jobId = result.data?.metadataScan;
-      console.log('[StashGraphQL] Scan triggered, job ID:', jobId);
+      log.info('Scan triggered, job ID:', jobId || 'unknown');
       return jobId || null;
     } catch (error) {
-      console.error('[StashGraphQL] Failed to trigger scan:', error);
+      log.error('Failed to trigger scan:', String(error));
       return null;
     }
   }
@@ -1010,7 +1009,7 @@ export class StashGraphQLService {
     // Get parent directory of the file
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
     const directory = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
-    console.log('[StashGraphQL] Triggering scan for directory:', directory);
+    log.debug('Triggering scan for directory:', directory);
     return this.triggerScan([directory]);
   }
 }

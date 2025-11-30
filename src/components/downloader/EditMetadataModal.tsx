@@ -14,7 +14,9 @@ import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
 import { getScraperRegistry } from '@/services/metadata';
-import { formatBytes, formatDownloadError } from '@/utils';
+import { formatBytes, formatDownloadError, createLogger } from '@/utils';
+
+const debugLog = createLogger('EditMetadataModal');
 
 interface ScraperInfo {
   name: string;
@@ -254,16 +256,14 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       const formattedError = formatDownloadError(err, item.url);
 
       // Log detailed error information
-      console.error('[EditMetadataModal] Import error details:', {
-        error: err,
-        originalMessage: err instanceof Error ? err.message : String(err),
+      debugLog.error('Import error details: ' + JSON.stringify({
+        error: err instanceof Error ? err.message : String(err),
         formattedError,
-        stack: errorStack,
         itemUrl: item.url,
         itemTitle: itemTitle,
         hasMetadata: !!item.metadata,
         videoUrl: item.metadata?.videoUrl,
-      });
+      }));
 
       log.addLog('error', 'download', `Failed to import to Stash: ${formattedError}`,
         `URL: ${item.url}\nVideo URL: ${item.metadata?.videoUrl || 'none'}\n${errorStack || ''}`

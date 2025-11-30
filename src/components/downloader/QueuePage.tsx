@@ -19,11 +19,13 @@ import { getDownloadService, getBrowserDownloadService } from '@/services/downlo
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { DownloadStatus, ContentType } from '@/types';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
-import { formatDownloadError } from '@/utils/helpers';
+import { formatDownloadError, createLogger } from '@/utils';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
 import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
+
+const debugLog = createLogger('QueuePage');
 
 export const QueuePage: React.FC = () => {
   const queue = useDownloadQueue();
@@ -62,7 +64,7 @@ export const QueuePage: React.FC = () => {
         if (!mounted) return;
 
         if (graphqlSettings && Object.keys(graphqlSettings).length > 0) {
-          console.log('[Settings] Loaded from Stash:', graphqlSettings);
+          debugLog.debug('Loaded from Stash:', JSON.stringify(graphqlSettings));
 
           // Merge Stash settings into local settings (Stash settings take priority)
           updateSettings(graphqlSettings as Partial<IPluginSettings>);
@@ -70,16 +72,16 @@ export const QueuePage: React.FC = () => {
           // Log proxy status
           if (graphqlSettings.httpProxy) {
             const masked = String(graphqlSettings.httpProxy).replace(/:[^:@]*@/, ':****@');
-            console.log(`[Settings] ✓ HTTP/SOCKS proxy: ${masked}`);
+            debugLog.info(`✓ HTTP/SOCKS proxy: ${masked}`);
           }
           if (graphqlSettings.serverDownloadPath) {
-            console.log(`[Settings] Server download path: ${graphqlSettings.serverDownloadPath}`);
+            debugLog.debug(`Server download path: ${graphqlSettings.serverDownloadPath}`);
           }
         } else {
-          console.log('[Settings] No settings configured in Stash');
+          debugLog.debug('No settings configured in Stash');
         }
       } catch (error) {
-        console.warn('[Settings] Could not fetch settings from Stash:', error);
+        debugLog.warn('Could not fetch settings from Stash:', String(error));
       }
     };
 
@@ -92,7 +94,7 @@ export const QueuePage: React.FC = () => {
           const newSettings = JSON.parse(e.newValue) as IPluginSettings;
           if (newSettings.httpProxy) {
             const masked = newSettings.httpProxy.replace(/:[^:@]*@/, ':****@');
-            console.log(`[Settings] Updated: proxy=${masked}`);
+            debugLog.debug(`Updated: proxy=${masked}`);
           }
         } catch {
           // Ignore parse errors
@@ -135,7 +137,7 @@ export const QueuePage: React.FC = () => {
         }
       } catch (error) {
         // Log but don't block if duplicate check fails
-        console.warn('[QueuePage] Failed to check for existing scene:', error);
+        debugLog.warn('Failed to check for existing scene:', String(error));
       }
     }
 
@@ -151,32 +153,31 @@ export const QueuePage: React.FC = () => {
     // Scrape metadata in background and update the item
     (async () => {
       try {
-        console.log(`[QueuePage] ========================================`);
-        console.log(`[QueuePage] Starting metadata scrape for: ${url}`);
-        console.log(`[QueuePage] Item ID: ${itemId}`);
-        console.log(`[QueuePage] Current queue items:`, queue.items.length);
-        console.log(`[QueuePage] ========================================`);
+        debugLog.debug(`======== Starting metadata scrape ========`);
+        debugLog.debug(`URL: ${url}`);
+        debugLog.debug(`Item ID: ${itemId}`);
+        debugLog.debug(`Current queue items: ${queue.items.length}`);
         log.addLog('info', 'scrape', `Starting metadata scrape for: ${url}`);
         
         // Note: We don't need to find the item - React state updates are async
         // We can update it directly using the itemId
         
         // Scrape metadata from URL (use enhancement flow for better fallback)
-        console.log(`[QueuePage] Calling scraperRegistry.scrapeWithEnhancement() (preferredContentType: ${preferredContentType || 'auto'})...`);
+        debugLog.debug(`Calling scraperRegistry.scrapeWithEnhancement() (preferredContentType: ${preferredContentType || 'auto'})...`);
         const metadata = await scraperRegistry.scrapeWithEnhancement(url, preferredContentType);
-        console.log(`[QueuePage] Scraping completed, metadata:`, {
+        debugLog.debug(`Scraping completed:`, JSON.stringify({
           title: metadata.title,
           hasVideoUrl: !!metadata.videoUrl,
           hasImageUrl: !!metadata.imageUrl,
           contentType: metadata.contentType,
-        });
-        
+        }));
+
         // Update the queue item with scraped metadata
-        console.log(`[QueuePage] Updating item ${itemId} with metadata...`);
+        debugLog.debug(`Updating item ${itemId} with metadata...`);
         queue.updateItem(itemId, {
           metadata,
         });
-        console.log(`[QueuePage] Item updated successfully`);
+        debugLog.debug(`Item updated successfully`);
         
         // Build detailed log message with all available metadata
         const logDetails: string[] = [
@@ -243,13 +244,13 @@ export const QueuePage: React.FC = () => {
         );
         
         if (metadata.videoUrl) {
-          console.log('[QueuePage] ✓ Scraper extracted videoUrl:', metadata.videoUrl.substring(0, 100) + '...');
+          debugLog.debug('✓ Scraper extracted videoUrl:', metadata.videoUrl.substring(0, 100) + '...');
         } else if (metadata.imageUrl) {
-          console.log('[QueuePage] ✓ Scraper extracted imageUrl:', metadata.imageUrl.substring(0, 100) + '...');
+          debugLog.debug('✓ Scraper extracted imageUrl:', metadata.imageUrl.substring(0, 100) + '...');
         } else {
           // This is normal for Stash's built-in scraper - it doesn't return direct video URLs
           // The download service will use yt-dlp or the page URL as fallback
-          console.log('[QueuePage] ℹ️ No direct video/image URL extracted - download service will use yt-dlp or page URL');
+          debugLog.debug('ℹ️ No direct video/image URL extracted - download service will use yt-dlp or page URL');
         }
         toast.showToast('success', 'Metadata Scraped', `Successfully scraped metadata for ${metadata.title || url}`);
       } catch (error) {
@@ -259,12 +260,11 @@ export const QueuePage: React.FC = () => {
           `Error: ${errorMessage}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
           `Error: ${String(error)}`;
         
-        console.error('[QueuePage] Scraping failed with full details:', {
+        debugLog.error('Scraping failed with full details:', JSON.stringify({
           url,
           errorMessage,
-          errorStack,
-          error,
-        });
+          errorStack: errorStack || 'No stack trace',
+        }));
         
         log.addLog('error', 'scrape', `Failed to scrape metadata: ${errorMessage}`, errorDetails);
         toast.showToast('warning', 'Scrape Failed', `Failed to scrape metadata: ${errorMessage}. Item added to queue without metadata.`);
@@ -409,14 +409,13 @@ export const QueuePage: React.FC = () => {
         `Error: ${formattedError}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
         `Error: ${formattedError}`;
 
-      console.error('[QueuePage] Download failed with full details:', {
+      debugLog.error('Download failed with full details:', JSON.stringify({
         itemId,
         url: item.url,
         originalError: error instanceof Error ? error.message : String(error),
         formattedError,
-        errorStack,
-        error,
-      });
+        errorStack: errorStack || 'No stack trace',
+      }));
 
       log.addLog('error', 'download', `Direct download failed: ${formattedError}`, errorDetails);
       toast.showToast('error', 'Download Failed', formattedError);

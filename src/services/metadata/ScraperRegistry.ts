@@ -231,17 +231,16 @@ export class ScraperRegistry {
     }
 
     if (!scraper.canHandle(url)) {
-      console.warn(`[ScraperRegistry] Scraper "${scraperName}" cannot handle URL: ${url}, but will try anyway`);
+      log.warn(`Scraper "${scraperName}" cannot handle URL: ${url}, but will try anyway`);
     }
 
-    console.log(`[ScraperRegistry] Manually scraping with "${scraperName}" for: ${url}`);
+    log.info(`Manually scraping with "${scraperName}" for: ${url}`);
     const metadata = await scraper.scrape(url);
-    console.log(`[ScraperRegistry] [Scraper] ${scraperName} succeeded - extracted:`,
-      Object.entries(metadata)
-        .filter(([_, v]) => v !== undefined && v !== null && v !== '')
-        .map(([k, v]) => Array.isArray(v) ? `${v.length} ${k}` : k)
-        .join(', ')
-    );
+    const extracted = Object.entries(metadata)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => Array.isArray(v) ? `${v.length} ${k}` : k)
+      .join(', ');
+    log.info(`[Scraper] ${scraperName} succeeded - extracted: ${extracted}`);
     return metadata;
   }
 }

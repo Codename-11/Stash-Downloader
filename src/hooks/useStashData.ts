@@ -5,6 +5,9 @@
 import { useState } from 'react';
 import type { IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { getStashService } from '@/services/stash';
+import { createLogger } from '@/utils';
+
+const log = createLogger('StashData');
 
 interface IStashDataState {
   performers: IStashPerformer[];
@@ -29,7 +32,7 @@ export function useStashData() {
       const service = getStashService();
       return await service.findPerformersByName(query);
     } catch (error) {
-      console.error('Error searching performers:', error);
+      log.error('Error searching performers:', error instanceof Error ? error.message : String(error));
       return [];
     }
   };
@@ -40,7 +43,7 @@ export function useStashData() {
       const service = getStashService();
       return await service.findTagsByName(query);
     } catch (error) {
-      console.error('Error searching tags:', error);
+      log.error('Error searching tags:', error instanceof Error ? error.message : String(error));
       return [];
     }
   };
@@ -51,7 +54,7 @@ export function useStashData() {
       const service = getStashService();
       return await service.findStudioByName(query);
     } catch (error) {
-      console.error('Error searching studio:', error);
+      log.error('Error searching studio:', error instanceof Error ? error.message : String(error));
       return null;
     }
   };

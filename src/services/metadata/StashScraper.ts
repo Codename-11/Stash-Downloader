@@ -14,6 +14,9 @@
 import type { IMetadataScraper, IScrapedMetadata, IStashScrapedScene } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from '@/services/stash/StashGraphQLService';
+import { createLogger } from '@/utils';
+
+const log = createLogger('StashScraper');
 
 export class StashScraper implements IMetadataScraper {
   name = 'Stash Built-in';
@@ -41,14 +44,14 @@ export class StashScraper implements IMetadataScraper {
    * Scrape metadata using Stash's built-in scrapers
    */
   async scrape(url: string): Promise<IScrapedMetadata> {
-    console.log(`[StashScraper] Attempting Stash built-in scrape for: ${url}`);
+    log.info(`Attempting Stash built-in scrape for: ${url}`);
 
     try {
       const stashService = getStashService();
 
       // Check if we're in Stash environment
       if (!stashService.isStashEnvironment()) {
-        console.log('[StashScraper] Not in Stash environment, skipping');
+        log.debug('Not in Stash environment, skipping');
         throw new Error('Stash scraping only available in Stash environment');
       }
 
@@ -56,7 +59,7 @@ export class StashScraper implements IMetadataScraper {
       const scrapedScene = await stashService.scrapeSceneURL(url);
 
       if (scrapedScene && this.hasUsefulData(scrapedScene)) {
-        console.log('[StashScraper] Successfully scraped via Stash:', scrapedScene.title);
+        log.info('Successfully scraped via Stash:', scrapedScene.title || 'untitled');
         return this.mapSceneToMetadata(scrapedScene, url);
       }
 
@@ -64,7 +67,7 @@ export class StashScraper implements IMetadataScraper {
       const scrapedGallery = await stashService.scrapeGalleryURL(url);
 
       if (scrapedGallery && scrapedGallery.title) {
-        console.log('[StashScraper] Successfully scraped gallery via Stash:', scrapedGallery.title);
+        log.info('Successfully scraped gallery via Stash:', scrapedGallery.title);
         return {
           title: scrapedGallery.title,
           description: scrapedGallery.details,
@@ -78,11 +81,11 @@ export class StashScraper implements IMetadataScraper {
       }
 
       // No data from Stash scrapers
-      console.log('[StashScraper] No data returned from Stash scrapers');
+      log.debug('No data returned from Stash scrapers');
       throw new Error('Stash scrapers returned no data for this URL');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn(`[StashScraper] Stash scraping failed: ${errorMsg}`);
+      log.warn(`Stash scraping failed: ${errorMsg}`);
       throw error; // Re-throw to let ScraperRegistry try next scraper
     }
   }

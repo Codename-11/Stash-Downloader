@@ -89,6 +89,7 @@ query GetPluginSettings($include: [ID!]) {
 - Implements queue with concurrency limits
 - Progress tracking and cancellation support
 - Server-side downloads via `downloadServerSide()` (uses Python backend)
+- **CSP Bypass**: In Stash environment, all external URLs use server-side download to avoid Content Security Policy restrictions
 - yt-dlp availability check via `checkServerYtDlp()`
 - Temporary file handling
 

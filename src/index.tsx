@@ -5,7 +5,10 @@
  */
 
 import { DownloaderMain } from './components/downloader/DownloaderMain';
-import { ROUTES, PLUGIN_ID } from './constants';
+import { ROUTES } from './constants';
+import { createLogger } from './utils';
+
+const log = createLogger('Plugin');
 
 // Import plugin styles as inline string (Stash plugins only load .js files)
 // The ?inline suffix tells Vite to return CSS as a string instead of extracting it
@@ -27,7 +30,7 @@ injectStyles();
 
 // Ensure PluginApi is available
 if (!window.PluginApi) {
-  console.error('PluginApi is not available. This plugin must be loaded within Stash.');
+  log.error('PluginApi is not available. This plugin must be loaded within Stash.');
   throw new Error('PluginApi not found');
 }
 
@@ -90,7 +93,7 @@ function addNavButtonViaMutationObserver() {
 
     // Insert at the beginning of navbar-buttons
     navbarButtons.insertBefore(navButton, navbarButtons.firstChild);
-    console.log(`[${PLUGIN_ID}] Navigation button added to navbar via DOM`);
+    log.debug('Navigation button added to navbar via DOM');
     return true;
   }
 
@@ -122,22 +125,22 @@ function addNavButtonViaMutationObserver() {
  */
 function initializePlugin() {
   try {
-    console.log(`[${PLUGIN_ID}] Initializing plugin...`);
-    console.log(`[${PLUGIN_ID}] Available libraries:`, Object.keys(window.PluginApi.libraries || {}));
+    log.info('Initializing plugin...');
+    log.debug('Available libraries:', JSON.stringify(Object.keys(window.PluginApi.libraries || {})));
 
     // Register main route with IntlProvider wrapper
     window.PluginApi.register.route(ROUTES.MAIN, (props?: any) => {
       return React.createElement(PluginWrapper, props);
     });
 
-    console.log(`[${PLUGIN_ID}] Plugin registered successfully at ${ROUTES.MAIN}`);
+    log.info(`Plugin registered successfully at ${ROUTES.MAIN}`);
 
     // Add navigation button using MutationObserver (community plugin pattern)
     // Uses .navbar-buttons selector like other community plugins
     addNavButtonViaMutationObserver();
 
   } catch (error) {
-    console.error(`[${PLUGIN_ID}] Failed to initialize:`, error);
+    log.error('Failed to initialize:', String(error));
     throw error;
   }
 }
