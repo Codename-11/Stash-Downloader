@@ -5,7 +5,7 @@ url: https://github.com/Codename-11/Stash-Downloader
 settings:
   serverDownloadPath:
     displayName: Download Path
-    description: Directory for downloaded files (absolute path). If set, overrides Stash library path. Leave empty to use your Stash video library.
+    description: "Absolute path for downloaded files (relative to Stash server/container). Overrides Stash library if set. Examples: /data/downloads, /mnt/media/videos. Default: /data/StashDownloader. Leave empty to use your Stash video library."
     type: STRING
   httpProxy:
     displayName: HTTP Proxy
