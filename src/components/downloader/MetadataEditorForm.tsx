@@ -2,7 +2,7 @@
  * MetadataEditorForm - Complete metadata editing form
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { ContentType } from '@/types';
 import { PerformerSelector } from '@/components/common/PerformerSelector';
@@ -52,8 +52,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     setPreviewOpen(true);
   };
 
-  // Track if auto-match has been triggered
-  const [hasAutoMatched, setHasAutoMatched] = useState(false);
+  // Track if auto-match has been triggered (use ref to avoid re-render race conditions)
+  const autoMatchTriggeredRef = useRef(false);
 
   // Initialize with scraped metadata
   useEffect(() => {
@@ -82,39 +82,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     }
   }, [item]);
 
-  // State to trigger auto-match after handleMatchToStash is defined
-  const [shouldAutoMatch, setShouldAutoMatch] = useState(false);
-
-  // Check if auto-match should be triggered when form opens
-  useEffect(() => {
-    // Skip if already matched or no metadata
-    if (hasAutoMatched || !item.metadata) {
-      debugLog.debug(`Auto-match skipped: hasAutoMatched=${hasAutoMatched}, hasMetadata=${!!item.metadata}`);
-      return;
-    }
-
-    // Skip if already have edited data with entities (user already edited)
-    if (item.editedMetadata && (
-      (item.editedMetadata.performers?.length ?? 0) > 0 ||
-      (item.editedMetadata.tags?.length ?? 0) > 0 ||
-      item.editedMetadata.studio
-    )) {
-      debugLog.debug('Auto-match skipped: item has existing edited metadata');
-      return;
-    }
-
-    // Only auto-match if there are entities to match
-    const hasEntities = (item.metadata.performers?.length ?? 0) > 0 ||
-                       (item.metadata.tags?.length ?? 0) > 0 ||
-                       !!item.metadata.studio;
-
-    debugLog.debug(`Auto-match check: hasEntities=${hasEntities}, performers=${item.metadata.performers?.length ?? 0}, tags=${item.metadata.tags?.length ?? 0}, studio=${!!item.metadata.studio}`);
-
-    if (hasEntities) {
-      setHasAutoMatched(true);
-      setShouldAutoMatch(true);
-    }
-  }, [item.metadata, item.editedMetadata, hasAutoMatched]);
+  // Note: Auto-match useEffect is defined after handleMatchToStash to avoid hoisting issues
 
   /**
    * Clear all matched metadata (performers, tags, studio)
@@ -235,19 +203,46 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     }
   }, [item.metadata, item.url, log, toast]);
 
-  // Execute auto-match when shouldAutoMatch is set
+  // Auto-trigger "Match to Stash" when form opens with metadata
+  // Uses ref instead of state to avoid race conditions with re-renders
   useEffect(() => {
-    if (shouldAutoMatch) {
-      debugLog.info('Auto-triggering match to Stash...');
-      setShouldAutoMatch(false);
-      // Small delay to let the UI render first
-      const timer = setTimeout(() => {
-        handleMatchToStash(true); // silent=true for auto-match
-      }, 100);
-      return () => clearTimeout(timer);
+    // Skip if already triggered (ref doesn't cause re-render)
+    if (autoMatchTriggeredRef.current) {
+      return;
     }
-    return undefined;
-  }, [shouldAutoMatch, handleMatchToStash]);
+
+    // Skip if no metadata
+    if (!item.metadata) {
+      debugLog.debug('Auto-match skipped: no metadata');
+      return;
+    }
+
+    // Skip if already have edited data with entities (user already edited)
+    if (item.editedMetadata && (
+      (item.editedMetadata.performers?.length ?? 0) > 0 ||
+      (item.editedMetadata.tags?.length ?? 0) > 0 ||
+      item.editedMetadata.studio
+    )) {
+      debugLog.debug('Auto-match skipped: item has existing edited metadata');
+      autoMatchTriggeredRef.current = true; // Mark as handled
+      return;
+    }
+
+    // Only auto-match if there are entities to match
+    const hasEntities = (item.metadata.performers?.length ?? 0) > 0 ||
+                       (item.metadata.tags?.length ?? 0) > 0 ||
+                       !!item.metadata.studio;
+
+    debugLog.debug(`Auto-match check: hasEntities=${hasEntities}, performers=${item.metadata.performers?.length ?? 0}, tags=${item.metadata.tags?.length ?? 0}, studio=${!!item.metadata.studio}`);
+
+    if (hasEntities) {
+      // Mark as triggered BEFORE calling (ref change doesn't cause re-render)
+      autoMatchTriggeredRef.current = true;
+      debugLog.info('Auto-triggering match to Stash...');
+      // Call directly - no setTimeout needed, ref prevents race conditions
+      handleMatchToStash(true); // silent=true for auto-match
+    }
+  }, [item.metadata, item.editedMetadata, handleMatchToStash]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
