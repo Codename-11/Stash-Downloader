@@ -21,6 +21,8 @@ export interface IDownloadOptions {
   outputDir?: string;
   filename?: string;
   quality?: 'best' | '1080p' | '720p' | '480p';
+  /** Fallback URL for yt-dlp if direct download fails (e.g., original page URL) */
+  fallbackUrl?: string;
 }
 
 export interface IServerDownloadResult {
@@ -88,6 +90,7 @@ export class DownloadService {
         {
           mode: 'download',
           url: url,
+          fallback_url: options.fallbackUrl, // Original page URL for yt-dlp fallback
           output_dir: serverDownloadPath,
           filename: options.filename,
           quality: options.quality || 'best',
@@ -375,7 +378,8 @@ export class DownloadService {
             options.outputDir = libraryPath;
           }
 
-          const serverResult = await this.downloadServerSide(videoUrl, options);
+          // Pass original page URL as fallback for yt-dlp if direct download fails
+          const serverResult = await this.downloadServerSide(videoUrl, { ...options, fallbackUrl: url });
           if (serverResult.success && serverResult.file_path) {
             log.debug('Server-side download complete:', serverResult.file_path);
 

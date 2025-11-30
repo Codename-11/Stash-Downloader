@@ -568,7 +568,8 @@ def task_download(args: dict) -> dict:
     Handle download task.
 
     Args:
-        url: URL to download
+        url: URL to download (may be direct file URL or page URL)
+        fallback_url: Original page URL for yt-dlp fallback (if url is direct file)
         output_dir: Directory to save file (defaults to /data/StashDownloader)
         filename: Optional custom filename
         quality: Quality preference (best, 1080p, 720p, 480p)
@@ -580,6 +581,7 @@ def task_download(args: dict) -> dict:
         If result_id is provided, also saves to file for later retrieval.
     """
     url = args.get("url")
+    fallback_url = args.get("fallback_url")  # Original page URL for yt-dlp fallback
     # Default to /data/StashDownloader (configurable via plugin settings)
     output_dir = args.get("output_dir", "/data/StashDownloader")
     filename = args.get("filename")
@@ -599,6 +601,9 @@ def task_download(args: dict) -> dict:
             save_result(result_id, result)
         return result
 
+    # Track which URL to use for yt-dlp fallback
+    ytdlp_url = url
+
     # Check if this is a direct file URL (try direct download first, fallback to yt-dlp)
     if is_direct_file_url(url):
         log.info(f"[task_download] Detected direct file URL, trying direct download first")
@@ -613,8 +618,12 @@ def task_download(args: dict) -> dict:
             return result
         else:
             # Direct download failed (likely 403/hotlink protection)
-            # Fall back to yt-dlp which has better site-specific handling
-            log.warning("[task_download] Direct download failed, falling back to yt-dlp")
+            # Fall back to yt-dlp with the original page URL (if provided)
+            if fallback_url:
+                log.warning(f"[task_download] Direct download failed, falling back to yt-dlp with page URL: {fallback_url}")
+                ytdlp_url = fallback_url
+            else:
+                log.warning("[task_download] Direct download failed, no fallback URL - trying yt-dlp with direct URL")
 
     # Check yt-dlp availability
     if not check_ytdlp():
@@ -632,7 +641,8 @@ def task_download(args: dict) -> dict:
         template = "%(title)s.%(ext)s"
 
     # Download using yt-dlp (with proxy if provided)
-    file_path = download_video(url, output_dir, template, quality, proxy=proxy)
+    # Use ytdlp_url which may be the original page URL if direct download failed
+    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy)
 
     if file_path:
         file_size = os.path.getsize(file_path)

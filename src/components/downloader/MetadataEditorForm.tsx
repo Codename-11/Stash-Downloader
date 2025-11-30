@@ -165,6 +165,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
    */
   const handleMatchToStash = useCallback(async (silent = false) => {
     if (!item.metadata) {
+      debugLog.warn('handleMatchToStash called but no metadata available');
       if (!silent) {
         toast.showToast('warning', 'No Metadata', 'Please scrape metadata first before matching.');
       }
@@ -176,10 +177,13 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
     try {
       debugLog.info('Matching metadata to Stash for:', item.url);
+      debugLog.debug(`Metadata to match: performers=${item.metadata.performers?.length ?? 0}, tags=${item.metadata.tags?.length ?? 0}, studio=${item.metadata.studio ?? 'none'}`);
       log.addLog('info', 'match', `Matching metadata to Stash for: ${item.url}`);
 
       const matchingService = getMetadataMatchingService();
+      debugLog.debug('Starting matchMetadataToStash...');
       const result = await matchingService.matchMetadataToStash(item.metadata);
+      debugLog.debug('matchMetadataToStash completed');
 
       // Combine matched and unmatched into the selectors
       const allPerformers: IStashPerformer[] = [
@@ -191,6 +195,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
         ...matchingService.createTempTags(result.unmatchedTags),
       ];
 
+      debugLog.info(`Setting ${allPerformers.length} performers, ${allTags.length} tags`);
       setPerformers(allPerformers);
       setTags(allTags);
 
@@ -208,6 +213,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
         result.matchedStudio ? '1 studio matched' : (result.unmatchedStudio ? '1 new studio' : ''),
       ].filter(Boolean).join(', ');
 
+      debugLog.info('Matching complete:', matchSummary);
       log.addLog('success', 'match', `Matching complete: ${matchSummary}`);
       if (!silent) {
         toast.showToast('success', 'Matching Complete', matchSummary);
@@ -217,12 +223,14 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Failed to match metadata';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
+      debugLog.error('Matching failed:', errorMessage);
       log.addLog('error', 'match', `Matching failed: ${errorMessage}`, errorStack);
       if (!silent) {
         toast.showToast('error', 'Match Failed', errorMessage);
       }
       setMatchError(errorMessage);
     } finally {
+      debugLog.debug('handleMatchToStash finished (finally block)');
       setIsMatching(false);
     }
   }, [item.metadata, item.url, log, toast]);
