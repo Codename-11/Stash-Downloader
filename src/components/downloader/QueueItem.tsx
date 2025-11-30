@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { MediaPreviewModal } from '@/components/common';
 import type { IDownloadItem } from '@/types';
 import { DownloadStatus, ContentType } from '@/types';
@@ -24,12 +25,18 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
   const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = React.useState(false);
+  const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0 });
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(target) &&
+        buttonRef.current && !buttonRef.current.contains(target)
+      ) {
         setRescrapeDropdownOpen(false);
       }
     };
@@ -40,6 +47,17 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [rescrapeDropdownOpen]);
+
+  // Update dropdown position when opened
+  React.useEffect(() => {
+    if (rescrapeDropdownOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.top - 8, // Position above the button with small gap
+        left: rect.right - 200, // Align right edge with button, dropdown is 200px wide
+      });
+    }
   }, [rescrapeDropdownOpen]);
 
   const handlePreview = (url: string, type: 'image' | 'video') => {
@@ -404,28 +422,30 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
             {/* Re-scrape dropdown */}
             {onRescrapeClick && availableScrapers && availableScrapers.length > 0 && item.status === DownloadStatus.Pending && (
-              <div ref={dropdownRef} className="dropup" style={{ position: 'relative' }}>
+              <>
                 <button
+                  ref={buttonRef}
                   className="btn btn-sm btn-outline-info"
                   onClick={() => setRescrapeDropdownOpen(!rescrapeDropdownOpen)}
                   title="Re-scrape metadata with a different scraper"
                 >
                   🔄 Re-scrape
                 </button>
-                {rescrapeDropdownOpen && (
+                {rescrapeDropdownOpen && ReactDOM.createPortal(
                   <div
+                    ref={dropdownRef}
                     className="dropdown-menu show"
                     style={{
-                      position: 'absolute',
-                      bottom: '100%',
-                      right: 0,
-                      top: 'auto',
-                      zIndex: 9999,
+                      position: 'fixed',
+                      top: dropdownPosition.top,
+                      left: dropdownPosition.left,
+                      transform: 'translateY(-100%)',
+                      zIndex: 99999,
                       backgroundColor: '#243340',
                       border: '1px solid #394b59',
                       minWidth: '200px',
-                      marginBottom: '4px',
-                      boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.3)',
+                      boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.4)',
+                      borderRadius: '4px',
                     }}
                   >
                     <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
@@ -452,9 +472,10 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                         {!scraper.supportsContentType && <small className="ms-1 text-warning">(wrong type)</small>}
                       </button>
                     ))}
-                  </div>
+                  </div>,
+                  document.body
                 )}
-              </div>
+              </>
             )}
             <button
               className="btn btn-sm btn-link text-danger p-1"
