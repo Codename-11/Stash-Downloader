@@ -2,7 +2,7 @@
  * MetadataEditorForm - Complete metadata editing form
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { IDownloadItem, IStashPerformer, IStashTag, IStashStudio } from '@/types';
 import { ContentType } from '@/types';
 import { PerformerSelector } from '@/components/common/PerformerSelector';
@@ -82,10 +82,24 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     }
   }, [item]);
 
-  // Auto-trigger "Match to Stash" when opening the form (if metadata has entities)
+  // State to trigger auto-match after handleMatchToStash is defined
+  const [shouldAutoMatch, setShouldAutoMatch] = useState(false);
+
+  // Check if auto-match should be triggered when form opens
   useEffect(() => {
-    // Skip if already matched, no metadata, or already have edited data
-    if (hasAutoMatched || !item.metadata || item.editedMetadata) {
+    // Skip if already matched or no metadata
+    if (hasAutoMatched || !item.metadata) {
+      debugLog.debug(`Auto-match skipped: hasAutoMatched=${hasAutoMatched}, hasMetadata=${!!item.metadata}`);
+      return;
+    }
+
+    // Skip if already have edited data with entities (user already edited)
+    if (item.editedMetadata && (
+      (item.editedMetadata.performers?.length ?? 0) > 0 ||
+      (item.editedMetadata.tags?.length ?? 0) > 0 ||
+      item.editedMetadata.studio
+    )) {
+      debugLog.debug('Auto-match skipped: item has existing edited metadata');
       return;
     }
 
@@ -94,16 +108,12 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                        (item.metadata.tags?.length ?? 0) > 0 ||
                        !!item.metadata.studio;
 
+    debugLog.debug(`Auto-match check: hasEntities=${hasEntities}, performers=${item.metadata.performers?.length ?? 0}, tags=${item.metadata.tags?.length ?? 0}, studio=${!!item.metadata.studio}`);
+
     if (hasEntities) {
       setHasAutoMatched(true);
-      // Small delay to let the UI render first
-      const timer = setTimeout(() => {
-        handleMatchToStash();
-      }, 100);
-      return () => clearTimeout(timer);
+      setShouldAutoMatch(true);
     }
-    
-    return undefined;
   }, [item.metadata, item.editedMetadata, hasAutoMatched]);
 
   /**
@@ -151,10 +161,13 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 
   /**
    * Match scraped metadata names against Stash database
+   * Wrapped in useCallback to ensure stable reference for auto-match useEffect
    */
-  const handleMatchToStash = async () => {
+  const handleMatchToStash = useCallback(async (silent = false) => {
     if (!item.metadata) {
-      toast.showToast('warning', 'No Metadata', 'Please scrape metadata first before matching.');
+      if (!silent) {
+        toast.showToast('warning', 'No Metadata', 'Please scrape metadata first before matching.');
+      }
       return;
     }
 
@@ -162,6 +175,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     setMatchError(null);
 
     try {
+      debugLog.info('Matching metadata to Stash for:', item.url);
       log.addLog('info', 'match', `Matching metadata to Stash for: ${item.url}`);
 
       const matchingService = getMetadataMatchingService();
@@ -195,19 +209,37 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       ].filter(Boolean).join(', ');
 
       log.addLog('success', 'match', `Matching complete: ${matchSummary}`);
-      toast.showToast('success', 'Matching Complete', matchSummary);
+      if (!silent) {
+        toast.showToast('success', 'Matching Complete', matchSummary);
+      }
       setMatchError(null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to match metadata';
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       log.addLog('error', 'match', `Matching failed: ${errorMessage}`, errorStack);
-      toast.showToast('error', 'Match Failed', errorMessage);
+      if (!silent) {
+        toast.showToast('error', 'Match Failed', errorMessage);
+      }
       setMatchError(errorMessage);
     } finally {
       setIsMatching(false);
     }
-  };
+  }, [item.metadata, item.url, log, toast]);
+
+  // Execute auto-match when shouldAutoMatch is set
+  useEffect(() => {
+    if (shouldAutoMatch) {
+      debugLog.info('Auto-triggering match to Stash...');
+      setShouldAutoMatch(false);
+      // Small delay to let the UI render first
+      const timer = setTimeout(() => {
+        handleMatchToStash(true); // silent=true for auto-match
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [shouldAutoMatch, handleMatchToStash]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -373,7 +405,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                     <button
                       type="button"
                       className="btn btn-outline-info"
-                      onClick={handleMatchToStash}
+                      onClick={() => handleMatchToStash()}
                       disabled={isMatching || isScraping}
                     >
                       {isMatching ? (

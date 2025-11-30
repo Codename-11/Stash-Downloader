@@ -406,11 +406,18 @@ def download_direct_file(
         # Download with streaming
         log.info(f"Downloading to: {output_path}")
 
+        # Build Referer header from the URL's origin to prevent hotlink protection
+        referer = f"{parsed.scheme}://{parsed.netloc}/"
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "*/*",
             "Accept-Encoding": "gzip, deflate",
+            "Referer": referer,
+            "Origin": f"{parsed.scheme}://{parsed.netloc}",
         }
+
+        log.info(f"Using Referer: {referer}")
 
         response = requests.get(
             url,
@@ -592,9 +599,9 @@ def task_download(args: dict) -> dict:
             save_result(result_id, result)
         return result
 
-    # Check if this is a direct file URL (no yt-dlp needed)
+    # Check if this is a direct file URL (try direct download first, fallback to yt-dlp)
     if is_direct_file_url(url):
-        log.info(f"[task_download] Detected direct file URL, using direct download")
+        log.info(f"[task_download] Detected direct file URL, trying direct download first")
         file_path = download_direct_file(url, output_dir, filename, proxy=proxy)
 
         if file_path:
@@ -605,12 +612,11 @@ def task_download(args: dict) -> dict:
                 log.info(f"Direct download result saved with result_id: {result_id}")
             return result
         else:
-            result = {"result_error": "Direct download failed", "success": False}
-            if result_id:
-                save_result(result_id, result)
-            return result
+            # Direct download failed (likely 403/hotlink protection)
+            # Fall back to yt-dlp which has better site-specific handling
+            log.warning("[task_download] Direct download failed, falling back to yt-dlp")
 
-    # Check yt-dlp availability for non-direct URLs
+    # Check yt-dlp availability
     if not check_ytdlp():
         result = {"result_error": "yt-dlp is not installed or not accessible", "success": False}
         if result_id:
