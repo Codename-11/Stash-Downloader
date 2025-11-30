@@ -152,7 +152,7 @@ export interface IDownloadQueueState {
 export type LogLevelSetting = 'off' | 'error' | 'warning' | 'info' | 'debug';
 
 export interface IPluginSettings {
-  defaultDownloadPath?: string;
+  /** Fallback directory if no Stash library is configured. Downloads normally go to Stash video library. */
   serverDownloadPath?: string;
   httpProxy?: string;
   concurrentDownloads: number;
