@@ -59,13 +59,30 @@ export const RescrapeModal: React.FC<RescrapeModalProps> = ({
   error,
 }) => {
   const [selections, setSelections] = useState<FieldSelections>(defaultSelections);
+  const [showAll, setShowAll] = useState(false);
 
   // Reset selections when modal opens
   useEffect(() => {
     if (open) {
       setSelections(defaultSelections);
+      setShowAll(false);
     }
   }, [open]);
+
+  // Helper to check if a field should be shown (has differences or showAll is true)
+  const shouldShowField = (originalValue: string | undefined, newValue: string | undefined): boolean => {
+    if (showAll) return true;
+    const hasOriginal = originalValue !== undefined && originalValue !== '';
+    const hasNew = newValue !== undefined && newValue !== '';
+    // Show if values are different, or if at least one has content
+    return (hasOriginal || hasNew) && originalValue !== newValue;
+  };
+
+  const shouldShowArrayField = (originalArray: string[] | undefined, newArray: string[] | undefined): boolean => {
+    const originalStr = originalArray?.join(', ') || '';
+    const newStr = newArray?.join(', ') || '';
+    return shouldShowField(originalStr, newStr);
+  };
 
   if (!open) return null;
 
@@ -232,9 +249,23 @@ export const RescrapeModal: React.FC<RescrapeModalProps> = ({
               <>
                 {/* Bulk actions */}
                 <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom" style={{ borderColor: '#394b59' }}>
-                  <span style={{ color: '#8b9fad', fontSize: '0.85rem' }}>
-                    Compare and select which values to keep:
-                  </span>
+                  <div className="d-flex align-items-center gap-3">
+                    <span style={{ color: '#8b9fad', fontSize: '0.85rem' }}>
+                      Compare and select which values to keep:
+                    </span>
+                    <div className="form-check form-switch">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="showAllFields"
+                        checked={showAll}
+                        onChange={(e) => setShowAll(e.target.checked)}
+                      />
+                      <label className="form-check-label text-muted" htmlFor="showAllFields" style={{ fontSize: '0.8rem' }}>
+                        Show all fields
+                      </label>
+                    </div>
+                  </div>
                   <div className="btn-group btn-group-sm">
                     <button
                       type="button"
@@ -256,50 +287,85 @@ export const RescrapeModal: React.FC<RescrapeModalProps> = ({
                 </div>
 
                 {/* Primary fields */}
-                <h6 className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Basic Info</h6>
-                {renderFieldComparison('title', 'Title', originalMetadata?.title, newMetadata.title)}
-                {renderFieldComparison('description', 'Description', originalMetadata?.description, newMetadata.description)}
-                {renderFieldComparison('date', 'Date', originalMetadata?.date, newMetadata.date)}
+                {(shouldShowField(originalMetadata?.title, newMetadata.title) ||
+                  shouldShowField(originalMetadata?.description, newMetadata.description) ||
+                  shouldShowField(originalMetadata?.date, newMetadata.date)) && (
+                  <h6 className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Basic Info</h6>
+                )}
+                {shouldShowField(originalMetadata?.title, newMetadata.title) &&
+                  renderFieldComparison('title', 'Title', originalMetadata?.title, newMetadata.title)}
+                {shouldShowField(originalMetadata?.description, newMetadata.description) &&
+                  renderFieldComparison('description', 'Description', originalMetadata?.description, newMetadata.description)}
+                {shouldShowField(originalMetadata?.date, newMetadata.date) &&
+                  renderFieldComparison('date', 'Date', originalMetadata?.date, newMetadata.date)}
 
                 {/* URLs - important to preserve */}
-                <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Media URLs (preserve originals recommended)</h6>
-                {renderFieldComparison(
-                  'videoUrl',
-                  'Video URL',
-                  originalMetadata?.videoUrl ? `${originalMetadata.videoUrl.substring(0, 80)}...` : undefined,
-                  newMetadata.videoUrl ? `${newMetadata.videoUrl.substring(0, 80)}...` : undefined
+                {(shouldShowField(originalMetadata?.videoUrl, newMetadata.videoUrl) ||
+                  shouldShowField(originalMetadata?.imageUrl, newMetadata.imageUrl) ||
+                  shouldShowField(originalMetadata?.thumbnailUrl, newMetadata.thumbnailUrl)) && (
+                  <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Media URLs (preserve originals recommended)</h6>
                 )}
-                {renderFieldComparison(
-                  'imageUrl',
-                  'Image URL',
-                  originalMetadata?.imageUrl ? `${originalMetadata.imageUrl.substring(0, 80)}...` : undefined,
-                  newMetadata.imageUrl ? `${newMetadata.imageUrl.substring(0, 80)}...` : undefined
-                )}
-                {renderFieldComparison(
-                  'thumbnailUrl',
-                  'Thumbnail',
-                  originalMetadata?.thumbnailUrl ? `${originalMetadata.thumbnailUrl.substring(0, 60)}...` : undefined,
-                  newMetadata.thumbnailUrl ? `${newMetadata.thumbnailUrl.substring(0, 60)}...` : undefined
-                )}
+                {shouldShowField(originalMetadata?.videoUrl, newMetadata.videoUrl) &&
+                  renderFieldComparison(
+                    'videoUrl',
+                    'Video URL',
+                    originalMetadata?.videoUrl ? `${originalMetadata.videoUrl.substring(0, 80)}...` : undefined,
+                    newMetadata.videoUrl ? `${newMetadata.videoUrl.substring(0, 80)}...` : undefined
+                  )}
+                {shouldShowField(originalMetadata?.imageUrl, newMetadata.imageUrl) &&
+                  renderFieldComparison(
+                    'imageUrl',
+                    'Image URL',
+                    originalMetadata?.imageUrl ? `${originalMetadata.imageUrl.substring(0, 80)}...` : undefined,
+                    newMetadata.imageUrl ? `${newMetadata.imageUrl.substring(0, 80)}...` : undefined
+                  )}
+                {shouldShowField(originalMetadata?.thumbnailUrl, newMetadata.thumbnailUrl) &&
+                  renderFieldComparison(
+                    'thumbnailUrl',
+                    'Thumbnail',
+                    originalMetadata?.thumbnailUrl ? `${originalMetadata.thumbnailUrl.substring(0, 60)}...` : undefined,
+                    newMetadata.thumbnailUrl ? `${newMetadata.thumbnailUrl.substring(0, 60)}...` : undefined
+                  )}
 
                 {/* Entity data */}
-                <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Metadata</h6>
-                {renderArrayComparison('performers', 'Performers', originalMetadata?.performers, newMetadata.performers)}
-                {renderArrayComparison('tags', 'Tags', originalMetadata?.tags, newMetadata.tags)}
-                {renderFieldComparison('studio', 'Studio', originalMetadata?.studio, newMetadata.studio)}
+                {(shouldShowArrayField(originalMetadata?.performers, newMetadata.performers) ||
+                  shouldShowArrayField(originalMetadata?.tags, newMetadata.tags) ||
+                  shouldShowField(originalMetadata?.studio, newMetadata.studio)) && (
+                  <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Metadata</h6>
+                )}
+                {shouldShowArrayField(originalMetadata?.performers, newMetadata.performers) &&
+                  renderArrayComparison('performers', 'Performers', originalMetadata?.performers, newMetadata.performers)}
+                {shouldShowArrayField(originalMetadata?.tags, newMetadata.tags) &&
+                  renderArrayComparison('tags', 'Tags', originalMetadata?.tags, newMetadata.tags)}
+                {shouldShowField(originalMetadata?.studio, newMetadata.studio) &&
+                  renderFieldComparison('studio', 'Studio', originalMetadata?.studio, newMetadata.studio)}
 
                 {/* Technical info */}
-                <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Technical</h6>
-                {renderFieldComparison(
-                  'duration',
-                  'Duration',
+                {(shouldShowField(
                   originalMetadata?.duration ? `${originalMetadata.duration}s` : undefined,
                   newMetadata.duration ? `${newMetadata.duration}s` : undefined
+                ) || shouldShowField(originalMetadata?.quality, newMetadata.quality)) && (
+                  <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Technical</h6>
                 )}
-                {renderFieldComparison('quality', 'Quality', originalMetadata?.quality, newMetadata.quality)}
+                {shouldShowField(
+                  originalMetadata?.duration ? `${originalMetadata.duration}s` : undefined,
+                  newMetadata.duration ? `${newMetadata.duration}s` : undefined
+                ) &&
+                  renderFieldComparison(
+                    'duration',
+                    'Duration',
+                    originalMetadata?.duration ? `${originalMetadata.duration}s` : undefined,
+                    newMetadata.duration ? `${newMetadata.duration}s` : undefined
+                  )}
+                {shouldShowField(originalMetadata?.quality, newMetadata.quality) &&
+                  renderFieldComparison('quality', 'Quality', originalMetadata?.quality, newMetadata.quality)}
 
                 {/* Gallery */}
-                {(originalMetadata?.galleryImages?.length || newMetadata.galleryImages?.length) && (
+                {(originalMetadata?.galleryImages?.length || newMetadata.galleryImages?.length) &&
+                  shouldShowField(
+                    originalMetadata?.galleryImages?.length ? `${originalMetadata.galleryImages.length} images` : undefined,
+                    newMetadata.galleryImages?.length ? `${newMetadata.galleryImages.length} images` : undefined
+                  ) && (
                   <>
                     <h6 className="text-muted mb-2 mt-3" style={{ fontSize: '0.8rem' }}>Gallery</h6>
                     {renderFieldComparison(
@@ -310,6 +376,36 @@ export const RescrapeModal: React.FC<RescrapeModalProps> = ({
                     )}
                   </>
                 )}
+
+                {/* Message when no differences found */}
+                {!showAll && (() => {
+                  const hasDifferences =
+                    shouldShowField(originalMetadata?.title, newMetadata.title) ||
+                    shouldShowField(originalMetadata?.description, newMetadata.description) ||
+                    shouldShowField(originalMetadata?.date, newMetadata.date) ||
+                    shouldShowField(originalMetadata?.videoUrl, newMetadata.videoUrl) ||
+                    shouldShowField(originalMetadata?.imageUrl, newMetadata.imageUrl) ||
+                    shouldShowField(originalMetadata?.thumbnailUrl, newMetadata.thumbnailUrl) ||
+                    shouldShowArrayField(originalMetadata?.performers, newMetadata.performers) ||
+                    shouldShowArrayField(originalMetadata?.tags, newMetadata.tags) ||
+                    shouldShowField(originalMetadata?.studio, newMetadata.studio) ||
+                    shouldShowField(
+                      originalMetadata?.duration ? `${originalMetadata.duration}s` : undefined,
+                      newMetadata.duration ? `${newMetadata.duration}s` : undefined
+                    ) ||
+                    shouldShowField(originalMetadata?.quality, newMetadata.quality);
+
+                  if (!hasDifferences) {
+                    return (
+                      <div className="alert alert-info mt-3" style={{ backgroundColor: 'rgba(13, 202, 240, 0.15)', borderColor: 'rgba(13, 202, 240, 0.3)' }}>
+                        <strong>No differences found.</strong> The scraped metadata is identical to the original.
+                        <br />
+                        <small className="text-muted">Enable "Show all fields" to see all metadata.</small>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </>
             ) : (
               <div className="text-center py-4 text-muted">

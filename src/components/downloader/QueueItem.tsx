@@ -359,6 +359,16 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             )}
           </div>
           <div className="d-flex gap-1 flex-wrap">
+            {/* Preview video button - before download */}
+            {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
+              <button
+                className="btn btn-sm btn-link text-info p-1"
+                onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
+                title="Preview video"
+              >
+                ▶️
+              </button>
+            )}
             {onDownload && item.status === DownloadStatus.Pending && (
               <button
                 className="btn btn-sm btn-success"
@@ -376,15 +386,6 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 disabled={item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing}
               >
                 {item.status === DownloadStatus.Complete ? '👁️ View' : '📝 Edit'}
-              </button>
-            )}
-            {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
-              <button
-                className="btn btn-sm btn-link text-info p-1"
-                onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
-                title="Preview video"
-              >
-                ▶️
               </button>
             )}
             {onViewLogs && item.logs && item.logs.length > 0 && (
@@ -419,7 +420,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                       bottom: '100%',
                       right: 0,
                       top: 'auto',
-                      zIndex: 1050,
+                      zIndex: 9999,
                       backgroundColor: '#243340',
                       border: '1px solid #394b59',
                       minWidth: '200px',
