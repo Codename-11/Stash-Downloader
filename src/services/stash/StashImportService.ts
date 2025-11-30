@@ -101,6 +101,15 @@ export class StashImportService {
     if (onStatusChange) onStatusChange('Downloading file...');
     if (onLog) onLog('info', 'Starting file download...');
     log.debug('Downloading file from URL:', downloadUrl);
+
+    // Pass original page URL as fallback for yt-dlp if direct download fails
+    // This is important for sites with hotlink protection (e.g., rule34video)
+    const fallbackUrl = downloadUrl !== item.url ? item.url : undefined;
+    if (fallbackUrl) {
+      log.debug('Using fallback URL for yt-dlp:', fallbackUrl);
+      if (onLog) onLog('info', 'Fallback URL set for retry attempts');
+    }
+
     const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
         log.debug('Download progress:',
@@ -108,6 +117,7 @@ export class StashImportService {
         );
         if (onProgress) onProgress(progress);
       },
+      fallbackUrl, // Original page URL for yt-dlp if direct download fails
     });
 
     // Check if this was a server-side download (file already on disk)

@@ -589,7 +589,10 @@ def task_download(args: dict) -> dict:
     proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
     result_id = args.get("result_id")
 
-    # Log proxy configuration for troubleshooting
+    # Log configuration for troubleshooting
+    log.info(f"[task_download] URL: {url}")
+    if fallback_url:
+        log.info(f"[task_download] Fallback URL for yt-dlp: {fallback_url}")
     if proxy:
         log.info(f"[task_download] Proxy configured: {proxy}")
     else:

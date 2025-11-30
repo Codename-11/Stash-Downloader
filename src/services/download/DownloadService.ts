@@ -61,6 +61,10 @@ export class DownloadService {
     options: IDownloadOptions = {}
   ): Promise<IServerDownloadResult> {
     log.info('Attempting server-side download via plugin task');
+    log.debug('Download URL:', url);
+    if (options.fallbackUrl) {
+      log.info('Fallback URL (for yt-dlp retry):', options.fallbackUrl);
+    }
 
     try {
       const stashService = getStashService();
@@ -71,19 +75,29 @@ export class DownloadService {
 
       // Generate result_id for async result retrieval
       const resultId = `download-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      log.debug('Result ID:', resultId);
 
       // Get server download path and proxy from settings
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const serverDownloadPath = options.outputDir || settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
       const httpProxy = settings.httpProxy;
 
+      log.debug('Output directory:', serverDownloadPath);
       if (httpProxy) {
         log.info(`Using HTTP proxy for server-side download: ${httpProxy}`);
       } else {
-        log.info('No HTTP proxy configured - using direct connection');
+        log.debug('No HTTP proxy configured - using direct connection');
       }
 
       // Run the download task and wait for completion
+      log.info('Starting download task with parameters:', JSON.stringify({
+        url: url.substring(0, 80) + (url.length > 80 ? '...' : ''),
+        fallback_url: options.fallbackUrl ? options.fallbackUrl.substring(0, 80) : undefined,
+        output_dir: serverDownloadPath,
+        quality: options.quality || 'best',
+        has_proxy: !!httpProxy,
+      }));
+
       const taskResult = await stashService.runPluginTaskAndWait(
         PLUGIN_ID,
         'Download Video',
@@ -113,7 +127,10 @@ export class DownloadService {
         }
       );
 
+      log.debug('Task result:', JSON.stringify(taskResult));
+
       if (!taskResult.success) {
+        log.error('Download task failed:', taskResult.error || 'Unknown error');
         return { success: false, error: taskResult.error || 'Download task failed' };
       }
 
@@ -125,17 +142,22 @@ export class DownloadService {
         result_id: resultId,
       }) as any;
 
+      log.debug('Read result response:', JSON.stringify(result));
+
       if (!result) {
+        log.error('Failed to read download result - got null/undefined');
         return { success: false, error: 'Failed to read download result' };
       }
 
       // Check for task_error (renamed from result_error/error to avoid GraphQL error interpretation)
       if (result.task_error) {
+        log.error('Download task error:', result.task_error);
         return { success: false, error: result.task_error };
       }
 
       // Legacy check for error field (shouldn't happen with updated Python script)
       if (result.error) {
+        log.error('Download error:', result.error);
         return { success: false, error: result.error };
       }
 
@@ -143,6 +165,7 @@ export class DownloadService {
       const fileSize = result.file_size;
 
       if (!filePath) {
+        log.error('Download completed but no file_path in result');
         return { success: false, error: 'Download completed but no file_path in result' };
       }
 
@@ -422,6 +445,9 @@ export class DownloadService {
     // This handles both yt-dlp domains and any other external URLs (CSP bypass)
     if (this.isStashEnvironment() && this.isExternalUrl(url)) {
       log.debug('Using server-side download for external URL (CSP bypass)');
+      if (options.fallbackUrl) {
+        log.debug('Fallback URL available for yt-dlp retry:', options.fallbackUrl);
+      }
       try {
         const stashService = getStashService();
         const libraryPath = await stashService.getVideoLibraryPath();
@@ -431,6 +457,7 @@ export class DownloadService {
           options.outputDir = libraryPath;
         }
 
+        // Pass fallbackUrl for yt-dlp if direct download fails
         const serverResult = await this.downloadServerSide(url, options);
         if (serverResult.success && serverResult.file_path) {
           log.debug('Server-side download complete:', serverResult.file_path);
