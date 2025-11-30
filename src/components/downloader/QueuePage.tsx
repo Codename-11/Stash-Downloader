@@ -15,11 +15,10 @@ import { useDownloadQueue } from '@/hooks';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
-import { getDownloadService, getBrowserDownloadService } from '@/services/download';
 import { getStashService } from '@/services/stash/StashGraphQLService';
-import { DownloadStatus, ContentType } from '@/types';
+import { DownloadStatus } from '@/types';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
-import { formatDownloadError, createLogger } from '@/utils';
+import { createLogger } from '@/utils';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
 import type { IPluginSettings } from '@/types';
@@ -310,121 +309,6 @@ export const QueuePage: React.FC = () => {
       stashId,
       completedAt: new Date(),
     });
-  };
-
-  const handleDirectDownload = async (itemId: string) => {
-    const item = queue.items.find((i) => i.id === itemId);
-    if (!item) return;
-
-    queue.updateItem(itemId, {
-      status: DownloadStatus.Downloading,
-      startedAt: new Date(),
-    });
-
-    try {
-      log.addLog('info', 'download', `Starting direct download: ${item.metadata?.title || item.url}`);
-      
-      // Log available URLs based on content type
-      if (item.metadata?.contentType === ContentType.Image) {
-        if (item.metadata?.imageUrl) {
-          log.addLog('info', 'download', `Scraped imageUrl available: ${item.metadata.imageUrl.substring(0, 100)}...`);
-        } else {
-          log.addLog('info', 'download', 'Downloading image from page URL directly');
-        }
-      } else {
-        if (item.metadata?.videoUrl) {
-          log.addLog('info', 'download', `Scraped videoUrl available for fallback: ${item.metadata.videoUrl.substring(0, 100)}...`);
-        } else {
-          log.addLog('warning', 'download', 'No scraped videoUrl available - yt-dlp must succeed or download will fail');
-        }
-      }
-      
-      const downloadService = getDownloadService();
-      const browserDownloadService = getBrowserDownloadService();
-      
-      // Download the file - use scraped videoUrl if available as fallback
-      const blob = await downloadService.download(
-        item.url,
-        {
-          onProgress: (progress) => {
-            queue.updateItem(itemId, {
-              progress,
-            });
-          },
-        },
-        item.metadata?.videoUrl, // Pass scraped videoUrl for videos
-        item.metadata?.imageUrl  // Pass scraped imageUrl for images
-      );
-
-      log.addLog('success', 'download', `Download complete: ${item.metadata?.title || item.url}`, `File size: ${blob.size} bytes`);
-
-      // Save to browser downloads with metadata
-      await browserDownloadService.downloadWithMetadata(
-        {
-          ...item,
-          editedMetadata: {
-            title: item.metadata?.title,
-            description: item.metadata?.description,
-            date: item.metadata?.date,
-          },
-        },
-        blob,
-        { id: itemId } as any // Mock stash result for test mode
-      );
-
-      toast.showToast('success', 'Download Complete', `Downloaded: ${item.metadata?.title || item.url}`);
-      
-      queue.updateItem(itemId, {
-        status: DownloadStatus.Complete,
-        completedAt: new Date(),
-        fileSize: blob.size,
-      });
-    } catch (error) {
-      // Check if this is a server-side success (file saved to server)
-      const isServerSuccess = (error as any)?.isServerSuccess === true;
-      const serverResult = (error as any)?.serverResult;
-
-      if (isServerSuccess && serverResult?.file_path) {
-        // Server-side download succeeded! File is saved to server's filesystem.
-        const filePath = serverResult.file_path;
-        const fileSize = serverResult.file_size || 0;
-
-        log.addLog('success', 'download',
-          `Downloaded to server: ${item.metadata?.title || item.url}`,
-          `File saved to: ${filePath}\nSize: ${fileSize} bytes\n\nStash will automatically index this file on the next scan.`
-        );
-        toast.showToast('success', 'Download Complete', `Saved to server: ${filePath}`);
-
-        queue.updateItem(itemId, {
-          status: DownloadStatus.Complete,
-          completedAt: new Date(),
-          fileSize: fileSize,
-        });
-        return;
-      }
-
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      const formattedError = formatDownloadError(error, item.url);
-      const errorDetails = error instanceof Error ?
-        `Error: ${formattedError}\n\nStack trace:\n${errorStack || 'No stack trace available'}` :
-        `Error: ${formattedError}`;
-
-      debugLog.error('Download failed with full details:', JSON.stringify({
-        itemId,
-        url: item.url,
-        originalError: error instanceof Error ? error.message : String(error),
-        formattedError,
-        errorStack: errorStack || 'No stack trace',
-      }));
-
-      log.addLog('error', 'download', `Direct download failed: ${formattedError}`, errorDetails);
-      toast.showToast('error', 'Download Failed', formattedError);
-
-      queue.updateItem(itemId, {
-        status: DownloadStatus.Failed,
-        error: formattedError,
-      });
-    }
   };
 
   // Handle re-scrape click - opens the modal and starts scraping
