@@ -2,16 +2,25 @@
  * EditMetadataModal - Modal for editing item metadata
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { MetadataEditorForm } from './MetadataEditorForm';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
-import type { IDownloadItem } from '@/types';
+import { RescrapeModal } from '@/components/common/RescrapeModal';
+import type { IDownloadItem, IScrapedMetadata } from '@/types';
 import { DownloadStatus } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
+import { getScraperRegistry } from '@/services/metadata';
 import { formatBytes, formatDownloadError } from '@/utils';
+
+interface ScraperInfo {
+  name: string;
+  canHandle: boolean;
+  supportsContentType: boolean;
+}
 
 interface EditMetadataModalProps {
   item: IDownloadItem | null;
@@ -32,11 +41,143 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
   const log = useLog();
   const [error, setError] = useState<string | null>(null);
 
+  // Re-scrape state
+  const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = useState(false);
+  const [rescrapeModalOpen, setRescrapeModalOpen] = useState(false);
+  const [rescrapeScraperName, setRescrapeScraperName] = useState('');
+  const [rescrapeNewMetadata, setRescrapeNewMetadata] = useState<IScrapedMetadata | undefined>(undefined);
+  const [rescrapeLoading, setRescrapeLoading] = useState(false);
+  const [rescrapeError, setRescrapeError] = useState<string | undefined>(undefined);
+  const [availableScrapers, setAvailableScrapers] = useState<ScraperInfo[]>([]);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [formKey, setFormKey] = useState(0); // Key to force form re-initialization
+  const [effectiveItem, setEffectiveItem] = useState<IDownloadItem | null>(null);
+
+  const rescrapeButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   // Get current state from item (persisted across modal open/close)
   const isImporting = item?.status === DownloadStatus.Processing || item?.status === DownloadStatus.Downloading;
   const downloadProgress = item?.progress || null;
   const importStatus = item?.status === DownloadStatus.Downloading ? 'Downloading file...' :
                        item?.status === DownloadStatus.Processing ? 'Processing...' : 'Preparing...';
+
+  // Update effective item when item prop changes
+  useEffect(() => {
+    if (item) {
+      setEffectiveItem(item);
+    }
+  }, [item]);
+
+  // Load available scrapers when item changes
+  useEffect(() => {
+    if (item && open) {
+      const scraperRegistry = getScraperRegistry();
+      const scrapers = scraperRegistry.getAvailableScrapersForUrl(item.url, item.metadata?.contentType);
+      setAvailableScrapers(scrapers);
+    }
+  }, [item, open]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(target) &&
+        rescrapeButtonRef.current && !rescrapeButtonRef.current.contains(target)
+      ) {
+        setRescrapeDropdownOpen(false);
+      }
+    };
+
+    if (rescrapeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [rescrapeDropdownOpen]);
+
+  // Update dropdown position when opened
+  useEffect(() => {
+    if (rescrapeDropdownOpen && rescrapeButtonRef.current) {
+      const rect = rescrapeButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+    }
+  }, [rescrapeDropdownOpen]);
+
+  // Reset re-scrape state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setRescrapeDropdownOpen(false);
+      setRescrapeModalOpen(false);
+      setRescrapeNewMetadata(undefined);
+      setRescrapeError(undefined);
+      setRescrapeLoading(false);
+      setFormKey(0);
+      setEffectiveItem(null);
+    }
+  }, [open]);
+
+  // Handle re-scrape scraper selection
+  const handleRescrapeClick = async (scraperName: string) => {
+    if (!item) return;
+
+    setRescrapeDropdownOpen(false);
+    setRescrapeScraperName(scraperName);
+    setRescrapeNewMetadata(undefined);
+    setRescrapeError(undefined);
+    setRescrapeLoading(true);
+    setRescrapeModalOpen(true);
+
+    try {
+      log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${item.url}`);
+      const scraperRegistry = getScraperRegistry();
+      const newMetadata = await scraperRegistry.scrapeWithScraper(item.url, scraperName);
+      setRescrapeNewMetadata(newMetadata);
+      setRescrapeLoading(false);
+      log.addLog('success', 'scrape', `Re-scrape complete with ${scraperName}: ${newMetadata.title || item.url}`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setRescrapeError(errorMsg);
+      setRescrapeLoading(false);
+      log.addLog('error', 'scrape', `Re-scrape failed with ${scraperName}: ${errorMsg}`);
+    }
+  };
+
+  // Handle applying merged metadata from re-scrape modal
+  const handleRescrapeApply = (mergedMetadata: IScrapedMetadata) => {
+    if (!item) return;
+
+    // Update the queue item with merged metadata
+    if (onUpdateItem) {
+      onUpdateItem(item.id, { metadata: mergedMetadata, error: undefined });
+    }
+
+    // Update effective item locally so form reflects changes
+    setEffectiveItem(prev => prev ? { ...prev, metadata: mergedMetadata } : null);
+
+    // Increment form key to force re-initialization
+    setFormKey(prev => prev + 1);
+
+    toast.showToast('success', 'Metadata Updated', `Applied merged metadata from ${rescrapeScraperName}`);
+    log.addLog('success', 'scrape', `Applied merged metadata for: ${mergedMetadata.title || item.url}`);
+
+    // Close re-scrape modal
+    setRescrapeModalOpen(false);
+    setRescrapeNewMetadata(undefined);
+  };
+
+  // Handle closing the re-scrape modal
+  const handleRescrapeClose = () => {
+    setRescrapeModalOpen(false);
+    setRescrapeNewMetadata(undefined);
+    setRescrapeError(undefined);
+    setRescrapeLoading(false);
+  };
 
   const handleSave = async (editedMetadata: IDownloadItem['editedMetadata']) => {
     if (!item || !onUpdateItem) return;
@@ -176,9 +317,66 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           <div className="modal-content" style={{ backgroundColor: '#30404d', color: '#fff' }}>
             {/* Modal Header */}
             <div className="modal-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
-              <h5 className="modal-title text-light">
-                {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
-              </h5>
+              <div className="d-flex align-items-center gap-3 flex-grow-1">
+                <h5 className="modal-title text-light mb-0">
+                  {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
+                </h5>
+                {/* Re-scrape dropdown - only show for pending items with available scrapers */}
+                {item.status === DownloadStatus.Pending && availableScrapers.length > 0 && (
+                  <div className="position-relative">
+                    <button
+                      ref={rescrapeButtonRef}
+                      type="button"
+                      className="btn btn-sm btn-outline-info"
+                      onClick={() => setRescrapeDropdownOpen(!rescrapeDropdownOpen)}
+                      disabled={isImporting}
+                      title="Re-scrape metadata with a different scraper"
+                    >
+                      🔄 Re-scrape
+                    </button>
+                    {rescrapeDropdownOpen && ReactDOM.createPortal(
+                      <div
+                        ref={dropdownRef}
+                        className="dropdown-menu show"
+                        style={{
+                          position: 'fixed',
+                          top: dropdownPosition.top,
+                          left: dropdownPosition.left,
+                          zIndex: 100000,
+                          backgroundColor: '#243340',
+                          border: '1px solid #394b59',
+                          minWidth: '200px',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        <div className="dropdown-header text-muted" style={{ fontSize: '0.75rem', padding: '0.5rem 1rem' }}>
+                          Select scraper to compare:
+                        </div>
+                        {availableScrapers.map((scraper) => (
+                          <button
+                            key={scraper.name}
+                            className={`dropdown-item ${!scraper.canHandle ? 'text-muted' : ''}`}
+                            style={{
+                              color: scraper.canHandle ? '#fff' : '#6c757d',
+                              backgroundColor: 'transparent',
+                              padding: '0.5rem 1rem',
+                            }}
+                            onClick={() => handleRescrapeClick(scraper.name)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#394b59'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            {scraper.name}
+                            {!scraper.canHandle && <small className="ms-1 text-warning">(may fail)</small>}
+                            {!scraper.supportsContentType && <small className="ms-1 text-warning">(wrong type)</small>}
+                          </button>
+                        ))}
+                      </div>,
+                      document.body
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 className="btn-close btn-close-white"
@@ -246,11 +444,14 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                   </div>
 
                   {/* Metadata editor */}
-                  <MetadataEditorForm
-                    item={item}
-                    onSave={handleSave}
-                    onCancel={handleCancel}
-                  />
+                  {effectiveItem && (
+                    <MetadataEditorForm
+                      key={`form-${formKey}`}
+                      item={effectiveItem}
+                      onSave={handleSave}
+                      onCancel={handleCancel}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -264,6 +465,18 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Re-scrape Comparison Modal */}
+      <RescrapeModal
+        open={rescrapeModalOpen}
+        onClose={handleRescrapeClose}
+        originalMetadata={effectiveItem?.metadata}
+        newMetadata={rescrapeNewMetadata}
+        scraperName={rescrapeScraperName}
+        onApply={handleRescrapeApply}
+        isLoading={rescrapeLoading}
+        error={rescrapeError}
+      />
     </>
   );
 };

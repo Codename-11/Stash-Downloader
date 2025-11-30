@@ -1,11 +1,9 @@
 /**
  * DownloadService - Handles file downloads
  *
- * Priority order:
- * 1. Server-side download via Stash plugin task (no CORS, requires yt-dlp on server)
+ * In Stash environment:
+ * 1. Server-side download via Stash plugin task (uses yt-dlp on server)
  * 2. Direct URL download (if videoUrl/imageUrl provided by scraper)
- * 3. yt-dlp via CORS proxy (test-app or fallback)
- * 4. Direct fetch with CORS proxy
  */
 
 import type { IDownloadProgress, IGalleryProgress } from '@/types';
@@ -41,7 +39,7 @@ export interface IGalleryDownloadResult {
 
 export class DownloadService {
   /**
-   * Check if we're running in Stash environment (vs test-app)
+   * Check if we're running in Stash environment
    */
   isStashEnvironment(): boolean {
     try {
@@ -53,38 +51,8 @@ export class DownloadService {
   }
 
   /**
-   * Check if CORS proxy is enabled (for test environment)
-   */
-  private isCorsProxyEnabled(): boolean {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('corsProxyEnabled') === 'true';
-  }
-
-  /**
-   * Get CORS proxy URL from settings
-   */
-  private getCorsProxyUrl(): string {
-    if (typeof window === 'undefined') return 'http://localhost:8080';
-    return localStorage.getItem('corsProxyUrl') || 'http://localhost:8080';
-  }
-
-  /**
-   * Wrap URL with CORS proxy if enabled
-   */
-  private wrapWithProxy(url: string): string {
-    if (!this.isCorsProxyEnabled()) return url;
-    const proxyUrl = this.getCorsProxyUrl();
-    return `${proxyUrl}/${url}`;
-  }
-
-  /**
    * Download using server-side plugin task (no CORS issues)
    * This uses Stash's runPluginTask to execute the Python backend
-   * 
-   * NOTE: Server-side downloads save files to the server's filesystem.
-   * The file_path returned is on the server, not accessible via HTTP.
-   * For browser downloads, use the regular download() method which returns Blobs.
-   * Server-side downloads are better suited for direct Stash import (future enhancement).
    */
   async downloadServerSide(
     url: string,
@@ -105,9 +73,8 @@ export class DownloadService {
       // Get server download path and proxy from settings
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const serverDownloadPath = options.outputDir || settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
-      const httpProxy = settings.httpProxy; // Optional proxy (e.g., http://proxy.example.com:8080)
-      
-      // Log proxy configuration for troubleshooting
+      const httpProxy = settings.httpProxy;
+
       if (httpProxy) {
         log.info(`Using HTTP proxy for server-side download: ${httpProxy}`);
       } else {
@@ -125,13 +92,12 @@ export class DownloadService {
           filename: options.filename,
           quality: options.quality || 'best',
           result_id: resultId,
-          proxy: httpProxy, // Pass proxy to Python script (optional)
+          proxy: httpProxy,
         },
         {
           maxWaitMs: 600000, // 10 minutes for large downloads
           onProgress: (progress) => {
             if (options.onProgress) {
-              // Convert job progress (0-100) to download progress
               options.onProgress({
                 bytesDownloaded: 0,
                 totalBytes: 0,
@@ -151,22 +117,19 @@ export class DownloadService {
       log.info('Server-side download task completed, reading result...');
 
       // Read the result to get file_path
-      // Stash extracts the 'output' field from PluginOutput and returns it directly
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'read_result',
         result_id: resultId,
-      }) as any; // Result is the data directly, not wrapped in IPluginTaskResult
+      }) as any;
 
       if (!result) {
         return { success: false, error: 'Failed to read download result' };
       }
 
-      // Check for error in result (from PluginOutput.error)
       if (result.error) {
         return { success: false, error: result.error };
       }
 
-      // Extract file_path from result (result is already the data object)
       const filePath = result.file_path;
       const fileSize = result.file_size;
 
@@ -209,10 +172,8 @@ export class DownloadService {
 
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      }) as any; // Result is the data directly, not wrapped in IPluginTaskResult
+      }) as any;
 
-      // Stash extracts the 'output' field from PluginOutput and returns it directly
-      // So result is already {available: bool, success: bool}
       return result?.available === true;
     } catch {
       return false;
@@ -220,8 +181,7 @@ export class DownloadService {
   }
 
   /**
-   * Check if URL is from a domain that requires yt-dlp (domain-based check only)
-   * This is used for server-side downloads in Stash (doesn't check CORS proxy)
+   * Check if URL is from a domain that requires yt-dlp
    */
   private requiresYtDlpDomain(url: string): boolean {
     // Never use yt-dlp for direct image URLs
@@ -255,265 +215,22 @@ export class DownloadService {
   }
 
   /**
-   * Check if we should use yt-dlp for download (client-side check, requires CORS proxy)
-   * Use yt-dlp for sites that typically require it (adult sites, streaming sites)
-   * Never use yt-dlp for direct image URLs
-   */
-  private shouldUseYtDlp(url: string): boolean {
-    if (typeof window === 'undefined') return false;
-    
-    const corsEnabled = this.isCorsProxyEnabled();
-    if (!corsEnabled) return false;
-
-    // Use domain-based check
-    return this.requiresYtDlpDomain(url);
-  }
-
-  /**
-   * Validate and normalize URL for yt-dlp
-   */
-  private validateUrl(url: string): string {
-    log.debug('validateUrl called', JSON.stringify({
-      url: url,
-      type: typeof url,
-      length: url?.length,
-      isString: typeof url === 'string',
-      isEmpty: !url || url.trim() === '',
-    }));
-
-    if (!url || typeof url !== 'string') {
-      const error = `Invalid URL: URL is empty or not a string. Received: ${JSON.stringify(url)} (type: ${typeof url})`;
-      console.error('[DownloadService] URL validation failed:', error);
-      throw new Error(error);
-    }
-
-    // Trim whitespace
-    const trimmedUrl = url.trim();
-    if (trimmedUrl === '') {
-      const error = 'Invalid URL: URL is empty after trimming';
-      console.error('[DownloadService] URL validation failed:', error);
-      throw new Error(error);
-    }
-
-    // If it's already a valid absolute URL, return it
-    try {
-      const urlObj = new URL(trimmedUrl);
-      const normalized = urlObj.href;
-      console.log('[DownloadService] URL validated and normalized:', {
-        original: url,
-        trimmed: trimmedUrl,
-        normalized: normalized,
-        protocol: urlObj.protocol,
-        hostname: urlObj.hostname,
-      });
-      return normalized;
-    } catch (error) {
-      // If it's not a valid URL, it might be relative or malformed
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      const fullError = `Invalid URL format: ${trimmedUrl}. yt-dlp requires a complete URL (e.g., https://example.com/video). Error: ${errorMsg}`;
-      console.error('[DownloadService] URL validation failed:', {
-        url: trimmedUrl,
-        error: errorMsg,
-        fullError: fullError,
-      });
-      throw new Error(fullError);
-    }
-  }
-
-  /**
-   * Download file using yt-dlp (for sites that require it)
-   */
-  private async downloadWithYtDlp(
-    url: string,
-    options: IDownloadOptions = {}
-  ): Promise<Blob> {
-    console.log('[DownloadService] downloadWithYtDlp called with URL:', url);
-    console.log('[DownloadService] URL type:', typeof url);
-    console.log('[DownloadService] URL length:', url?.length);
-    
-    // Validate and normalize the URL
-    let validatedUrl: string;
-    try {
-      validatedUrl = this.validateUrl(url);
-      console.log('[DownloadService] URL validated successfully:', validatedUrl);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown validation error';
-      console.error('[DownloadService] URL validation failed:', {
-        originalUrl: url,
-        error: errorMsg,
-        urlType: typeof url,
-        urlLength: url?.length,
-      });
-      throw new Error(`Invalid URL for yt-dlp: ${errorMsg}. Original URL: ${url}`);
-    }
-    
-    const { onProgress, signal } = options;
-    const proxyUrl = this.getCorsProxyUrl();
-    const downloadUrl = `${proxyUrl}/api/download?url=${encodeURIComponent(validatedUrl)}&format=best`;
-
-    console.log('[DownloadService] Using yt-dlp to download:', {
-      originalUrl: url,
-      validatedUrl: validatedUrl,
-      proxyUrl: proxyUrl,
-      downloadEndpoint: downloadUrl,
-    });
-
-    let response: Response;
-    try {
-      // Use fetchWithTimeout with a longer timeout for downloads (5 minutes)
-      // Downloads can take a while, but we still want to prevent infinite hangs
-      response = await fetchWithTimeout(
-        downloadUrl,
-        { signal },
-        300000 // 5 minutes timeout for downloads
-      );
-      console.log('[DownloadService] Fetch response status:', response.status, response.statusText);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      console.error('[DownloadService] Fetch error:', {
-        error: errorMessage,
-        stack: errorStack,
-        downloadUrl: downloadUrl,
-        validatedUrl: validatedUrl,
-      });
-      throw new Error(
-        `yt-dlp download failed: ${errorMessage}. ` +
-        `URL: ${validatedUrl}. ` +
-        'Make sure yt-dlp is installed and CORS proxy is running.'
-      );
-    }
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        const responseText = await response.text();
-        try {
-          errorData = JSON.parse(responseText);
-        } catch {
-          // If not JSON, use the text as error message
-          errorData = { error: responseText || response.statusText };
-        }
-      } catch {
-        errorData = { error: response.statusText };
-      }
-      
-      console.error('[DownloadService] yt-dlp API error response:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData,
-        validatedUrl: validatedUrl,
-        originalUrl: url,
-        downloadEndpoint: downloadUrl,
-      });
-      
-      // Provide more detailed error message with full stderr
-      const errorMessage = errorData.error || response.statusText;
-      const stderr = errorData.stderr ? `\n\nyt-dlp stderr:\n${errorData.stderr}` : '';
-      const exitCode = errorData.exitCode ? ` (exit code: ${errorData.exitCode})` : '';
-      const hint = errorData.message ? `\nHint: ${errorData.message}` : '';
-      
-      // Log full error details to console for debugging
-      console.error('[DownloadService] Full yt-dlp error details:', {
-        errorMessage,
-        stderr: errorData.stderr,
-        exitCode: errorData.exitCode,
-        status: response.status,
-        statusText: response.statusText,
-        errorData,
-        validatedUrl,
-        originalUrl: url,
-      });
-      
-      const fullError = new Error(
-        `yt-dlp download failed${exitCode}: ${errorMessage}\n` +
-        `URL: ${validatedUrl}${stderr}${hint}`
-      );
-      
-      // Attach error data for fallback logic
-      (fullError as any).errorData = errorData;
-      (fullError as any).originalUrl = url;
-      
-      throw fullError;
-    }
-
-    const contentLength = response.headers.get('content-length');
-    const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-    if (!response.body) {
-      throw new Error('Response body is null');
-    }
-
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let bytesDownloaded = 0;
-    const startTime = Date.now();
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) break;
-
-      chunks.push(value);
-      bytesDownloaded += value.length;
-
-      if (onProgress) {
-        const elapsedTime = (Date.now() - startTime) / 1000; // seconds
-        const speed = bytesDownloaded / elapsedTime;
-        const percentage = totalBytes > 0 ? (bytesDownloaded / totalBytes) * 100 : 0;
-        const timeRemaining = totalBytes > 0 ? (totalBytes - bytesDownloaded) / speed : undefined;
-
-        onProgress({
-          bytesDownloaded,
-          totalBytes,
-          percentage,
-          speed,
-          timeRemaining,
-        });
-      }
-    }
-
-    return new Blob(chunks as BlobPart[]);
-  }
-
-  /**
-   * Download an image file directly (simple HTTP fetch, no yt-dlp needed)
-   * Images are simpler than videos - just direct fetch with progress tracking
-   *
-   * @param imageUrl Direct image URL to download
-   * @param options Download options (progress callback, abort signal)
+   * Download an image file directly
    */
   async downloadImage(
     imageUrl: string,
     options: IDownloadOptions = {}
   ): Promise<Blob> {
     const { onProgress, signal } = options;
-    const fetchUrl = this.wrapWithProxy(imageUrl);
 
     log.info(`Downloading image: ${imageUrl}`);
 
     let response: Response;
     try {
-      // 1 minute timeout for images (usually much smaller than videos)
-      response = await fetchWithTimeout(fetchUrl, { signal }, 60000);
+      response = await fetchWithTimeout(imageUrl, { signal }, 60000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
-
-      if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
-        const corsEnabled = this.isCorsProxyEnabled();
-        if (!corsEnabled) {
-          throw new Error(
-            'CORS Error: This site blocks direct browser requests. ' +
-            'Please enable CORS proxy in settings to download images from this site.'
-          );
-        } else {
-          throw new Error(
-            'Network Error: Failed to fetch image. ' +
-            `The CORS proxy may not be running. Proxy URL: ${this.getCorsProxyUrl()}`
-          );
-        }
-      }
-      throw error;
+      throw new Error(`Image download failed: ${errorMessage}`);
     }
 
     if (!response.ok) {
@@ -523,8 +240,6 @@ export class DownloadService {
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     const contentLength = response.headers.get('content-length');
     const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-    log.debug(`Image download: ${contentType}, ${totalBytes} bytes`);
 
     if (!response.body) {
       throw new Error('Response body is null');
@@ -562,11 +277,6 @@ export class DownloadService {
 
   /**
    * Download a gallery (multiple images from one URL)
-   * Downloads each image sequentially with progress tracking
-   *
-   * @param images Array of gallery image objects with URLs
-   * @param options Download options
-   * @param onGalleryProgress Callback for gallery-level progress
    */
   async downloadGallery(
     images: Array<{ url: string; filename?: string }>,
@@ -581,7 +291,6 @@ export class DownloadService {
     for (let i = 0; i < images.length; i++) {
       const image = images[i]!;
 
-      // Update gallery progress
       if (onGalleryProgress) {
         onGalleryProgress({
           totalImages: images.length,
@@ -595,17 +304,14 @@ export class DownloadService {
         const blob = await this.downloadImage(image.url, options);
         downloadedBlobs.push(blob);
 
-        // Generate filename from URL if not provided
         const filename = image.filename ?? this.getFilenameFromUrl(image.url, i);
         filePaths.push(filename);
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         log.error(`Failed to download gallery image ${i + 1}: ${errorMsg}`);
-        // Continue with remaining images
       }
     }
 
-    // Final progress update
     if (onGalleryProgress) {
       onGalleryProgress({
         totalImages: images.length,
@@ -632,21 +338,12 @@ export class DownloadService {
     } catch {
       // Ignore URL parsing errors
     }
-    // Fallback: generate filename with index
     const ext = this.getFileExtension(url) || 'jpg';
     return `image_${index + 1}.${ext}`;
   }
 
   /**
-   * Download file from URL and return as Blob (for browser downloads)
-   *
-   * NOTE: This method returns Blobs for browser downloads.
-   * For server-side downloads (which save to server filesystem), use downloadServerSide().
-   * Server-side downloads are better suited for direct Stash import (future enhancement).
-   *
-   * @param videoUrl Optional direct video URL from scraper (preferred over yt-dlp)
-   * @param imageUrl Optional direct image URL from scraper (for image downloads)
-   * @param contentType Optional content type to route download appropriately
+   * Download file from URL and return as Blob
    */
   async download(
     url: string,
@@ -655,65 +352,53 @@ export class DownloadService {
     imageUrl?: string,
     contentType?: ContentType
   ): Promise<Blob> {
-    // Route image downloads through simpler path (no yt-dlp needed)
+    // Route image downloads through simpler path
     if (contentType === ContentType.Image) {
       const targetUrl = imageUrl || url;
       log.info('Routing to image download path');
       return this.downloadImage(targetUrl, options);
     }
-    // PRIORITY 1: If we have a direct imageUrl from scraper, use it (never use yt-dlp for images)
+
+    // PRIORITY 1: If we have a direct imageUrl from scraper, use it
     if (imageUrl && imageUrl !== url && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
       console.log('[DownloadService] Using direct imageUrl from scraper');
-      console.log('[DownloadService] Original URL:', url);
-      console.log('[DownloadService] Direct imageUrl:', imageUrl);
-      
       try {
         return await this.downloadDirect(imageUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.warn('[DownloadService] Direct imageUrl download failed:', errorMessage);
-        throw error; // Don't fall back to yt-dlp for images
+        throw error;
       }
     }
 
-    // PRIORITY 2: If we have a direct videoUrl from scraper, use it first (like stacher7)
-    // This is more reliable than yt-dlp for Pornhub
+    // PRIORITY 2: If we have a direct videoUrl from scraper, use it
     if (videoUrl && videoUrl !== url && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-      console.log('[DownloadService] Using direct videoUrl from scraper (stacher7 approach)');
-      console.log('[DownloadService] Original URL:', url);
-      console.log('[DownloadService] Direct videoUrl:', videoUrl);
-      
+      console.log('[DownloadService] Using direct videoUrl from scraper');
       try {
         return await this.downloadDirect(videoUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn('[DownloadService] Direct videoUrl download failed, trying yt-dlp as fallback:', errorMessage);
-        // Fall through to yt-dlp as backup
+        console.warn('[DownloadService] Direct videoUrl download failed:', errorMessage);
+        // Fall through to server-side yt-dlp
       }
     }
 
-    // PRIORITY 3: In Stash environment, use server-side download for videos that need yt-dlp
-    // This bypasses CORS issues and uses server's yt-dlp
-    // Use requiresYtDlpDomain (not shouldUseYtDlp) because server-side doesn't need CORS proxy
+    // PRIORITY 3: Use server-side download for videos that need yt-dlp
     if (this.isStashEnvironment() && this.requiresYtDlpDomain(url)) {
-      console.log('[DownloadService] Stash environment: using server-side download for yt-dlp');
+      console.log('[DownloadService] Using server-side download for yt-dlp');
       try {
-        // Try to get Stash library path for automatic indexing
         const stashService = getStashService();
         const libraryPath = await stashService.getVideoLibraryPath();
 
         if (libraryPath) {
           console.log('[DownloadService] Using Stash library path:', libraryPath);
           options.outputDir = libraryPath;
-        } else {
-          console.log('[DownloadService] No library path found, using default download path');
         }
 
         const serverResult = await this.downloadServerSide(url, options);
         if (serverResult.success && serverResult.file_path) {
           console.log('[DownloadService] Server-side download complete:', serverResult.file_path);
 
-          // Trigger Stash scan for the downloaded file
           let scanJobId: string | null = null;
           if (libraryPath) {
             console.log('[DownloadService] Triggering Stash scan for:', serverResult.file_path);
@@ -723,8 +408,7 @@ export class DownloadService {
             }
           }
 
-          // Return empty blob with metadata - caller should use file_path for Stash import
-          // This is a workaround since we can't return the actual file data from server
+          // Return empty blob with metadata
           const emptyBlob = new Blob([], { type: 'application/octet-stream' });
           (emptyBlob as any).__serverFilePath = serverResult.file_path;
           (emptyBlob as any).__libraryPath = libraryPath;
@@ -736,60 +420,29 @@ export class DownloadService {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('[DownloadService] Server-side download failed:', errorMessage);
-        // Fall through to client-side yt-dlp as last resort (will fail with CORS, but at least we tried)
-        console.warn('[DownloadService] Falling back to client-side yt-dlp (may fail with CORS)');
-      }
-    }
-
-    // PRIORITY 4: Use client-side yt-dlp for sites that require it (test-app or fallback)
-    // Never use yt-dlp for direct image URLs (checked in shouldUseYtDlp)
-    if (this.shouldUseYtDlp(url)) {
-      try {
-        return await this.downloadWithYtDlp(url, options);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[DownloadService] Client-side yt-dlp also failed:', errorMessage);
         throw error;
       }
     }
 
-    // Otherwise use regular fetch (with CORS proxy if enabled)
+    // Otherwise use regular fetch
     return this.downloadDirect(url, options);
   }
 
   /**
-   * Download file directly from URL (without yt-dlp)
+   * Download file directly from URL
    */
   private async downloadDirect(
     url: string,
     options: IDownloadOptions = {}
   ): Promise<Blob> {
     const { onProgress, signal } = options;
-    const fetchUrl = this.wrapWithProxy(url);
 
     let response: Response;
     try {
-      response = await fetchWithTimeout(fetchUrl, { signal }, 300000); // 5 minute timeout
+      response = await fetchWithTimeout(url, { signal }, 300000);
     } catch (error) {
-      // Handle network errors (CORS, connection issues, etc.)
       const errorMessage = error instanceof Error ? error.message : 'Unknown network error';
-
-      if (errorMessage.includes('NetworkError') || errorMessage.includes('Failed to fetch')) {
-        const corsEnabled = this.isCorsProxyEnabled();
-        if (!corsEnabled) {
-          throw new Error(
-            'CORS Error: This site blocks direct browser requests. ' +
-            'Please enable CORS proxy in settings to download from this site.'
-          );
-        } else {
-          throw new Error(
-            'Network Error: Failed to fetch resource. ' +
-            'The CORS proxy may not be running or the site may be blocking the request. ' +
-            `Proxy URL: ${this.getCorsProxyUrl()}`
-          );
-        }
-      }
-      throw error;
+      throw new Error(`Download failed: ${errorMessage}`);
     }
 
     if (!response.ok) {
@@ -797,15 +450,8 @@ export class DownloadService {
     }
 
     const contentLength = response.headers.get('content-length');
-    const contentType = response.headers.get('content-type') || 'video/mp4'; // Default to video/mp4
+    const contentType = response.headers.get('content-type') || 'video/mp4';
     const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-    console.log('[DownloadService] Download starting:', {
-      url: fetchUrl,
-      contentType,
-      contentLength: totalBytes,
-      hasContentLength: !!contentLength,
-    });
 
     if (!response.body) {
       throw new Error('Response body is null');
@@ -825,7 +471,7 @@ export class DownloadService {
       bytesDownloaded += value.length;
 
       if (onProgress) {
-        const elapsedTime = (Date.now() - startTime) / 1000; // seconds
+        const elapsedTime = (Date.now() - startTime) / 1000;
         const speed = bytesDownloaded / elapsedTime;
         const percentage = totalBytes > 0 ? (bytesDownloaded / totalBytes) * 100 : 0;
         const timeRemaining = totalBytes > 0 ? (totalBytes - bytesDownloaded) / speed : undefined;
@@ -840,7 +486,6 @@ export class DownloadService {
       }
     }
 
-    // Create blob with proper MIME type from response headers
     return new Blob(chunks as BlobPart[], { type: contentType });
   }
 
@@ -875,8 +520,7 @@ export class DownloadService {
    */
   async detectContentType(url: string): Promise<string | null> {
     try {
-      const fetchUrl = this.wrapWithProxy(url);
-      const response = await fetch(fetchUrl, { method: 'HEAD' });
+      const response = await fetch(url, { method: 'HEAD' });
       return response.headers.get('content-type');
     } catch {
       return null;

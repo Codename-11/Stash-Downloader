@@ -6,7 +6,6 @@
 A React-based web-UI plugin for Stash that enables downloading images and videos from external sources with automatic metadata extraction, tagging, and organization.
 
 📖 **[Quick Reference Guide](USAGE_QUICK_REFERENCE.md)** - Common tasks and commands
-🧪 **[Test Environment Guide](test-app/README.md)** - Develop without Stash
 
 ## Features
 
@@ -110,12 +109,19 @@ The easiest way to install and keep the plugin updated:
    - Navigate to `http://localhost:9999/downloader` (or your Stash URL + `/downloader`)
    - Or look for "Downloader" in Stash navigation (if patched)
 
-### Automated Build & Export
+### Build for Stash
 
-- **Linux/macOS**: `./scripts/export-plugin.sh`
-- **Windows (PowerShell 7+)**: `pwsh ./scripts/export-plugin.ps1`
+Build and package the plugin for manual installation:
 
-These scripts clean previous artifacts, run `pnpm install && pnpm build`, and place ready-to-import assets in `build/export/stash-downloader/` along with a `stash-downloader.zip` archive for distribution.
+```bash
+npm run build:stash
+```
+
+This creates a `stash-plugin/` directory with everything needed for manual installation:
+- `dist/` - Compiled JavaScript bundle
+- `scripts/` - Python backend scripts
+- `stash-downloader.yml` - Plugin manifest
+- `README.md` and `LICENSE`
 
 **Verification:**
 - You should see the download queue page
@@ -123,32 +129,6 @@ These scripts clean previous artifacts, run `pnpm install && pnpm build`, and pl
 - Check browser console for any errors (F12)
 
 ## Development
-
-### Testing Without Stash
-
-You can develop and test the plugin **without a running Stash instance**:
-
-```bash
-# Install dependencies
-pnpm install
-
-# Start test environment (opens browser at http://localhost:3000)
-pnpm test
-```
-
-This runs a complete mock environment with:
-- Mock PluginApi with in-memory GraphQL
-- Pre-loaded test data (3 performers, 4 tags, 2 studios)
-- Simulated file downloads with progress tracking
-- All plugin features fully functional
-- Hot reload for rapid development
-
-**Test URLs that work:**
-- `https://example.com/video1.mp4`
-- `https://example.com/video2.mp4`
-- `https://example.com/image1.jpg`
-
-See [`test-app/README.md`](test-app/README.md) for detailed testing documentation.
 
 ### Project Structure
 
@@ -167,25 +147,16 @@ src/
 ├── utils/             # Utilities
 ├── constants/         # Constants
 └── index.tsx          # Plugin entry point
-
-test/
-├── mocks/             # Mock implementations
-│   ├── mockPluginApi.ts      # Mock Stash PluginApi
-│   ├── mockDownloadService.ts # Mock downloads
-│   └── mockMetadataScraper.ts # Mock scraper
-├── fixtures/          # Test data
-│   └── mockData.ts    # Performers, tags, studios
-├── utils/             # Test utilities
-└── app.tsx            # Standalone test app
 ```
 
 ### Available Scripts
 
-- `pnpm dev` - Build in watch mode for development
-- `pnpm build` - Production build
-- `pnpm type-check` - Check TypeScript types
-- `pnpm lint` - Lint code
-- `pnpm format` - Format code with Prettier
+- `npm run dev` - Build in watch mode for development
+- `npm run build` - Production build
+- `npm run build:stash` - Build and package for Stash installation
+- `npm run type-check` - Check TypeScript types
+- `npm run lint` - Lint code
+- `npm run test` - Run tests
 
 ### Adding New Scrapers
 
@@ -472,9 +443,8 @@ That's it! The content is now in your Stash library with all metadata.
 1. Check URL is direct link to file
 2. Verify internet connection
 3. Some sites block automated downloads
-4. **CORS errors in test mode**: Expected behavior - many sites block cross-origin requests. This works in production with Stash. See `test-app/CORS_LIMITATIONS.md` for details
-5. Authentication required - some sites need login/cookies
-6. Try different URL or download manually first
+4. Authentication required - some sites need login/cookies
+5. Try different URL or download manually first
 
 **Performers/Tags not found:**
 1. Autocomplete searches existing Stash data
@@ -520,7 +490,7 @@ That's it! The content is now in your Stash library with all metadata.
 **Where to get help:**
 - GitHub Issues: [Report bugs](../../issues)
 - Stash Discord: Community support
-- Documentation: Check this README and `test-app/README.md`
+- Documentation: Check this README
 
 **When reporting issues, include:**
 - Stash version

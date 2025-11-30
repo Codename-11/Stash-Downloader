@@ -7,7 +7,7 @@ pnpm-lock.yaml
 
 # Build output
 dist/
-dist-test/
+stash-plugin/
 build/
 *.tsbuildinfo
 

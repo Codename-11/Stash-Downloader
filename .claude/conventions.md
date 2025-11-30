@@ -34,7 +34,6 @@ src/
 ├── types/             # TypeScript type definitions
 ├── utils/             # Utility functions
 ├── constants/         # Application constants
-├── theme/             # Theme utilities (ThemeProvider for test-app only)
 └── index.tsx          # Plugin entry point
 ```
 

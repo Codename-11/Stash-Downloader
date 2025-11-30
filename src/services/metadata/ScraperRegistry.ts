@@ -1,27 +1,16 @@
 /**
  * ScraperRegistry - Manages metadata scrapers
  *
- * Priority order (yt-dlp first for video URL extraction):
- * - YtDlpScraper (primary) - Always extracts video URLs via yt-dlp
- * - StashScraper (fallback) - Kept in code but only used if yt-dlp fails
+ * Priority order:
+ * - YtDlpScraper (primary) - Server-side yt-dlp via Python backend
+ * - BooruScraper - Image/gallery scraper for booru sites
+ * - StashScraper (fallback) - Uses Stash's built-in scraper API
  * - GenericScraper (last resort) - URL parsing only
- *
- * In Stash environment:
- * - YtDlpScraper uses server-side extraction (no CORS)
- * - StashScraper available as fallback (server-side, no CORS)
- * - Skips client-side scrapers that fail due to CORS/CSP
- *
- * In test-app environment:
- * - YtDlpScraper uses CORS proxy
- * - All scrapers available including CORS proxy-based ones
  */
 
 import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { ContentType } from '@/types';
 import { GenericScraper } from './GenericScraper';
-import { HTMLScraper } from './HTMLScraper';
-import { PornhubScraper } from './PornhubScraper';
-import { YouPornScraper } from './YouPornScraper';
 import { YtDlpScraper } from './YtDlpScraper';
 import { StashScraper } from './StashScraper';
 import { BooruScraper } from './BooruScraper';
@@ -32,50 +21,18 @@ const log = createLogger('ScraperRegistry');
 export class ScraperRegistry {
   private scrapers: IMetadataScraper[] = [];
   private fallbackScraper: IMetadataScraper;
-  private readonly overallTimeoutMs = 90000; // 90 seconds overall timeout for entire scraping operation
+  private readonly overallTimeoutMs = 90000; // 90 seconds overall timeout
 
   constructor() {
     this.fallbackScraper = new GenericScraper();
 
-    const isStashEnv = this.isStashEnvironment();
+    // Register scrapers in priority order
+    // All scrapers use server-side extraction (no CORS issues)
+    this.register(new YtDlpScraper());   // Primary for video
+    this.register(new BooruScraper());   // Primary for images/galleries
+    this.register(new StashScraper());   // Fallback (uses Stash's scraper API)
 
-    // Register built-in scrapers based on environment
-    // Priority: yt-dlp first (always extracts video URLs), StashScraper as fallback
-    // In Stash environment:
-    // - YtDlpScraper uses server-side extraction (no CORS)
-    // - StashScraper available as fallback (server-side, no CORS)
-    // - Skip client-side scrapers that fail due to CSP
-    // In test-app:
-    // - YtDlpScraper uses CORS proxy
-    // - All scrapers available (CORS proxy required)
-
-    // Video scrapers (yt-dlp primary)
-    this.register(new YtDlpScraper());
-    this.register(new StashScraper());
-
-    // Image scrapers (booru sites)
-    this.register(new BooruScraper());
-
-    if (!isStashEnv) {
-      // Client-side scrapers only work in test-app with CORS proxy
-      console.log('[ScraperRegistry] Test-app mode: enabling client-side scrapers');
-      this.register(new PornhubScraper());
-      this.register(new YouPornScraper());
-      this.register(new HTMLScraper());
-    } else {
-      console.log('[ScraperRegistry] Stash mode: using YtDlpScraper (primary) and StashScraper (fallback) - server-side');
-    }
-  }
-
-  /**
-   * Check if running in Stash environment
-   */
-  private isStashEnvironment(): boolean {
-    return !!(
-      typeof window !== 'undefined' &&
-      window.PluginApi &&
-      !(window as any).__TEST_APP__
-    );
+    log.info('Scrapers registered: YtDlpScraper, BooruScraper, StashScraper, GenericScraper (fallback)');
   }
 
   /**
@@ -87,9 +44,6 @@ export class ScraperRegistry {
 
   /**
    * Find appropriate scraper for URL with optional content type filter
-   * @param url URL to scrape
-   * @param preferredContentType Optional content type to filter scrapers
-   * @returns The first registered scraper that can handle the URL and content type
    */
   findScraper(url: string, preferredContentType?: ContentType): IMetadataScraper {
     for (const scraper of this.scrapers) {
@@ -120,10 +74,6 @@ export class ScraperRegistry {
 
   /**
    * Scrape metadata from URL
-   * Tries registered scrapers in order, falls back to GenericScraper
-   * Wrapped with overall timeout to prevent hanging
-   * @param url URL to scrape
-   * @param preferredContentType Optional content type preference
    */
   async scrape(url: string, preferredContentType?: ContentType): Promise<IScrapedMetadata> {
     return withTimeout(
@@ -135,9 +85,6 @@ export class ScraperRegistry {
 
   /**
    * Scrape with metadata enhancement fallback
-   * When primary scraper fails to extract metadata, tries other scrapers for metadata-only enhancement
-   * @param url URL to scrape
-   * @param preferredContentType Optional content type preference
    */
   async scrapeWithEnhancement(url: string, preferredContentType?: ContentType): Promise<IScrapedMetadata> {
     return withTimeout(
@@ -205,13 +152,11 @@ export class ScraperRegistry {
 
   /**
    * Internal scrape method (without timeout wrapper)
-   * Tries registered scrapers in order, falls back to GenericScraper
    */
   private async _scrape(url: string, preferredContentType?: ContentType): Promise<IScrapedMetadata> {
     log.info(`========================================`);
     log.info(`Starting scrape for: ${url}`);
     log.info(`Available scrapers: ${this.scrapers.map(s => s.name).join(', ') || 'none'}`);
-    log.info(`Environment: ${this.isStashEnvironment() ? 'Stash (server-side only)' : 'test-app'}`);
     if (preferredContentType) {
       log.info(`Preferred content type: ${preferredContentType}`);
     }
@@ -264,7 +209,6 @@ export class ScraperRegistry {
 
   /**
    * Get scrapers that can handle a specific URL
-   * Returns array of {name, canHandle} for UI display
    */
   getAvailableScrapersForUrl(url: string, contentType?: ContentType): Array<{ name: string; canHandle: boolean; supportsContentType: boolean }> {
     const allScrapers = this.getScrapers();

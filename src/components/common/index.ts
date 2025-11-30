@@ -10,7 +10,6 @@ export * from './TagSelector';
 export * from './StudioSelector';
 export * from './ToastContainer';
 export * from './LogViewer';
-export * from './ThemeToggle';
 export * from './InfoModal';
 export * from './ItemLogModal';
 export * from './ImagePreviewModal';

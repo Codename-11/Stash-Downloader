@@ -19,19 +19,13 @@ import { getDownloadService, getBrowserDownloadService } from '@/services/downlo
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { DownloadStatus, ContentType } from '@/types';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
-import { checkYtDlpAvailable } from '@/utils/systemCheck';
 import { formatDownloadError } from '@/utils/helpers';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
 import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
 
-interface QueuePageProps {
-  isTestMode?: boolean;
-  testSettingsPanel?: React.ReactNode;
-}
-
-export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSettingsPanel }) => {
+export const QueuePage: React.FC = () => {
   const queue = useDownloadQueue();
   const toast = useToast();
   const log = useLog();
@@ -114,38 +108,6 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStashEnvironment]);
 
-  // Check for yt-dlp on component mount
-  useEffect(() => {
-    const checkYtDlp = async () => {
-      // Only check once per session
-      const alreadyChecked = sessionStorage.getItem('ytdlp-checked');
-      if (alreadyChecked) {
-        return;
-      }
-
-      // Check if CORS proxy is enabled first
-      const corsEnabled = localStorage.getItem('corsProxyEnabled') === 'true';
-      if (!corsEnabled) {
-        console.log('[QueuePage] CORS proxy not enabled, skipping yt-dlp check');
-        sessionStorage.setItem('ytdlp-checked', 'true');
-        return;
-      }
-
-      console.log('[QueuePage] Checking if yt-dlp is available...');
-      const isAvailable = await checkYtDlpAvailable();
-
-      if (!isAvailable) {
-        console.log('[QueuePage] yt-dlp not available, showing warning');
-        setShowYtDlpWarning(true);
-      } else {
-        console.log('[QueuePage] yt-dlp is available');
-      }
-
-      sessionStorage.setItem('ytdlp-checked', 'true');
-    };
-
-    checkYtDlp();
-  }, []);
 
   const handleAddUrl = async (url: string, contentTypeOption: ContentTypeOption = 'auto') => {
     // Clear URL field after adding
@@ -515,40 +477,19 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
 
   return (
     <div className="d-flex flex-column min-vh-100">
-      {/* Header - only shown in test mode, Stash provides its own header */}
-      {isTestMode && (
-        <nav className="navbar navbar-dark bg-dark border-bottom border-secondary">
-          <div className="container-fluid">
-            <div className="d-flex align-items-center gap-3 flex-grow-1">
-              <img
-                src={logoSvg}
-                alt="Stash Downloader Logo"
-                style={{ width: '40px', height: '40px' }}
-              />
-              <h6 className="mb-0 text-light">Stash Downloader</h6>
-            </div>
-            <span className="badge bg-warning me-2">DEVELOPMENT MODE</span>
-          </div>
-        </nav>
-      )}
       <div className="container-lg py-4">
         <div className="d-flex flex-column gap-3">
-          {/* Logo and title when not in test mode (Stash context) */}
-          {!isTestMode && (
-            <div className="d-flex align-items-center gap-3 mb-2" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
-              <img
-                src={logoSvg}
-                alt="Stash Downloader Logo"
-                style={{ width: '40px', height: '40px' }}
-              />
-            </div>
-          )}
+          {/* Logo */}
+          <div className="d-flex align-items-center gap-3 mb-2" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
+            <img
+              src={logoSvg}
+              alt="Stash Downloader Logo"
+              style={{ width: '40px', height: '40px' }}
+            />
+          </div>
 
-          {/* Test settings panel in test mode */}
-          {isTestMode && testSettingsPanel}
-
-          {/* Proxy and Server Status (Stash mode only) */}
-          {!isTestMode && isStashEnvironment && (
+          {/* Proxy and Server Status */}
+          {isStashEnvironment && (
             <div className="card text-light mb-3" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
               <div
                 className="card-header d-flex justify-content-between align-items-center"
@@ -592,7 +533,7 @@ export const QueuePage: React.FC<QueuePageProps> = ({ isTestMode = false, testSe
                             onClick={async (e) => {
                               e.stopPropagation();
                               const { testHttpProxy } = await import('@/utils/systemCheck');
-                              const result = await testHttpProxy(httpProxy, isStashEnvironment);
+                              const result = await testHttpProxy(httpProxy);
                               if (result.success) {
                                 toast.showToast('success', 'Proxy Test', result.message);
                                 log.addLog('success', 'proxy', result.message, result.details);

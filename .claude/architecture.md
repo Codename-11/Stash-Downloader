@@ -97,9 +97,8 @@ query GetPluginSettings($include: [ID!]) {
 - **ContentType support**: Scrapers declare supported content types (Video, Image, Gallery)
 - **YtDlpScraper**: PRIMARY - Server-side yt-dlp via Python backend (extracts video URLs)
 - **BooruScraper**: Image/gallery scraper for booru sites (Rule34, Gelbooru, Danbooru)
-- **StashScraper**: DISABLED - `canHandle()` returns false (kept in code for potential future use)
-- **GenericScraper**: FALLBACK - URL parsing only (last resort)
-- In test-app mode: PornhubScraper, YouPornScraper, HTMLScraper also enabled
+- **StashScraper**: FALLBACK - Uses Stash's built-in scraper API
+- **GenericScraper**: LAST RESORT - URL parsing only
 - **Re-scrape support**: `getAvailableScrapersForUrl()` and `scrapeWithScraper()` for manual scraper selection
 - Common `IScrapedMetadata` interface
 
@@ -318,21 +317,13 @@ interface IMetadataScraper {
   scrape(url: string): Promise<IScrapedMetadata>;
 }
 
-// Scrapers registered conditionally based on environment
+// Scrapers registered in priority order
 class ScraperRegistry {
   constructor() {
-    // Always registered (both Stash and test-app)
     this.register(new YtDlpScraper());    // PRIMARY: Video via yt-dlp
     this.register(new BooruScraper());    // Image/Gallery for booru sites
-    this.register(new StashScraper());    // FALLBACK: Server-side Stash scraper
-
-    // Test-app only (require CORS proxy)
-    if (!isStashEnvironment) {
-      this.register(new PornhubScraper());  // Site-specific
-      this.register(new YouPornScraper());
-      this.register(new HTMLScraper());     // Generic OG tags
-    }
-    // GenericScraper is always fallback (last resort)
+    this.register(new StashScraper());    // FALLBACK: Stash's built-in scraper
+    // GenericScraper is always last resort
   }
 
   // Get available scrapers for manual re-scrape
@@ -345,7 +336,6 @@ class ScraperRegistry {
 
 ### Scraper Fallback Chain
 
-**Stash Environment (server-side, no CORS issues):**
 1. **YtDlpScraper** - PRIMARY for Video: Server-side yt-dlp via Python backend
    - Uses `runPluginTask` to extract metadata (saves to temp file)
    - Uses `runPluginOperation` to read result from temp file
@@ -357,18 +347,6 @@ class ScraperRegistry {
    - Parses booru tag categories (artist, character, copyright, general)
 3. **StashScraper** - FALLBACK: Uses Stash's built-in scraper API
 4. **GenericScraper** - LAST RESORT: Extracts filename from URL
-
-**Test-app Environment (client-side, requires CORS proxy):**
-1. **YtDlpScraper** - via CORS proxy's `/api/extract` endpoint
-2. **BooruScraper** - Booru site API scraper (via CORS proxy)
-3. **StashScraper** - via CORS proxy (if Stash API accessible)
-4. **PornhubScraper** - Site-specific HTML parsing
-5. **YouPornScraper** - Site-specific HTML parsing
-6. **HTMLScraper** - Generic Open Graph meta tag extraction
-   - Extracts `imageUrl` from `og:image` (works for images)
-   - Extracts `videoUrl` from `og:video` (rarely available on video sites)
-   - Main value: metadata (title, description, thumbnail)
-7. **GenericScraper** - LAST RESORT: Extracts filename from URL
 
 If a scraper throws an error, the registry tries the next one.
 
@@ -397,7 +375,7 @@ If a scraper throws an error, the registry tries the next one.
 | IntlProvider error | Stash internal code | Ignore - not plugin's fault |
 | useThemeMode error | Using context outside provider | Don't use custom contexts in plugin |
 | Cannot read 'NavLink' | PluginApi not ready | Check `PluginApi.libraries.ReactRouterDOM` |
-| CORS errors (scraping) | Browser security restrictions | Use `YtDlpScraper` (server-side) or CORS proxy |
+| CORS errors (scraping) | Browser security restrictions | Use `YtDlpScraper` (server-side) |
 | Python exec fails | `interface: js` breaks subprocess | Use `interface: raw` (still works with `ui.javascript`) |
 | `runPluginOperation` returns null | Python script output doesn't match PluginOutput format | Output must be `{error?: string, output?: {...data...}}` - Stash extracts `output` field and returns it directly |
 | `exit status 1` from Python | Python syntax error or crash | Run `python -m py_compile scripts/download.py` to check syntax |

@@ -195,79 +195,32 @@ export async function withTimeout<T>(
 
 /**
  * Format download error messages with helpful context
- * Checks for CORS errors, network errors, and provides appropriate guidance
  */
 export function formatDownloadError(error: unknown, url?: string): string {
   const errorMsg = error instanceof Error ? error.message : String(error);
-  
-  // Check if we're in Stash environment (server-side downloads don't need CORS proxy)
-  const isStashEnvironment = typeof window !== 'undefined' && 
-    !!(window as any).PluginApi && 
-    !(window as any).__TEST_APP__;
-  
-  // Check for CORS/network errors
-  if (errorMsg.includes('NetworkError') || 
-      errorMsg.includes('Failed to fetch') || 
-      errorMsg.includes('CORS') ||
-      errorMsg.includes('CORS Error')) {
-    
-    // In Stash, server-side downloads bypass CORS, so this is a different issue
-    if (isStashEnvironment) {
-      // Check if it's a server-side download error
-      if (errorMsg.includes('Server-side download') || errorMsg.includes('file_path')) {
-        return errorMsg; // Keep the original server-side error message
-      }
-      // Otherwise, it might be a client-side fallback error
-      return `Network Error: ${errorMsg}\n\n` +
-        `Note: In Stash environment, server-side downloads should bypass CORS. ` +
-        `If you see this error, check Stash server logs for details.`;
+
+  // Check for network errors
+  if (errorMsg.includes('NetworkError') ||
+      errorMsg.includes('Failed to fetch') ||
+      errorMsg.includes('CORS')) {
+    // Server-side download error
+    if (errorMsg.includes('Server-side download') || errorMsg.includes('file_path')) {
+      return errorMsg;
     }
-    
-    // In test-app, check CORS proxy status
-    const corsEnabled = typeof window !== 'undefined' && 
-      localStorage.getItem('corsProxyEnabled') === 'true';
-    
-    if (!corsEnabled) {
-      return `CORS Error: This site blocks direct browser requests.\n\n` +
-        `Solution: Enable CORS proxy in test app settings to download from this site.\n\n` +
-        `The CORS proxy allows the browser to download from sites that block direct requests.`;
-    } else {
-      const corsProxyUrl = typeof window !== 'undefined' ? 
-        (localStorage.getItem('corsProxyUrl') || 'http://localhost:8080') : 
-        'http://localhost:8080';
-      
-      return `Network Error: Failed to fetch resource.\n\n` +
-        `Possible causes:\n` +
-        `• CORS proxy may not be running (check: ${corsProxyUrl})\n` +
-        `• Site may be blocking the request even through proxy\n` +
-        `• Network connectivity issues\n\n` +
-        `Check browser console and CORS proxy logs for more details.`;
-    }
+    return `Network Error: ${errorMsg}\n\n` +
+      `Check Stash server logs for details.`;
   }
-  
+
   // Check for server-side download errors
   if (errorMsg.includes('Server-side download')) {
-    return errorMsg; // Keep original message
+    return errorMsg;
   }
-  
+
   // Check for yt-dlp errors
   if (errorMsg.includes('yt-dlp') || errorMsg.includes('yt_dlp')) {
-    if (isStashEnvironment) {
-      return `yt-dlp Error: ${errorMsg}\n\n` +
-        `This is a server-side error. Check Stash server logs for details.\n` +
-        `Ensure yt-dlp is installed on the Stash server.`;
-    } else {
-      const corsEnabled = typeof window !== 'undefined' && 
-        localStorage.getItem('corsProxyEnabled') === 'true';
-      
-      if (!corsEnabled) {
-        return `yt-dlp Error: ${errorMsg}\n\n` +
-          `Note: Enable CORS proxy in test app settings to use yt-dlp.`;
-      } else {
-        return `yt-dlp Error: ${errorMsg}\n\n` +
-          `Check if yt-dlp is installed and CORS proxy is running.`;
-      }
-    }
+    return `yt-dlp Error: ${errorMsg}\n\n` +
+      `This is a server-side error. Check Stash server logs for details.\n` +
+      `Ensure yt-dlp is installed on the Stash server.`;
   }
   
   // Check for timeout errors

@@ -18,7 +18,7 @@ Streamline the process of importing content into Stash by:
 - **State Management**: React Context + Hooks
 - **Plugin API**: Stash PluginApi (window.PluginApi)
 - **Backend**: Python scripts with yt-dlp for server-side downloads
-- **Scraping**: Server-side via yt-dlp Python backend (Stash), client-side with CORS proxy (test-app)
+- **Scraping**: Server-side via yt-dlp Python backend
 
 ## Plugin Type
 JavaScript Extension / Web-UI Plugin for Stash
@@ -59,11 +59,10 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Preview before finalizing
    - Visual distinction for new vs existing entities (green = new, blue = existing)
 
-6. **Dual-Mode Architecture**
-   - **Production (Stash)**: Server-side scraping/downloading, no CORS issues
-   - **Development (test-app)**: Client-side with CORS proxy fallback
-   - **Proxy Support**: HTTP/SOCKS proxy support in both modes (for bypassing geo-restrictions, IP blocks)
-   - **SSL Handling**: Certificate verification automatically disabled when using proxy (handles self-signed certs)
+6. **Proxy Support**
+   - HTTP/SOCKS proxy support for bypassing geo-restrictions and IP blocks
+   - SSL certificate verification automatically disabled when using proxy (handles self-signed certs)
+   - Configured via Stash plugin settings
 
 ## External Dependencies (NOT Bundled)
 These are provided by Stash via PluginApi and marked as external in build config:
@@ -112,7 +111,7 @@ The plugin must:
 - **IntlProvider errors**: Stash's own code may log these - not plugin's fault
 - **Context errors**: Don't use hooks like `useThemeMode()` that require custom providers
 - **CSS conflicts**: Stash provides Bootstrap; don't bundle another copy
-- **CORS errors**: Use YtDlpScraper (server-side) instead of client-side fetch, or enable CORS proxy
+- **CORS errors**: Use YtDlpScraper (server-side) instead of client-side fetch
 
 ## Finding CSS Selectors in Stash
 When adding UI elements via DOM injection:

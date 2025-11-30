@@ -25,8 +25,7 @@ tests/
 ├── setup.ts                          # Test setup and global mocks
 ├── services/
 │   ├── metadata/
-│   │   ├── GenericScraper.test.ts   # Generic metadata scraper tests
-│   │   └── PornhubScraper.test.ts   # Pornhub-specific scraper tests
+│   │   └── GenericScraper.test.ts   # Generic metadata scraper tests
 │   ├── download/
 │   │   └── BrowserDownloadService.test.ts  # File download/save tests
 │   └── stash/
@@ -134,20 +133,6 @@ global.fetch = vi.fn(() =>
 global.document.querySelector = vi.fn();
 global.URL.createObjectURL = vi.fn();
 ```
-
-## Test-App vs Tests
-
-**`test-app/`** - Development UI for manual testing
-- Runs the actual plugin in a standalone environment
-- For visual testing and debugging
-- Uses mock Stash API
-- Run with: `npm run test-app`
-
-**`tests/`** - Automated unit tests
-- Tests individual functions and services
-- No UI, pure logic testing
-- Fast execution
-- Run with: `npm test`
 
 ## CI/CD Integration
 
