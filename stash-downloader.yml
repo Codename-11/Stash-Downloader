@@ -4,8 +4,8 @@ version: 0.1.0
 url: https://github.com/Codename-11/Stash-Downloader
 settings:
   serverDownloadPath:
-    displayName: Fallback Download Path
-    description: Fallback directory if no Stash library is configured (absolute path, e.g., /data/StashDownloader). Downloads normally go to your Stash video library.
+    displayName: Download Path
+    description: Directory for downloaded files (absolute path). If set, overrides Stash library path. Leave empty to use your Stash video library.
     type: STRING
   httpProxy:
     displayName: HTTP Proxy

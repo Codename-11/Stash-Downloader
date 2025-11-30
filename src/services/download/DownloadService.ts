@@ -78,15 +78,16 @@ export class DownloadService {
       log.debug('Result ID:', resultId);
 
       // Get server download path and proxy from settings
+      // Priority: plugin setting > Stash library > default
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
-      const serverDownloadPath = options.outputDir || settings.serverDownloadPath || DEFAULT_SETTINGS.serverDownloadPath;
+      const serverDownloadPath = settings.serverDownloadPath || options.outputDir || DEFAULT_SETTINGS.serverDownloadPath;
       const httpProxy = settings.httpProxy;
 
       // Log which path was determined and why
-      if (options.outputDir) {
-        log.info('Download path (from Stash library):', serverDownloadPath);
-      } else if (settings.serverDownloadPath) {
+      if (settings.serverDownloadPath) {
         log.info('Download path (from plugin settings):', serverDownloadPath);
+      } else if (options.outputDir) {
+        log.info('Download path (from Stash library):', serverDownloadPath);
       } else {
         log.info('Download path (default fallback):', serverDownloadPath);
       }

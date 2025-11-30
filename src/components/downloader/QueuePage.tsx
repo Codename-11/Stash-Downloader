@@ -74,15 +74,19 @@ export const QueuePage: React.FC = () => {
             debugLog.info(`✓ HTTP/SOCKS proxy: ${masked}`);
           }
 
-          // Log download path (query Stash library path - the actual destination)
+          // Log download path - plugin setting takes priority over Stash library
           try {
-            const libraryPath = await stashService.getVideoLibraryPath();
-            if (libraryPath) {
-              debugLog.info(`✓ Download path (Stash library): ${libraryPath}`);
-            } else if (graphqlSettings.serverDownloadPath) {
+            if (graphqlSettings.serverDownloadPath) {
+              // User explicitly set a download path - use it
               debugLog.info(`✓ Download path (plugin setting): ${graphqlSettings.serverDownloadPath}`);
             } else {
-              debugLog.info(`✓ Download path (default): ${DEFAULT_SETTINGS.serverDownloadPath}`);
+              // No plugin setting - fall back to Stash library
+              const libraryPath = await stashService.getVideoLibraryPath();
+              if (libraryPath) {
+                debugLog.info(`✓ Download path (Stash library): ${libraryPath}`);
+              } else {
+                debugLog.info(`✓ Download path (default): ${DEFAULT_SETTINGS.serverDownloadPath}`);
+              }
             }
           } catch (pathError) {
             debugLog.warn('Could not determine download path:', String(pathError));
@@ -369,6 +373,56 @@ export const QueuePage: React.FC = () => {
     setRescrapeLoading(false);
   };
 
+  // Handle retry for failed items
+  const handleRetry = async (itemId: string) => {
+    const item = queue.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    log.addLog('info', 'retry', `Retrying failed item: ${item.url}`);
+    toast.showToast('info', 'Retry', 'Retrying download...');
+
+    // Reset item status to Pending and clear error
+    queue.updateItem(itemId, {
+      status: DownloadStatus.Pending,
+      error: undefined,
+      progress: undefined,
+    });
+
+    // If we already have metadata, we don't need to re-scrape - just need to trigger download again
+    // The download will be triggered when user clicks Edit & Import
+    if (item.metadata) {
+      log.addLog('success', 'retry', `Item reset to pending: ${item.metadata.title || item.url}`);
+      toast.showToast('success', 'Ready to Retry', 'Item reset to pending. Click "Edit" to retry the download.');
+      return;
+    }
+
+    // No metadata - need to re-scrape
+    debugLog.debug(`Retrying scrape for: ${item.url}`);
+
+    try {
+      // No preferred content type since we don't have metadata
+      const metadata = await scraperRegistry.scrapeWithEnhancement(item.url, undefined);
+
+      queue.updateItem(itemId, {
+        metadata,
+        error: undefined,
+      });
+
+      log.addLog('success', 'retry', `Retry successful: ${metadata.title || item.url}`);
+      toast.showToast('success', 'Retry Successful', `Scraped metadata: ${metadata.title || 'Unknown'}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      queue.updateItem(itemId, {
+        error: `Retry failed: ${errorMessage}`,
+        status: DownloadStatus.Failed,
+      });
+
+      log.addLog('error', 'retry', `Retry failed: ${errorMessage}`);
+      toast.showToast('error', 'Retry Failed', errorMessage);
+    }
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
@@ -580,6 +634,7 @@ export const QueuePage: React.FC = () => {
                     }
                   }}
                   onRescrapeClick={handleRescrapeClick}
+                  onRetry={handleRetry}
                   availableScrapers={scraperRegistry.getAvailableScrapersForUrl(item.url, item.metadata?.contentType)}
                   showThumbnail={settings.showThumbnailPreviews}
                 />

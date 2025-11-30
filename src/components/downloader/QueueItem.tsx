@@ -17,11 +17,12 @@ interface QueueItemProps {
   onEdit?: (id: string) => void;
   onViewLogs?: (id: string) => void;
   onRescrapeClick?: (id: string, scraperName: string) => void;
+  onRetry?: (id: string) => void;
   availableScrapers?: Array<{ name: string; canHandle: boolean; supportsContentType: boolean }>;
   showThumbnail?: boolean;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, availableScrapers, showThumbnail = true }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, onRetry, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
@@ -410,6 +411,16 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                     {item.logs.length > 99 ? '99+' : item.logs.length}
                   </span>
                 )}
+              </button>
+            )}
+            {/* Retry button for failed items */}
+            {onRetry && item.status === DownloadStatus.Failed && (
+              <button
+                className="btn btn-sm btn-outline-warning"
+                onClick={() => onRetry(item.id)}
+                title="Retry failed download"
+              >
+                🔄 Retry
               </button>
             )}
             {/* Re-scrape dropdown */}
