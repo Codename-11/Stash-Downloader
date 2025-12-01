@@ -31,6 +31,12 @@
 
 ## Completed
 
+- [x] Retry button for failed queue items
+- [x] Navbar icon for quick access to downloader
+- [x] Queue position indicator in edit modal (1 of X)
+- [x] Skip button for multi-item workflow
+- [x] "Exists in Stash" badge on duplicate queue items
+- [x] Activity log improvements (reduced verbose noise)
 - [x] Logger migration: All `console.*` calls migrated to `createLogger()` pattern (20 files)
 - [x] Remove test-app infrastructure (standalone testing environment)
 - [x] Add `npm run build:stash` script for easy plugin packaging

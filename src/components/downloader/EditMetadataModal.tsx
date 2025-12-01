@@ -104,7 +104,6 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
     setRescrapeModalOpen(true);
 
     try {
-      log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${item.url}`);
       const scraperRegistry = getScraperRegistry();
       const newMetadata = await scraperRegistry.scrapeWithScraper(item.url, scraperName);
       setRescrapeNewMetadata(newMetadata);
@@ -401,10 +400,19 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
               <small className="flex-grow-1" style={{ color: '#8b9fad' }}>
                 {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
               </small>
+              {!isImporting && (
+                <button
+                  type="button"
+                  className="btn btn-outline-light btn-sm"
+                  onClick={handleCancel}
+                >
+                  Close
+                </button>
+              )}
               {onSkip && totalPending && totalPending > 1 && !isImporting && (
                 <button
                   type="button"
-                  className="btn btn-outline-secondary btn-sm"
+                  className="btn btn-outline-warning btn-sm"
                   onClick={onSkip}
                   title="Skip to next pending item"
                 >

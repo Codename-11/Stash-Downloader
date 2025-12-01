@@ -156,8 +156,6 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     setScrapeError(null);
 
     try {
-      log.addLog('info', 'scrape', `Scraping metadata from: ${item.url}`);
-
       const scraperRegistry = getScraperRegistry();
       const metadata = await scraperRegistry.scrape(item.url);
 
@@ -203,7 +201,6 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     try {
       debugLog.info('Matching metadata to Stash for:', item.url);
       debugLog.debug(`Metadata to match: performers=${item.metadata.performers?.length ?? 0}, tags=${item.metadata.tags?.length ?? 0}, studio=${item.metadata.studio ?? 'none'}`);
-      log.addLog('info', 'match', `Matching metadata to Stash for: ${item.url}`);
 
       const matchingService = getMetadataMatchingService();
       debugLog.debug('Starting matchMetadataToStash...');

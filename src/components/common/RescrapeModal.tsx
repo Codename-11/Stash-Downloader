@@ -235,11 +235,9 @@ export const RescrapeModal: React.FC<RescrapeModalProps> = ({
           </div>
           <div className="modal-body" style={{ backgroundColor: '#30404d', maxHeight: '70vh', overflowY: 'auto' }}>
             {isLoading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-info mb-3" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="text-muted">Scraping with {scraperName}...</p>
+              <div className="d-flex flex-column align-items-center justify-content-center py-5">
+                <div className="spinner-border text-info" role="status" aria-label="Loading"></div>
+                <p className="text-muted mt-3 mb-0">Scraping with {scraperName}...</p>
               </div>
             ) : error ? (
               <div className="alert alert-danger">

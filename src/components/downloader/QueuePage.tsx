@@ -179,7 +179,6 @@ export const QueuePage: React.FC = () => {
         debugLog.debug(`URL: ${url}`);
         debugLog.debug(`Item ID: ${itemId}`);
         debugLog.debug(`Current queue items: ${queue.items.length}`);
-        log.addLog('info', 'scrape', `Starting metadata scrape for: ${url}`);
         
         // Note: We don't need to find the item - React state updates are async
         // We can update it directly using the itemId
@@ -296,8 +295,7 @@ export const QueuePage: React.FC = () => {
           error: `Scraping failed: ${errorMessage}`,
         });
         
-        // Item is already in queue, just log that metadata scraping failed
-        log.addLog('info', 'scrape', `Item remains in queue without metadata: ${url}`);
+        // Item is already in queue with error status - no need for additional log
       }
     })();
   };
@@ -397,8 +395,6 @@ export const QueuePage: React.FC = () => {
     setRescrapeError(undefined);
     setRescrapeLoading(true);
 
-    log.addLog('info', 'scrape', `Re-scraping with ${scraperName}: ${item.url}`);
-
     try {
       const metadata = await scraperRegistry.scrapeWithScraper(item.url, scraperName);
       setRescrapeNewMetadata(metadata);
@@ -437,7 +433,6 @@ export const QueuePage: React.FC = () => {
     const item = queue.items.find((i) => i.id === itemId);
     if (!item) return;
 
-    log.addLog('info', 'retry', `Retrying failed item: ${item.url}`);
     toast.showToast('info', 'Retry', 'Retrying download...');
 
     // Reset item status to Pending and clear error
