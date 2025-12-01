@@ -859,7 +859,7 @@ export class StashGraphQLService {
     const pollInterval = options?.pollIntervalMs || 500;
     const maxWait = options?.maxWaitMs || 120000; // 2 minutes default
 
-    log.info(`Starting plugin task: ${pluginId}/${taskName}`);
+    log.debug(`Starting plugin task: ${pluginId}/${taskName}`);
 
     // Start the task
     const jobId = await this.runPluginTask(pluginId, taskName, args);
@@ -867,7 +867,7 @@ export class StashGraphQLService {
       return { success: false, error: 'Failed to start plugin task' };
     }
 
-    log.info(`Task started with job ID: ${jobId}`);
+    log.debug(`Task started with job ID: ${jobId}`);
 
     // Poll for completion
     const startTime = Date.now();
@@ -888,16 +888,16 @@ export class StashGraphQLService {
 
       switch (job.status) {
         case 'FINISHED':
-          log.info(`Job ${jobId} finished successfully`);
+          log.debug(`Stash job ${jobId} finished successfully`);
           return { success: true, jobId };
 
         case 'FAILED':
-          log.error(`Job ${jobId} failed:`, job.error);
+          log.error(`Stash job failed`, `Job ID: ${jobId}\nError: ${job.error || 'Unknown error'}`);
           return { success: false, error: job.error || 'Job failed', jobId };
 
         case 'CANCELLED':
         case 'STOPPING':
-          log.warn(`Job ${jobId} was cancelled/stopped`);
+          log.warn(`Stash job was cancelled`, `Job ID: ${jobId}`);
           return { success: false, error: 'Job was cancelled', jobId };
 
         case 'READY':

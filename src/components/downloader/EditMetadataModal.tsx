@@ -29,6 +29,10 @@ interface EditMetadataModalProps {
   onClose: () => void;
   onComplete: (itemId: string, stashId: string) => void;
   onUpdateItem?: (id: string, updates: Partial<IDownloadItem>) => void;
+  // Queue position for multi-item workflow
+  queuePosition?: number; // 1-indexed current position
+  totalPending?: number; // Total pending items
+  onSkip?: () => void; // Skip to next item
 }
 
 export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
@@ -37,6 +41,9 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
   onClose,
   onComplete,
   onUpdateItem,
+  queuePosition,
+  totalPending,
+  onSkip,
 }) => {
   const toast = useToast();
   const log = useLog();
@@ -155,8 +162,23 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
 
     const itemTitle = item.editedMetadata?.title || item.metadata?.title || item.url;
 
+    // Build import details for logging
+    const importDetails: string[] = [`URL: ${item.url}`];
+    if (editedMetadata?.performers?.length) {
+      importDetails.push(`Performers: ${editedMetadata.performers.map(p => p.name).join(', ')}`);
+    }
+    if (editedMetadata?.tags?.length) {
+      importDetails.push(`Tags: ${editedMetadata.tags.length} selected`);
+    }
+    if (editedMetadata?.studio) {
+      importDetails.push(`Studio: ${editedMetadata.studio.name}`);
+    }
+    if (item.metadata?.videoUrl) {
+      importDetails.push(`Video URL: ${item.metadata.videoUrl.substring(0, 80)}...`);
+    }
+
     try {
-      log.addLog('info', 'download', `Starting import to Stash: ${itemTitle}`);
+      log.addLog('info', 'download', `Starting import: ${itemTitle}`, importDetails.join('\n'));
 
       const importService = getStashImportService();
 
@@ -207,7 +229,11 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         },
       });
 
-      log.addLog('success', 'download', `Successfully imported to Stash: ${itemTitle}`, `Stash ID: ${result.id}`);
+      const successDetails = [
+        `Stash ID: ${result.id}`,
+        ...importDetails,
+      ].join('\n');
+      log.addLog('success', 'download', `Successfully imported: ${itemTitle}`, successDetails);
       toast.showToast('success', 'Import Successful', `Successfully imported: ${itemTitle}`);
 
       // Mark as complete
@@ -278,9 +304,16 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           <div className="modal-content" style={{ backgroundColor: '#30404d', color: '#fff' }}>
             {/* Modal Header */}
             <div className="modal-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
-              <h5 className="modal-title text-light mb-0">
-                {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
-              </h5>
+              <div className="d-flex align-items-center gap-2">
+                <h5 className="modal-title text-light mb-0">
+                  {item.status === DownloadStatus.Complete ? 'View Metadata' : 'Edit Metadata & Import'}
+                </h5>
+                {queuePosition && totalPending && totalPending > 1 && (
+                  <span className="badge bg-info" style={{ fontSize: '0.75rem' }}>
+                    {queuePosition} of {totalPending}
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 className="btn-close btn-close-white"
@@ -368,6 +401,16 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
               <small className="flex-grow-1" style={{ color: '#8b9fad' }}>
                 {isImporting ? 'Please wait...' : 'Review and edit metadata before importing to Stash'}
               </small>
+              {onSkip && totalPending && totalPending > 1 && !isImporting && (
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={onSkip}
+                  title="Skip to next pending item"
+                >
+                  Skip →
+                </button>
+              )}
             </div>
           </div>
         </div>

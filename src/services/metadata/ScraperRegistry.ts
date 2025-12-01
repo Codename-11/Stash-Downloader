@@ -57,11 +57,11 @@ export class ScraperRegistry {
         continue;
       }
 
-      log.info(`Using ${scraper.name} for ${url}`);
+      log.debug(`Using ${scraper.name} for ${url}`);
       return scraper;
     }
 
-    log.info(`Using fallback scraper for ${url}`);
+    log.debug(`Using fallback scraper for ${url}`);
     return this.fallbackScraper;
   }
 
@@ -101,13 +101,13 @@ export class ScraperRegistry {
     const primaryScraper = this.findScraper(url, preferredContentType);
 
     try {
-      log.info(`[Scraper] Trying primary: ${primaryScraper.name} for ${url}`);
+      log.info(`Trying ${primaryScraper.name} scraper`);
       const metadata = await primaryScraper.scrape(url);
-      this.logExtractedMetadata(primaryScraper.name, metadata);
+      this.logExtractedMetadata(primaryScraper.name, metadata, url);
       return metadata;
     } catch (primaryError) {
       const errorMsg = primaryError instanceof Error ? primaryError.message : String(primaryError);
-      log.warn(`[Scraper] Primary ${primaryScraper.name} failed: ${errorMsg}, trying enhancement scrapers`);
+      log.warn(`${primaryScraper.name} failed, trying alternatives`, `Error: ${errorMsg}\nURL: ${url}`);
 
       // Try other scrapers for metadata enhancement
       for (const scraper of this.scrapers) {
@@ -116,17 +116,17 @@ export class ScraperRegistry {
         if (preferredContentType && !scraper.contentTypes.includes(preferredContentType)) continue;
 
         try {
-          log.info(`[Scraper] Trying enhancement: ${scraper.name}`);
+          log.info(`Trying ${scraper.name} scraper`);
           const enhanced = await scraper.scrape(url);
-          this.logExtractedMetadata(scraper.name, enhanced);
+          this.logExtractedMetadata(scraper.name, enhanced, url);
           return enhanced;
         } catch {
-          log.debug(`[Scraper] Enhancement ${scraper.name} failed`);
+          log.debug(`${scraper.name} failed`);
         }
       }
 
       // Last resort: fallback scraper
-      log.info(`[Scraper] All scrapers failed, using fallback: ${this.fallbackScraper.name}`);
+      log.info('All scrapers failed, using generic fallback');
       return await this.fallbackScraper.scrape(url);
     }
   }
@@ -134,33 +134,34 @@ export class ScraperRegistry {
   /**
    * Log extracted metadata details
    */
-  private logExtractedMetadata(scraperName: string, metadata: IScrapedMetadata): void {
+  private logExtractedMetadata(scraperName: string, metadata: IScrapedMetadata, url?: string): void {
     const extracted: string[] = [];
     if (metadata.title) extracted.push('title');
     if (metadata.description) extracted.push('description');
     if (metadata.thumbnailUrl) extracted.push('thumbnail');
-    if (metadata.videoUrl) extracted.push('videoUrl');
-    if (metadata.imageUrl) extracted.push('imageUrl');
+    if (metadata.videoUrl) extracted.push('video URL');
+    if (metadata.imageUrl) extracted.push('image URL');
     if (metadata.performers?.length) extracted.push(`${metadata.performers.length} performers`);
     if (metadata.tags?.length) extracted.push(`${metadata.tags.length} tags`);
     if (metadata.studio) extracted.push('studio');
     if (metadata.duration) extracted.push('duration');
     if (metadata.date) extracted.push('date');
 
-    log.info(`[Scraper] ${scraperName} succeeded - extracted: ${extracted.join(', ') || 'minimal data'}`);
+    const title = metadata.title || 'Untitled';
+    const summary = extracted.length > 0 ? extracted.join(', ') : 'minimal data';
+    const details = url ? `URL: ${url}\nExtracted: ${summary}` : `Extracted: ${summary}`;
+
+    log.success(`${scraperName} extracted: ${title}`, details);
   }
 
   /**
    * Internal scrape method (without timeout wrapper)
    */
   private async _scrape(url: string, preferredContentType?: ContentType): Promise<IScrapedMetadata> {
-    log.info(`========================================`);
-    log.info(`Starting scrape for: ${url}`);
-    log.info(`Available scrapers: ${this.scrapers.map(s => s.name).join(', ') || 'none'}`);
+    log.debug(`Starting scrape for: ${url}`);
     if (preferredContentType) {
-      log.info(`Preferred content type: ${preferredContentType}`);
+      log.debug(`Preferred content type: ${preferredContentType}`);
     }
-    log.info(`========================================`);
 
     let lastErrorMsg = 'Unknown error';
 
@@ -178,24 +179,24 @@ export class ScraperRegistry {
       }
 
       try {
-        log.info(`[Scraper] Trying ${scraper.name}...`);
+        log.info(`Trying ${scraper.name} scraper`);
         const result = await scraper.scrape(url);
-        this.logExtractedMetadata(scraper.name, result);
+        this.logExtractedMetadata(scraper.name, result, url);
         return result;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         lastErrorMsg = errorMsg;
-        log.warn(`[Scraper] ${scraper.name} failed: ${errorMsg}`);
+        log.warn(`${scraper.name} failed`, `Error: ${errorMsg}\nURL: ${url}`);
         // Continue to next scraper
       }
     }
 
     // Last resort: use generic scraper (URL parsing only)
-    log.info('[Scraper] All scrapers failed, using GenericScraper as last resort');
+    log.info('All scrapers failed, using generic fallback');
     try {
       return await this.fallbackScraper.scrape(url);
     } catch (fallbackError) {
-      log.error(`Even GenericScraper failed: ${fallbackError}`);
+      log.error('All scrapers failed', `URL: ${url}\nLast error: ${lastErrorMsg}`);
       throw new Error(`All scrapers failed for ${url}. Last error: ${lastErrorMsg}`);
     }
   }
@@ -231,16 +232,12 @@ export class ScraperRegistry {
     }
 
     if (!scraper.canHandle(url)) {
-      log.warn(`Scraper "${scraperName}" cannot handle URL: ${url}, but will try anyway`);
+      log.warn(`${scraperName} may not support this URL`, `URL: ${url}`);
     }
 
-    log.info(`Manually scraping with "${scraperName}" for: ${url}`);
+    log.info(`Re-scraping with ${scraperName}`);
     const metadata = await scraper.scrape(url);
-    const extracted = Object.entries(metadata)
-      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
-      .map(([k, v]) => Array.isArray(v) ? `${v.length} ${k}` : k)
-      .join(', ');
-    log.info(`[Scraper] ${scraperName} succeeded - extracted: ${extracted}`);
+    this.logExtractedMetadata(scraperName, metadata, url);
     return metadata;
   }
 }

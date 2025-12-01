@@ -324,7 +324,58 @@ export const QueuePage: React.FC = () => {
       stashId,
       completedAt: new Date(),
     });
+
+    // Auto-advance to next pending item
+    const pendingItems = queue.items.filter(
+      (i) => i.status === DownloadStatus.Pending && i.id !== itemId
+    );
+    const nextItem = pendingItems[0];
+    if (nextItem) {
+      // Small delay to let state update before opening next item
+      setTimeout(() => {
+        setEditingItem(nextItem);
+      }, 100);
+    } else {
+      setEditingItem(null);
+    }
   };
+
+  // Skip to next pending item
+  const handleSkipToNext = () => {
+    if (!editingItem) return;
+
+    const pendingItems = queue.items.filter(
+      (i) => i.status === DownloadStatus.Pending
+    );
+    const currentIndex = pendingItems.findIndex((i) => i.id === editingItem.id);
+
+    if (currentIndex >= 0 && currentIndex < pendingItems.length - 1) {
+      // Move to next item
+      const nextItem = pendingItems[currentIndex + 1];
+      if (nextItem) setEditingItem(nextItem);
+    } else if (currentIndex === pendingItems.length - 1) {
+      // Wrap to first item if at end
+      const firstItem = pendingItems[0];
+      if (firstItem) setEditingItem(firstItem);
+    }
+  };
+
+  // Calculate queue position for modal
+  const getQueuePosition = (): { position: number; total: number } | null => {
+    if (!editingItem) return null;
+
+    const pendingItems = queue.items.filter(
+      (i) => i.status === DownloadStatus.Pending
+    );
+    const currentIndex = pendingItems.findIndex((i) => i.id === editingItem.id);
+
+    if (currentIndex >= 0) {
+      return { position: currentIndex + 1, total: pendingItems.length };
+    }
+    return null;
+  };
+
+  const queuePosition = getQueuePosition();
 
   // Handle re-scrape click - opens the modal and starts scraping
   const handleRescrapeClick = async (itemId: string, scraperName: string) => {
@@ -654,6 +705,9 @@ export const QueuePage: React.FC = () => {
         onClose={() => setEditingItem(null)}
         onComplete={handleCompleteImport}
         onUpdateItem={queue.updateItem}
+        queuePosition={queuePosition?.position}
+        totalPending={queuePosition?.total}
+        onSkip={handleSkipToNext}
       />
 
       {/* yt-dlp Warning Modal */}

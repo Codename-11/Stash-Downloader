@@ -36,7 +36,7 @@ export class YtDlpScraper implements IMetadataScraper {
   }
 
   async scrape(url: string): Promise<IScrapedMetadata> {
-    log.info('Using server-side yt-dlp to extract:', url);
+    log.debug('Using server-side yt-dlp to extract:', url);
     return this.scrapeServerSide(url);
   }
 
@@ -81,7 +81,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
       // Log proxy configuration for troubleshooting
       if (proxy) {
-        log.info(`Using HTTP proxy for metadata extraction: ${proxy}`);
+        log.debug(`Using HTTP proxy for metadata extraction: ${proxy}`);
       } else {
         log.debug('No HTTP proxy configured - using direct connection');
       }
@@ -167,7 +167,7 @@ export class YtDlpScraper implements IMetadataScraper {
       throw new Error(`yt-dlp extraction did not succeed: ${readResult.result_error || readResult.error || 'Unknown error'}`);
     }
 
-    log.info('Got metadata from server-side yt-dlp:', readResult.title);
+    log.debug('Got metadata from server-side yt-dlp:', readResult.title);
 
     // Extract video URL from the result
     let videoUrl: string | undefined;
