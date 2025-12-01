@@ -132,6 +132,7 @@ export interface IDownloadItem {
 
   // Stash integration
   stashId?: string; // Scene/Image/Gallery ID after creation
+  existsInStash?: { id: string; title?: string }; // If scene already exists in Stash before import
 
   // Logs for this specific item
   logs?: IItemLogEntry[];

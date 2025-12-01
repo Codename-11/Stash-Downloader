@@ -339,6 +339,15 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
             {/* Status and metadata chips */}
             <div className="d-flex gap-2 align-items-center mb-2">
               {getStatusChip()}
+              {item.existsInStash && (
+                <span
+                  className="badge bg-warning text-dark"
+                  title={`Scene already exists in Stash${item.existsInStash.title ? `: ${item.existsInStash.title}` : ''}`}
+                  style={{ cursor: 'help' }}
+                >
+                  ⚠️ Exists
+                </span>
+              )}
               {isScrapingMetadata ? null : (
                 item.metadata?.contentType && (
                   <span

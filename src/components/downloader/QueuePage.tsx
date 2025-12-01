@@ -141,10 +141,12 @@ export const QueuePage: React.FC = () => {
     }
 
     // Check for existing scene in Stash database
+    let existingSceneInfo: { id: string; title?: string } | undefined;
     if (isStashEnvironment) {
       try {
         const existingScene = await stashService.findSceneByURL(url);
         if (existingScene) {
+          existingSceneInfo = { id: existingScene.id, title: existingScene.title };
           log.addLog('warning', 'scrape', `Scene already exists in Stash: "${existingScene.title || existingScene.id}"`);
           toast.showToast('warning', 'Scene Exists', `This scene already exists in Stash: "${existingScene.title || 'ID: ' + existingScene.id}". Adding anyway.`);
           // Continue adding - user can choose to skip manually
@@ -162,6 +164,12 @@ export const QueuePage: React.FC = () => {
       toast.showToast('error', 'Add Failed', 'Failed to add URL to queue.');
       return;
     }
+
+    // If scene exists in Stash, mark the item
+    if (existingSceneInfo) {
+      queue.updateItem(itemId, { existsInStash: existingSceneInfo });
+    }
+
     log.addLog('info', 'scrape', `Added URL to queue: ${url}`);
     
     // Scrape metadata in background and update the item
