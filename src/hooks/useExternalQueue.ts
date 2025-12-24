@@ -72,35 +72,51 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
 
     /**
      * Process URLs stored in localStorage (from extension when page wasn't focused)
+     * Returns true if any URLs were processed
      */
-    const processExternalQueue = () => {
+    const processExternalQueue = (): boolean => {
       try {
         const queueJson = localStorage.getItem(EXTERNAL_QUEUE_KEY);
-        if (!queueJson) return;
+        if (!queueJson) return false;
 
         const queue: ExternalQueueItem[] = JSON.parse(queueJson);
-        if (!queue.length) return;
+        if (!queue.length) return false;
 
         log.info(`Processing ${queue.length} URL(s) from external queue`);
 
+        let processedAny = false;
         // Process each URL
         queue.forEach((item) => {
           if (!processedUrls.current.has(item.url)) {
             processedUrls.current.add(item.url);
             setTimeout(() => processedUrls.current.delete(item.url), 5000);
             onUrlReceived(item.url, mapContentType(item.contentType));
+            processedAny = true;
           }
         });
 
         // Clear the queue after processing
         localStorage.removeItem(EXTERNAL_QUEUE_KEY);
+        return processedAny;
       } catch (e) {
         log.error('Failed to process external queue:', e instanceof Error ? e.message : String(e));
+        return false;
       }
     };
 
     // Process any queued URLs on mount
     processExternalQueue();
+
+    // Poll localStorage periodically for a few seconds after mount
+    // This handles the race condition when extension's executeScript runs after React mounts
+    let pollCount = 0;
+    const maxPolls = 10; // Poll for up to 5 seconds (10 * 500ms)
+    const pollInterval = setInterval(() => {
+      pollCount++;
+      if (processExternalQueue() || pollCount >= maxPolls) {
+        clearInterval(pollInterval);
+      }
+    }, 500);
 
     /**
      * Listen for localStorage changes (from other tabs or extension)
@@ -134,6 +150,7 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
     return () => {
       window.removeEventListener('stash-downloader-add-url', handleExternalUrl);
       window.removeEventListener('storage', handleStorageChange);
+      clearInterval(pollInterval);
     };
   }, [onUrlReceived]);
 }

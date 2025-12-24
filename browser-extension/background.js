@@ -97,17 +97,75 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
     return { success: true, method: 'realtime' };
   }
 
-  // Fallback: Open Stash Downloader with URL param
-  const params = new URLSearchParams({
-    url: url,
-    type: contentType
-  });
+  // Fallback: Open Stash and use localStorage + SPA navigation
+  // Can't use URL params because Stash is a SPA - direct URL access gives 404
 
-  const targetUrl = `${settings.stashUrl}/plugin/stash-downloader?${params.toString()}`;
-  await browser.tabs.create({ url: targetUrl });
+  // Open Stash root (or find existing Stash tab)
+  const newTab = await browser.tabs.create({ url: settings.stashUrl });
+
+  // Wait for tab to load, then inject the URL into localStorage and navigate
+  const queueData = JSON.stringify([{
+    url: url,
+    contentType: contentType,
+    options: options,
+    timestamp: Date.now()
+  }]);
+
+  // Listen for tab to complete loading
+  const onTabUpdated = (tabId, changeInfo) => {
+    if (tabId === newTab.id && changeInfo.status === 'complete') {
+      browser.tabs.onUpdated.removeListener(onTabUpdated);
+
+      // Execute script to navigate and dispatch event after React mounts
+      browser.tabs.executeScript(newTab.id, {
+        code: `
+          (function() {
+            const urlToQueue = ${JSON.stringify(url)};
+            const contentType = ${JSON.stringify(contentType)};
+
+            // Store in localStorage as backup
+            const queueData = JSON.stringify([{
+              url: urlToQueue,
+              contentType: contentType,
+              timestamp: Date.now()
+            }]);
+            localStorage.setItem('stash-downloader-external-queue', queueData);
+
+            // Navigate to downloader within the SPA
+            window.history.pushState({}, '', '/plugin/stash-downloader');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+
+            console.log('[Stash Downloader Extension] Navigating to downloader...');
+
+            // Wait for React to mount, then dispatch custom event
+            function dispatchAddUrl() {
+              window.dispatchEvent(new CustomEvent('stash-downloader-add-url', {
+                detail: { url: urlToQueue, contentType: contentType }
+              }));
+              console.log('[Stash Downloader Extension] Dispatched add-url event');
+            }
+
+            // Try multiple times to catch React mount
+            setTimeout(dispatchAddUrl, 500);
+            setTimeout(dispatchAddUrl, 1500);
+            setTimeout(dispatchAddUrl, 3000);
+          })();
+        `
+      }).catch(err => {
+        console.error('Failed to inject script:', err);
+      });
+    }
+  };
+
+  browser.tabs.onUpdated.addListener(onTabUpdated);
+
+  // Cleanup listener after 10s timeout
+  setTimeout(() => {
+    browser.tabs.onUpdated.removeListener(onTabUpdated);
+  }, 10000);
 
   if (settings.showNotifications) {
-    showNotification('Opening Stash', 'Downloader page opened with URL');
+    showNotification('Opening Stash', 'Opening Stash Downloader...');
   }
 
   return { success: true, method: 'redirect' };
