@@ -465,18 +465,31 @@ That's it! The content is now in your Stash library with all metadata.
 
 **yt-dlp in Docker (Stash container):**
 
-The official Stash Docker image is Alpine-based and requires special handling:
+The official Stash Docker image is Alpine-based. The recommended approach uses a virtual environment:
 
 ```bash
-# Install/update yt-dlp in container
-docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
+# Access the container
+docker exec -it <container_name> /bin/sh
 
-# Or with docker-compose
-docker-compose exec stash pip install -U yt-dlp --break-system-packages
+# Create virtual environment (persists if /root/.stash is mounted)
+python -m venv /root/.stash/venv
+
+# Activate and install yt-dlp
+source /root/.stash/venv/bin/activate
+pip install -U yt-dlp
 ```
 
-**Note:** This update is lost when the container is recreated. For persistence, create a custom Dockerfile:
+Then configure Stash to use the venv Python:
+1. Go to **Settings → System**
+2. Set **Python Executable Path** to: `/root/.stash/venv/bin/python`
+3. Save and restart Stash
 
+**Quick method (less persistent):**
+```bash
+docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
+```
+
+**For persistence with custom Dockerfile:**
 ```dockerfile
 FROM stashapp/stash:latest
 RUN pip install -U yt-dlp --break-system-packages
