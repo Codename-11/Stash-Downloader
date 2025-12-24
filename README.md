@@ -14,11 +14,15 @@
 - **Queue Management** - Track downloads with progress indicators
 - **Persistent Queue** - Queue survives page refresh and navigation
 
+![Stash Downloader Main Interface](screenshots/stash_downloader_main_layout.png)
+
 ---
 
 ## Browser Extension
 
 Send URLs directly to your Stash Downloader queue from any webpage.
+
+![Browser Extension](screenshots/stash_downloader_extension_layout.png)
 
 ### Features
 
@@ -29,9 +33,17 @@ Send URLs directly to your Stash Downloader queue from any webpage.
 
 ### Installation
 
+**Firefox Add-ons (Coming Soon)**
+
+The extension is currently pending review on [Firefox Add-ons](https://addons.mozilla.org/). Once approved, you'll be able to install it directly from the store.
+
+**Manual Installation (Temporary)**
+
 1. Open Firefox and navigate to `about:debugging`
 2. Click "This Firefox" → "Load Temporary Add-on"
 3. Select `browser-extension/manifest.json`
+
+Note: Temporary add-ons are removed when Firefox closes.
 
 ### Setup
 
