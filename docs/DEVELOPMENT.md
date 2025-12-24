@@ -196,6 +196,58 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) with emoji:
 
 ---
 
+## Releasing
+
+### Release Process
+
+This project uses **tag-based releases**. When you push a tag, GitHub Actions automatically:
+1. Runs tests, lint, and type-check
+2. Builds the plugin
+3. Deploys to GitHub Pages (updates Stash plugin index)
+4. Creates a GitHub Release with the ZIP attached
+
+### How to Create a Release
+
+```bash
+# 1. Update version in package.json
+#    Edit package.json: "version": "0.1.0" → "0.2.0"
+
+# 2. Commit the version bump
+git add package.json
+git commit -m "🔖 chore: release v0.2.0"
+
+# 3. Create and push the tag
+git tag v0.2.0
+git push origin main --tags
+```
+
+### Version Bump Guidelines
+
+| Change Type | Version Bump | Example |
+|-------------|--------------|---------|
+| Breaking changes | MAJOR | 0.1.0 → 1.0.0 |
+| New features | MINOR | 0.1.0 → 0.2.0 |
+| Bug fixes | PATCH | 0.1.0 → 0.1.1 |
+
+### What Happens on Release
+
+1. **CI runs**: Type-check, lint, tests must pass
+2. **Build**: Plugin is compiled and packaged
+3. **GitHub Pages**: `index.yml` updated with new version
+4. **GitHub Release**: Created with:
+   - Release notes (auto-generated)
+   - `stash-downloader.zip` attached
+   - Installation instructions
+
+### Verifying a Release
+
+After pushing a tag:
+1. Check [Actions](https://github.com/Codename-11/Stash-Downloader/actions) for build status
+2. Verify [Releases](https://github.com/Codename-11/Stash-Downloader/releases) page
+3. Test installation via Stash plugin manager
+
+---
+
 ## Build Configuration
 
 ### Vite Config

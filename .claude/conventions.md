@@ -264,6 +264,41 @@ Include:
 - Breaking changes (if any)
 - Related issues (closes #123)
 
+### Releasing (Tag-Based)
+
+This project uses **tag-based releases**. When the user asks to create a release:
+
+**Steps to Create a Release:**
+```bash
+# 1. Determine version bump (major/minor/patch based on changes)
+# 2. Update package.json version
+# 3. Commit the version bump
+git add package.json
+git commit -m "🔖 chore: release vX.Y.Z"
+
+# 4. Create and push the tag
+git tag vX.Y.Z
+git push origin main --tags
+```
+
+**Version Bump Rules:**
+| Changes | Bump | Example |
+|---------|------|---------|
+| Breaking changes, API changes | MAJOR | 0.1.0 → 1.0.0 |
+| New features, enhancements | MINOR | 0.1.0 → 0.2.0 |
+| Bug fixes, patches | PATCH | 0.1.0 → 0.1.1 |
+
+**What Happens Automatically:**
+1. GitHub Actions runs CI (tests, lint, type-check)
+2. Plugin is built and packaged
+3. GitHub Pages index.yml is updated
+4. GitHub Release is created with ZIP attached
+
+**Important:**
+- Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
+- Version in `package.json` should match tag (without `v` prefix)
+- Always push both the commit AND the tag: `git push origin main --tags`
+
 ## Documentation
 - **Code Comments**: Explain "why", not "what"
 - **JSDoc**: Document public APIs and complex functions
