@@ -15,13 +15,18 @@ import { YtDlpScraper } from './YtDlpScraper';
 import { StashScraper } from './StashScraper';
 import { BooruScraper } from './BooruScraper';
 import { withTimeout, createLogger } from '@/utils';
+import { getStashService } from '@/services/stash/StashGraphQLService';
 
 const log = createLogger('ScraperRegistry');
+
+// Plugin ID for yt-dlp check
+const PLUGIN_ID = 'stash-downloader';
 
 export class ScraperRegistry {
   private scrapers: IMetadataScraper[] = [];
   private fallbackScraper: IMetadataScraper;
   private readonly overallTimeoutMs = 90000; // 90 seconds overall timeout
+  private ytdlpVersionChecked = false;
 
   constructor() {
     this.fallbackScraper = new GenericScraper();
@@ -33,6 +38,39 @@ export class ScraperRegistry {
     this.register(new StashScraper());   // Fallback (uses Stash's scraper API)
 
     log.info('Scrapers registered: YtDlpScraper, BooruScraper, StashScraper, GenericScraper (fallback)');
+
+    // Check yt-dlp version asynchronously (fire and forget)
+    this.checkYtDlpVersion();
+  }
+
+  /**
+   * Check yt-dlp availability and version, log result
+   */
+  private async checkYtDlpVersion(): Promise<void> {
+    if (this.ytdlpVersionChecked) return;
+    this.ytdlpVersionChecked = true;
+
+    try {
+      const stashService = getStashService();
+      if (!stashService.isStashEnvironment()) {
+        log.debug('Not in Stash environment, skipping yt-dlp check');
+        return;
+      }
+
+      const result = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'check_ytdlp',
+      }) as { available?: boolean; version?: string; result_error?: string } | null;
+
+      if (result?.available && result?.version) {
+        log.info(`yt-dlp installed: v${result.version}`);
+      } else if (result?.result_error) {
+        log.warn(`yt-dlp not available: ${result.result_error}`);
+      } else {
+        log.warn('yt-dlp status unknown - server-side scraping may not work');
+      }
+    } catch (error) {
+      log.debug(`yt-dlp check failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   /**

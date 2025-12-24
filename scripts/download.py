@@ -878,9 +878,21 @@ def task_cleanup_result(args: dict) -> dict:
 
 
 def task_check_ytdlp(args: dict) -> dict:
-    """Check if yt-dlp is available."""
-    available = check_ytdlp()
-    return {"available": available, "success": available}
+    """Check if yt-dlp is available and return version info."""
+    try:
+        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            log.info(f"yt-dlp version: {version}")
+            return {"available": True, "success": True, "version": version}
+        else:
+            return {"available": False, "success": False, "version": None, "result_error": "yt-dlp check failed"}
+    except FileNotFoundError:
+        log.warning("yt-dlp not found")
+        return {"available": False, "success": False, "version": None, "result_error": "yt-dlp not installed"}
+    except subprocess.TimeoutExpired:
+        log.error("yt-dlp version check timed out")
+        return {"available": False, "success": False, "version": None, "result_error": "yt-dlp check timed out"}
 
 
 def task_test_proxy(args: dict) -> dict:
