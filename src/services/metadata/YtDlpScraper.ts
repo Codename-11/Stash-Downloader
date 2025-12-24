@@ -104,7 +104,7 @@ export class YtDlpScraper implements IMetadataScraper {
       );
       log.debug('runPluginTaskAndWait returned:', JSON.stringify(taskResult));
     } catch (taskError) {
-      log.error('runPluginTaskAndWait threw error:', String(taskError));
+      log.error(`runPluginTaskAndWait threw error: ${String(taskError)}`);
       throw taskError;
     }
 
@@ -142,7 +142,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
       log.debug('Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
     } catch (readError) {
-      log.error('Read result error:', String(readError));
+      log.error(`Read result error: ${String(readError)}`);
       throw readError;
     }
 

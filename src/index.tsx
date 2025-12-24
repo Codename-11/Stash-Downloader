@@ -148,7 +148,7 @@ function initializePlugin() {
     addNavButtonViaMutationObserver();
 
   } catch (error) {
-    log.error('Failed to initialize:', String(error));
+    log.error(`Failed to initialize: ${String(error)}`);
     throw error;
   }
 }

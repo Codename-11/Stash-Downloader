@@ -469,7 +469,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeSceneURL || null;
     } catch (error) {
-      log.error('scrapeSceneURL failed:', String(error));
+      log.error(`scrapeSceneURL failed: ${String(error)}`);
       return null;
     }
   }
@@ -516,7 +516,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeGalleryURL || null;
     } catch (error) {
-      log.error('scrapeGalleryURL failed:', String(error));
+      log.error(`scrapeGalleryURL failed: ${String(error)}`);
       return null;
     }
   }
@@ -563,7 +563,7 @@ export class StashGraphQLService {
       );
       return result.data?.scrapeImageURL || null;
     } catch (error) {
-      log.error('scrapeImageURL failed:', String(error));
+      log.error(`scrapeImageURL failed: ${String(error)}`);
       return null;
     }
   }
@@ -600,7 +600,7 @@ export class StashGraphQLService {
       );
       return result.data?.listScrapers || [];
     } catch (error) {
-      log.error('listScrapers failed:', String(error));
+      log.error(`listScrapers failed: ${String(error)}`);
       return [];
     }
   }
@@ -630,7 +630,7 @@ export class StashGraphQLService {
 
       return false;
     } catch (error) {
-      log.error('canScrapeURL failed:', String(error));
+      log.error(`canScrapeURL failed: ${String(error)}`);
       return false;
     }
   }
@@ -662,7 +662,7 @@ export class StashGraphQLService {
       });
       return result.data?.runPluginTask || null;
     } catch (error) {
-      log.error('runPluginTask failed:', String(error));
+      log.error(`runPluginTask failed: ${String(error)}`);
       return null;
     }
   }
@@ -702,7 +702,7 @@ export class StashGraphQLService {
 
       return result.data?.runPluginOperation || null;
     } catch (error) {
-      log.error('runPluginOperation exception:', String(error));
+      log.error(`runPluginOperation exception: ${String(error)}`);
       return null;
     }
   }
@@ -721,7 +721,7 @@ export class StashGraphQLService {
       const result = await this.gqlRequest<{ stopJob: boolean }>(mutation, { job_id: jobId });
       return result.data?.stopJob || false;
     } catch (error) {
-      log.error('stopJob failed:', String(error));
+      log.error(`stopJob failed: ${String(error)}`);
       return false;
     }
   }
@@ -771,7 +771,7 @@ export class StashGraphQLService {
       }
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      log.warn('configuration.plugins query failed:', errorMsg);
+      log.warn(`configuration.plugins query failed: ${errorMsg}`);
     }
 
     // Fallback: try without the include filter (older Stash versions may not support it)
@@ -804,7 +804,7 @@ export class StashGraphQLService {
       }
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
-      log.warn('configuration.plugins fallback query failed:', errorMsg);
+      log.warn(`configuration.plugins fallback query failed: ${errorMsg}`);
     }
 
     log.warn('Could not retrieve plugin settings from Stash');
@@ -837,7 +837,7 @@ export class StashGraphQLService {
       const result = await this.gqlRequest<{ findJob: any }>(query, { input: { id: jobId } });
       return result.data?.findJob || null;
     } catch (error) {
-      log.error('findJob failed:', String(error));
+      log.error(`findJob failed: ${String(error)}`);
       return null;
     }
   }
@@ -952,7 +952,7 @@ export class StashGraphQLService {
       log.debug('Library paths:', JSON.stringify(stashes));
       return stashes;
     } catch (error) {
-      log.error('Failed to get library paths:', String(error));
+      log.error(`Failed to get library paths: ${String(error)}`);
       return [];
     }
   }
@@ -994,10 +994,10 @@ export class StashGraphQLService {
 
       const result = await this.gqlRequest<{ metadataScan: string }>(mutation, { input });
       const jobId = result.data?.metadataScan;
-      log.info('Scan triggered, job ID:', jobId || 'unknown');
+      log.info(`Scan triggered, job ID: ${jobId || 'unknown'}`);
       return jobId || null;
     } catch (error) {
-      log.error('Failed to trigger scan:', String(error));
+      log.error(`Failed to trigger scan: ${String(error)}`);
       return null;
     }
   }

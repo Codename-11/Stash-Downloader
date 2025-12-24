@@ -129,6 +129,41 @@ When adding UI elements via DOM injection:
 4. Test selectors in console: `document.querySelector('.navbar-buttons')`
 5. Watch for class names that might change between Stash versions
 
+## Troubleshooting
+
+### yt-dlp Extraction Failures
+If scraping fails with errors like "No video formats found" or "Failed to extract metadata", yt-dlp likely needs updating. Site extractors break frequently as sites change their structure.
+
+**Update yt-dlp (standard install):**
+```bash
+pip install -U yt-dlp
+# or
+yt-dlp -U
+```
+
+**Update yt-dlp (Docker - Alpine-based Stash image):**
+```bash
+# Find container name
+docker ps
+
+# Update inside container (--break-system-packages required for Alpine/PEP 668)
+docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
+
+# Or with docker-compose
+docker-compose exec stash pip install -U yt-dlp --break-system-packages
+```
+
+**Note:** Docker updates are lost on container recreation. For persistence, add to your startup or create a custom Dockerfile:
+```dockerfile
+FROM stashapp/stash:latest
+RUN pip install -U yt-dlp --break-system-packages
+```
+
+### Common Site-Specific Issues
+- **XHamster**: Extractor updates frequently needed (check [yt-dlp issues](https://github.com/yt-dlp/yt-dlp/issues))
+- **Sites behind geo-blocks**: Configure HTTP/SOCKS proxy in plugin settings
+- **Rate limiting**: Some sites block rapid requests; add delays between downloads
+
 ## Future Enhancement Considerations
 - Plugin architecture supports adding new source scrapers
 - Extensible metadata mapping system

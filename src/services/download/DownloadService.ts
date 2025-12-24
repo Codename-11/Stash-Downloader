@@ -193,7 +193,7 @@ export class DownloadService {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      log.error('Server-side download failed', errorMsg);
+      log.error(`Server-side download failed: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
   }
@@ -387,7 +387,7 @@ export class DownloadService {
         return await this.downloadDirect(imageUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        log.warn('Direct imageUrl download failed:', errorMessage);
+        log.warn(`Direct imageUrl download failed: ${errorMessage}`);
         throw error;
       }
     }
@@ -433,17 +433,17 @@ export class DownloadService {
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          log.error('Server-side download failed:', errorMessage);
+          log.error(`Server-side download failed: ${errorMessage}`);
           throw error;
         }
       }
-      
+
       // Fallback to direct download (for same-origin URLs or non-Stash environments)
       try {
         return await this.downloadDirect(videoUrl, options);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        log.warn('Direct videoUrl download failed:', errorMessage);
+        log.warn(`Direct videoUrl download failed: ${errorMessage}`);
         // Fall through to server-side download
       }
     }
@@ -489,7 +489,7 @@ export class DownloadService {
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        log.error('Server-side download failed:', errorMessage);
+        log.error(`Server-side download failed: ${errorMessage}`);
         throw error;
       }
     }

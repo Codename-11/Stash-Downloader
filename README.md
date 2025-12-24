@@ -461,8 +461,33 @@ That's it! The content is now in your Stash library with all metadata.
 1. Ensure Python 3.7+ is installed: `python3 --version`
 2. Install yt-dlp: `pip install yt-dlp`
 3. Verify yt-dlp works: `yt-dlp --version`
-4. For Docker: Python should be at `/usr/bin/python3`
-5. Check Stash logs for "no such file or directory" errors
+4. Check Stash logs for "no such file or directory" errors
+
+**yt-dlp in Docker (Stash container):**
+
+The official Stash Docker image is Alpine-based and requires special handling:
+
+```bash
+# Install/update yt-dlp in container
+docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
+
+# Or with docker-compose
+docker-compose exec stash pip install -U yt-dlp --break-system-packages
+```
+
+**Note:** This update is lost when the container is recreated. For persistence, create a custom Dockerfile:
+
+```dockerfile
+FROM stashapp/stash:latest
+RUN pip install -U yt-dlp --break-system-packages
+```
+
+**yt-dlp extraction failures (e.g., "No video formats found"):**
+
+Site extractors break frequently as websites change. Update yt-dlp to get the latest fixes:
+- Standard: `pip install -U yt-dlp` or `yt-dlp -U`
+- Docker: See above
+- Check [yt-dlp issues](https://github.com/yt-dlp/yt-dlp/issues) for site-specific problems
 
 **Proxy/SSL errors:**
 1. **SSL certificate errors**: If using a proxy, SSL verification is automatically disabled. If you see certificate errors without a proxy, check your system's certificate store.
