@@ -1,8 +1,9 @@
 /**
- * LogContext - Context for managing application logs
+ * LogContext - Context for managing application logs with localStorage persistence
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
+import { STORAGE_KEYS } from '@/constants';
 
 export type LogLevel = 'info' | 'success' | 'warning' | 'error';
 
@@ -30,11 +31,51 @@ interface LogProviderProps {
   maxLogs?: number; // Maximum number of logs to keep in memory
 }
 
+/**
+ * Load logs from localStorage
+ */
+function loadLogs(): ILogEntry[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.LOGS);
+    if (!stored) return [];
+
+    const parsed = JSON.parse(stored);
+    // Convert timestamp strings back to Date objects
+    return parsed.map((log: ILogEntry & { timestamp: string }) => ({
+      ...log,
+      timestamp: new Date(log.timestamp),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save logs to localStorage
+ */
+function saveLogs(logs: ILogEntry[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
+  } catch {
+    // localStorage might be full or unavailable
+  }
+}
+
 export const LogProvider: React.FC<LogProviderProps> = ({
   children,
   maxLogs = 1000,
 }) => {
-  const [logs, setLogs] = useState<ILogEntry[]>([]);
+  const [logs, setLogs] = useState<ILogEntry[]>(() => loadLogs());
+  const isInitialLoad = useRef(true);
+
+  // Save logs to localStorage whenever they change
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    saveLogs(logs);
+  }, [logs]);
 
   const addLog = useCallback(
     (level: LogLevel, category: string, message: string, details?: string) => {
@@ -61,6 +102,12 @@ export const LogProvider: React.FC<LogProviderProps> = ({
 
   const clearLogs = useCallback(() => {
     setLogs([]);
+    // Also clear from localStorage immediately
+    try {
+      localStorage.removeItem(STORAGE_KEYS.LOGS);
+    } catch {
+      // Ignore errors
+    }
   }, []);
 
   const getLogsByCategory = useCallback(

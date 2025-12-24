@@ -30,6 +30,7 @@ export const STORAGE_KEYS = {
   SETTINGS: 'stash-downloader:settings',
   QUEUE: 'stash-downloader:queue',
   DOWNLOAD_HISTORY: 'stash-downloader:history',
+  LOGS: 'stash-downloader:logs',
 } as const;
 
 export const API_ENDPOINTS = {
