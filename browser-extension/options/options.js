@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showNotificationsCheckbox = document.getElementById('showNotifications');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
-  const urlPattern = document.getElementById('urlPattern');
   const saveBtn = document.getElementById('saveBtn');
   const testBtn = document.getElementById('testBtn');
   const toast = document.getElementById('toast');
@@ -47,19 +46,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     apiKeyInput.value = settings.apiKey;
     showNotificationsCheckbox.checked = settings.showNotifications;
 
-    updateUrlPattern(settings.stashUrl);
-
     // Auto-test on load
     await testConnection();
-  }
-
-  function updateUrlPattern(url) {
-    try {
-      const parsed = new URL(url);
-      urlPattern.textContent = `*://${parsed.host}/*`;
-    } catch {
-      urlPattern.textContent = '*://localhost:9999/*';
-    }
   }
 
   async function testConnection() {
