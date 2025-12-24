@@ -57,6 +57,34 @@ The plugin registers via `PluginApi.register.route()` and adds navbar link via M
 
 **Re-scrape**: Users can manually try different scrapers via dropdown menu on queue items.
 
+## PR Review Criteria (for Claude GitHub Action)
+
+When reviewing pull requests, check:
+
+1. **Code Quality**
+   - TypeScript strict mode compliance
+   - No `any` types without justification
+   - Proper error handling
+
+2. **Style Compliance**
+   - Conventional commits format
+   - Bootstrap utilities for styling (not custom CSS)
+   - Stash theme colors for dark mode
+
+3. **Testing**
+   - Tests pass (`npm test`)
+   - Build succeeds (`npm run build`)
+   - No new lint warnings
+
+4. **Security**
+   - No hardcoded credentials
+   - Input validation for user data
+   - Safe URL handling
+
+5. **Documentation**
+   - README updated if needed
+   - Code comments for complex logic
+
 # Documentation Instructions
 Keep the documentation concise and to the point. Use markdown formatting for the documentation.
 Update relevant files with the new information and remove any outdated information when necessary.

@@ -1,0 +1,34 @@
+name: Question
+description: Ask a question about using Stash Downloader
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question? We're happy to help!
+        
+        **Before asking**, please check:
+        - [README](https://github.com/Codename-11/Stash-Downloader#readme)
+        - [Troubleshooting Guide](https://github.com/Codename-11/Stash-Downloader/blob/main/docs/TROUBLESHOOTING.md)
+        - [Existing issues](https://github.com/Codename-11/Stash-Downloader/issues?q=is%3Aissue)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Any relevant context about what you're trying to do?
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: What solutions have you already attempted?
