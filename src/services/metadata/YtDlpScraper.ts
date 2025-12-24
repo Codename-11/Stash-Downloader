@@ -23,7 +23,7 @@ export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
   supportedDomains = ['*']; // Supports all domains
   contentTypes = [ContentType.Video]; // Primarily for video extraction
-  private readonly timeoutMs = 60000; // 60 seconds for yt-dlp (can be slow)
+  private readonly timeoutMs = 60000; // 60 seconds for yt-dlp (proxy connections can be slow)
 
   canHandle(url: string): boolean {
     // Can handle any URL if yt-dlp is available
@@ -169,11 +169,27 @@ export class YtDlpScraper implements IMetadataScraper {
 
     log.debug('Got metadata from server-side yt-dlp:', readResult.title);
 
-    // Extract video URL from the result
+    // Extract video URL and available qualities from the result
     let videoUrl: string | undefined;
     let quality: string | undefined;
+    let availableQualities: string[] = [];
 
     if (readResult.formats && Array.isArray(readResult.formats) && readResult.formats.length > 0) {
+      // Extract all unique video heights (qualities)
+      const heights = new Set<number>();
+      for (const format of readResult.formats) {
+        if (format.height && format.height > 0 && (format.vcodec !== 'none' || format.acodec !== 'none')) {
+          heights.add(format.height);
+        }
+      }
+
+      // Sort heights descending and format as quality strings
+      availableQualities = Array.from(heights)
+        .sort((a, b) => b - a)
+        .map(h => `${h}p`);
+
+      log.debug(`Available qualities: ${availableQualities.join(', ')}`);
+
       // Sort by height descending to get best quality first
       const sortedFormats = [...readResult.formats].sort((a: any, b: any) => (b.height || 0) - (a.height || 0));
       for (const format of sortedFormats) {
@@ -190,6 +206,9 @@ export class YtDlpScraper implements IMetadataScraper {
     if (!videoUrl && readResult.url) {
       videoUrl = readResult.url;
       quality = readResult.height ? `${readResult.height}p` : undefined;
+      if (quality && availableQualities.length === 0) {
+        availableQualities = [quality];
+      }
       log.debug('Using top-level URL');
     }
 
@@ -215,6 +234,7 @@ export class YtDlpScraper implements IMetadataScraper {
       tags: tags,
       studio: readResult.uploader || readResult.channel || undefined,
       quality: quality,
+      availableQualities: availableQualities.length > 0 ? availableQualities : undefined,
       contentType: 'video' as ContentType,
     };
   }

@@ -63,7 +63,8 @@ export interface IScrapedMetadata {
   studio?: string;
   thumbnailUrl?: string;
   duration?: number; // seconds
-  quality?: string; // Video quality (e.g., "1080p", "720p", "4K")
+  quality?: string; // Best available quality (e.g., "1080p", "720p", "4K")
+  availableQualities?: string[]; // All available qualities from source (e.g., ["1080p", "720p", "480p"])
   contentType: ContentType;
 
   // Gallery support (multiple images from one URL)

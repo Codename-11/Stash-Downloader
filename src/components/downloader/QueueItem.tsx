@@ -349,36 +349,57 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 </span>
               )}
               {isScrapingMetadata ? null : (
-                item.metadata?.contentType && (
-                  <span
-                    className="badge"
-                    style={{
-                      backgroundColor: item.metadata.contentType === ContentType.Gallery
-                        ? 'rgba(111, 66, 193, 0.2)'
-                        : item.metadata.contentType === ContentType.Image
-                          ? 'rgba(108, 117, 125, 0.2)'
-                          : 'rgba(13, 110, 253, 0.2)',
-                      color: item.metadata.contentType === ContentType.Gallery
-                        ? '#a78bfa'
-                        : item.metadata.contentType === ContentType.Image
-                          ? '#adb5bd'
-                          : '#6ea8fe',
-                      border: `1px solid ${
-                        item.metadata.contentType === ContentType.Gallery
-                          ? '#6f42c1'
+                <>
+                  {item.metadata?.contentType && (
+                    <span
+                      className="badge"
+                      style={{
+                        backgroundColor: item.metadata.contentType === ContentType.Gallery
+                          ? 'rgba(111, 66, 193, 0.2)'
                           : item.metadata.contentType === ContentType.Image
-                            ? '#6c757d'
-                            : '#0d6efd'
-                      }`,
-                    }}
-                  >
-                    {item.metadata.contentType === ContentType.Gallery
-                      ? `📁 Gallery (${item.metadata.galleryImages?.length || 0} images)`
-                      : item.metadata.contentType === ContentType.Image
-                        ? '🖼️ Image'
-                        : '🎥 Video'}
-                  </span>
-                )
+                            ? 'rgba(108, 117, 125, 0.2)'
+                            : 'rgba(13, 110, 253, 0.2)',
+                        color: item.metadata.contentType === ContentType.Gallery
+                          ? '#a78bfa'
+                          : item.metadata.contentType === ContentType.Image
+                            ? '#adb5bd'
+                            : '#6ea8fe',
+                        border: `1px solid ${
+                          item.metadata.contentType === ContentType.Gallery
+                            ? '#6f42c1'
+                            : item.metadata.contentType === ContentType.Image
+                              ? '#6c757d'
+                              : '#0d6efd'
+                        }`,
+                      }}
+                    >
+                      {item.metadata.contentType === ContentType.Gallery
+                        ? `📁 Gallery (${item.metadata.galleryImages?.length || 0} images)`
+                        : item.metadata.contentType === ContentType.Image
+                          ? '🖼️ Image'
+                          : '🎥 Video'}
+                    </span>
+                  )}
+                  {/* Quality badge for videos */}
+                  {item.metadata?.quality && item.metadata.contentType === ContentType.Video && (
+                    <span
+                      className="badge"
+                      style={{
+                        backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                        color: '#75b798',
+                        border: '1px solid #198754',
+                        cursor: item.metadata.availableQualities?.length ? 'help' : 'default',
+                      }}
+                      title={
+                        item.metadata.availableQualities?.length
+                          ? `Available: ${item.metadata.availableQualities.join(', ')}`
+                          : undefined
+                      }
+                    >
+                      📺 {item.metadata.quality}
+                    </span>
+                  )}
+                </>
               )}
             </div>
             {item.error && (
