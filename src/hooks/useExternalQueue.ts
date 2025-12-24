@@ -52,6 +52,7 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
         options?: Record<string, unknown>;
       }>;
 
+      log.debug(`[ExternalQueue] CustomEvent received, detail:`, JSON.stringify(customEvent.detail));
       const { url, contentType } = customEvent.detail;
 
       // Deduplicate
@@ -77,12 +78,16 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
     const processExternalQueue = (): boolean => {
       try {
         const queueJson = localStorage.getItem(EXTERNAL_QUEUE_KEY);
+        log.debug(`[ExternalQueue] localStorage raw value: ${queueJson}`);
         if (!queueJson) return false;
 
         const queue: ExternalQueueItem[] = JSON.parse(queueJson);
         if (!queue.length) return false;
 
         log.info(`Processing ${queue.length} URL(s) from external queue`);
+        queue.forEach((item, idx) => {
+          log.debug(`[ExternalQueue] Item ${idx}: url=${item.url}, contentType=${item.contentType}`);
+        });
 
         let processedAny = false;
         // Process each URL

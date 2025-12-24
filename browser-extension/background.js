@@ -123,6 +123,9 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
             const urlToQueue = ${JSON.stringify(url)};
             const contentType = ${JSON.stringify(contentType)};
 
+            console.log('[Stash Downloader Extension] URL to queue:', urlToQueue);
+            console.log('[Stash Downloader Extension] Content type:', contentType);
+
             // Store in localStorage as backup
             const queueData = JSON.stringify([{
               url: urlToQueue,
@@ -130,6 +133,7 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
               timestamp: Date.now()
             }]);
             localStorage.setItem('stash-downloader-external-queue', queueData);
+            console.log('[Stash Downloader Extension] Stored in localStorage:', queueData);
 
             // Navigate to downloader within the SPA
             window.history.pushState({}, '', '/plugin/stash-downloader');
@@ -139,10 +143,10 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
 
             // Wait for React to mount, then dispatch custom event
             function dispatchAddUrl() {
+              console.log('[Stash Downloader Extension] Dispatching event with URL:', urlToQueue);
               window.dispatchEvent(new CustomEvent('stash-downloader-add-url', {
                 detail: { url: urlToQueue, contentType: contentType }
               }));
-              console.log('[Stash Downloader Extension] Dispatched add-url event');
             }
 
             // Try multiple times to catch React mount
