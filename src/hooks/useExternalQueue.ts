@@ -104,8 +104,12 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
       }
     };
 
-    // Process any queued URLs on mount
-    processExternalQueue();
+    // Delay initial processing slightly to ensure parent component's refs are set
+    // This handles the race condition where useExternalQueue's useEffect runs before
+    // the parent's ref-update useEffect
+    const initialDelay = setTimeout(() => {
+      processExternalQueue();
+    }, 50);
 
     // Poll localStorage periodically for a few seconds after mount
     // This handles the race condition when extension's executeScript runs after React mounts
@@ -150,6 +154,7 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
     return () => {
       window.removeEventListener('stash-downloader-add-url', handleExternalUrl);
       window.removeEventListener('storage', handleStorageChange);
+      clearTimeout(initialDelay);
       clearInterval(pollInterval);
     };
   }, [onUrlReceived]);
