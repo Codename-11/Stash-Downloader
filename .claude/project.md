@@ -143,19 +143,15 @@ yt-dlp -U
 
 **Update yt-dlp (Docker - Alpine-based Stash image):**
 
-Recommended: Use a virtual environment (persists if `/root/.stash` is mounted):
 ```bash
-docker exec -it <container_name> /bin/sh
-python -m venv /root/.stash/venv
-source /root/.stash/venv/bin/activate
-pip install -U yt-dlp
-```
-Then set **Python Executable Path** to `/root/.stash/venv/bin/python` in Stash Settings → System.
+# Install/update yt-dlp (replace 'stash' with your container name)
+docker exec -it stash pip install -U yt-dlp --break-system-packages
 
-Quick method (less persistent):
-```bash
-docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
+# Verify installation
+docker exec -it stash yt-dlp --version
 ```
+
+Note: Lost on container recreation. For persistence, use custom Dockerfile with `RUN pip install -U yt-dlp --break-system-packages`.
 
 ### Common Site-Specific Issues
 - **XHamster**: Extractor updates frequently needed (check [yt-dlp issues](https://github.com/yt-dlp/yt-dlp/issues))

@@ -878,7 +878,13 @@ def task_cleanup_result(args: dict) -> dict:
 
 
 def task_check_ytdlp(args: dict) -> dict:
-    """Check if yt-dlp is available and return version info."""
+    """Check if yt-dlp is available and return version info.
+
+    Note: We use 'status_message' instead of 'result_error' here because
+    this is a status check, not an error condition. Using 'result_error'
+    would cause write_output to set PluginOutput.error, which Stash
+    interprets as a GraphQL error and returns null data.
+    """
     try:
         result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
@@ -886,13 +892,13 @@ def task_check_ytdlp(args: dict) -> dict:
             log.info(f"yt-dlp version: {version}")
             return {"available": True, "success": True, "version": version}
         else:
-            return {"available": False, "success": False, "version": None, "result_error": "yt-dlp check failed"}
+            return {"available": False, "success": True, "version": None, "status_message": "yt-dlp check failed"}
     except FileNotFoundError:
         log.warning("yt-dlp not found")
-        return {"available": False, "success": False, "version": None, "result_error": "yt-dlp not installed"}
+        return {"available": False, "success": True, "version": None, "status_message": "yt-dlp not installed"}
     except subprocess.TimeoutExpired:
         log.error("yt-dlp version check timed out")
-        return {"available": False, "success": False, "version": None, "result_error": "yt-dlp check timed out"}
+        return {"available": False, "success": True, "version": None, "status_message": "yt-dlp check timed out"}
 
 
 def task_test_proxy(args: dict) -> dict:

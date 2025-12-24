@@ -465,35 +465,32 @@ That's it! The content is now in your Stash library with all metadata.
 
 **yt-dlp in Docker (Stash container):**
 
-The official Stash Docker image is Alpine-based. The recommended approach uses a virtual environment:
+The official Stash Docker image is Alpine-based and requires `--break-system-packages`:
 
 ```bash
-# Access the container
-docker exec -it <container_name> /bin/sh
+# Install/update yt-dlp (replace 'stash' with your container name)
+docker exec -it stash pip install -U yt-dlp --break-system-packages
 
-# Create virtual environment (persists if /root/.stash is mounted)
-python -m venv /root/.stash/venv
-
-# Activate and install yt-dlp
-source /root/.stash/venv/bin/activate
-pip install -U yt-dlp
+# Verify installation
+docker exec -it stash yt-dlp --version
 ```
 
-Then configure Stash to use the venv Python:
-1. Go to **Settings → System**
-2. Set **Python Executable Path** to: `/root/.stash/venv/bin/python`
-3. Save and restart Stash
+**Note:** This install is lost when the container is recreated. For persistence, use a custom Dockerfile:
 
-**Quick method (less persistent):**
-```bash
-docker exec -it <container_name> pip install -U yt-dlp --break-system-packages
-```
-
-**For persistence with custom Dockerfile:**
 ```dockerfile
 FROM stashapp/stash:latest
 RUN pip install -U yt-dlp --break-system-packages
 ```
+
+**Alternative: Virtual environment** (for advanced users managing multiple plugin dependencies):
+```bash
+docker exec -it stash /bin/sh
+python -m venv /root/.stash/venv
+source /root/.stash/venv/bin/activate
+pip install -U yt-dlp
+```
+Then set **Python Executable Path** to `/root/.stash/venv/bin/python` in Settings → System.
+⚠️ **Warning:** Changing Python path affects ALL plugins - ensure all plugin dependencies are in the venv.
 
 **yt-dlp extraction failures (e.g., "No video formats found"):**
 

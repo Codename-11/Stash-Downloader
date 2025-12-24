@@ -59,12 +59,12 @@ export class ScraperRegistry {
 
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      }) as { available?: boolean; version?: string; result_error?: string } | null;
+      }) as { available?: boolean; version?: string; status_message?: string } | null;
 
       if (result?.available && result?.version) {
         log.info(`yt-dlp installed: v${result.version}`);
-      } else if (result?.result_error) {
-        log.warn(`yt-dlp not available: ${result.result_error}`);
+      } else if (result?.available === false) {
+        log.warn(`yt-dlp not available: ${result.status_message || 'not installed'}`);
       } else {
         log.warn('yt-dlp status unknown - server-side scraping may not work');
       }
