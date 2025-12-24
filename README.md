@@ -2,6 +2,11 @@
   <img src="src/assets/logo.svg" alt="Stash Downloader Logo" width="128" height="128" />
   <h1>Stash Downloader</h1>
   <p>Download videos and images directly to your Stash library with automatic metadata extraction</p>
+
+  [![License](https://img.shields.io/github/license/Codename-11/Stash-Downloader)](LICENSE)
+  [![GitHub Release](https://img.shields.io/github/v/release/Codename-11/Stash-Downloader)](https://github.com/Codename-11/Stash-Downloader/releases)
+  [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/ci.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
+  [![Stash](https://img.shields.io/badge/Stash-v0.20%2B-blue)](https://github.com/stashapp/stash)
 </div>
 
 ## Features
