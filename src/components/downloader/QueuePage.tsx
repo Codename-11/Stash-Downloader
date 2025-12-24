@@ -2,7 +2,7 @@
  * QueuePage - Main download queue page
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
 import { RescrapeModal } from '@/components/common/RescrapeModal';
@@ -11,7 +11,7 @@ import { QueueItem } from './QueueItem';
 import { BatchImport } from './BatchImport';
 import { EditMetadataModal } from './EditMetadataModal';
 import { LogViewer } from '@/components/common';
-import { useDownloadQueue } from '@/hooks';
+import { useDownloadQueue, useExternalQueue } from '@/hooks';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
@@ -46,6 +46,16 @@ export const QueuePage: React.FC = () => {
   const [rescrapeNewMetadata, setRescrapeNewMetadata] = useState<IScrapedMetadata | undefined>(undefined);
   const [rescrapeLoading, setRescrapeLoading] = useState(false);
   const [rescrapeError, setRescrapeError] = useState<string | undefined>(undefined);
+
+  // Ref to hold handleAddUrl for external queue hook
+  const handleAddUrlRef = useRef<(url: string, contentType: ContentTypeOption) => void>(() => {});
+
+  // External queue hook - receives URLs from browser extension
+  useExternalQueue({
+    onUrlReceived: useCallback((url: string, contentType: ContentTypeOption) => {
+      handleAddUrlRef.current(url, contentType);
+    }, []),
+  });
 
   // Get proxy info for display
   const httpProxy = settings.httpProxy;
@@ -300,6 +310,10 @@ export const QueuePage: React.FC = () => {
     })();
   };
 
+// Update ref when handleAddUrl changes
+  useEffect(() => {
+    handleAddUrlRef.current = handleAddUrl;
+  });
   const handleBatchImport = async (urls: string[]) => {
     log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs`);
     toast.showToast('info', 'Batch Import Started', `Processing ${urls.length} URLs...`);

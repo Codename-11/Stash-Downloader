@@ -72,6 +72,14 @@ JavaScript Extension / Web-UI Plugin for Stash
    - SSL certificate verification automatically disabled when using proxy (handles self-signed certs)
    - Configured via Stash plugin settings
 
+8. **Browser Extension**
+   - Firefox extension for sending URLs to queue from any page
+   - Context menu integration (right-click any link)
+   - Real-time queue updates (no page refresh needed)
+   - Auto-detects content type based on URL patterns
+   - Connection status indicator
+   - Located in `browser-extension/` directory
+
 ## External Dependencies (NOT Bundled)
 These are provided by Stash via PluginApi and marked as external in build config:
 - react

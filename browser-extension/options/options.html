@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stash Downloader Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo svg {
+      width: 22px;
+      height: 22px;
+      color: white;
+    }
+
+    .header-text h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: #737373;
+    }
+
+    /* Sections */
+    .section {
+      background: #1a1a1a;
+      border: 1px solid #262626;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #737373;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e5e5e5;
+      margin-bottom: 8px;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: #525252;
+      margin-top: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="url"] {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0f0f0f;
+      border: 1px solid #262626;
+      border-radius: 8px;
+      color: #e5e5e5;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    input::placeholder {
+      color: #525252;
+    }
+
+    /* Checkbox */
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #3b82f6;
+      cursor: pointer;
+    }
+
+    .checkbox-group label {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Button */
+    .btn {
+      padding: 12px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .btn:hover {
+      background: #2563eb;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn-secondary {
+      background: #262626;
+      color: #e5e5e5;
+    }
+
+    .btn-secondary:hover {
+      background: #333;
+    }
+
+    /* Status */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #0f0f0f;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #525252;
+    }
+
+    .status-dot.connected {
+      background: #22c55e;
+    }
+
+    .status-dot.disconnected {
+      background: #ef4444;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 14px 20px;
+      background: #22c55e;
+      color: white;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.error {
+      background: #ef4444;
+    }
+
+    /* Info Box */
+    .info-box {
+      background: #1e3a5f;
+      border: 1px solid #2563eb;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #93c5fd;
+    }
+
+    .info-box code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Stash Downloader</h1>
+        <p>Extension Settings</p>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">Connection</h2>
+
+      <div class="form-group">
+        <label class="form-label">Stash URL</label>
+        <input type="url" id="stashUrl" placeholder="http://localhost:9999">
+        <p class="form-hint">Full URL to your Stash instance (no trailing slash)</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input type="password" id="apiKey" placeholder="Optional - only if auth is enabled">
+        <p class="form-hint">Required if Stash authentication is enabled</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <div class="status-badge">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Checking...</span>
+        </div>
+        <details style="margin-top: 12px;">
+          <summary style="cursor: pointer; color: #525252; font-size: 12px; user-select: none;">Show Debug Log</summary>
+          <div id="debugLog" style="margin-top: 8px; padding: 10px; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; color: #888; white-space: pre-wrap;"></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Preferences</h2>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="showNotifications" checked>
+          <label for="showNotifications">Show notifications when URLs are queued</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Content Script Permissions</h2>
+      <div class="info-box">
+        <p>The extension needs permission to run on your Stash domain for real-time queue updates.</p>
+        <p style="margin-top: 8px;">Current pattern: <code id="urlPattern">*://localhost:9999/*</code></p>
+      </div>
+    </section>
+
+    <div class="btn-row">
+      <button class="btn" id="saveBtn">Save Settings</button>
+      <button class="btn btn-secondary" id="testBtn">Test Connection</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
