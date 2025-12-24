@@ -5,34 +5,49 @@ browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
     id: 'send-to-stash',
     title: 'Send to Stash Downloader',
-    contexts: ['link', 'page', 'video', 'image', 'audio']
+    contexts: ['link', 'page', 'video', 'image', 'audio', 'selection']
   });
 
   browser.contextMenus.create({
     id: 'send-to-stash-video',
     title: 'As Video',
     parentId: 'send-to-stash',
-    contexts: ['link', 'page', 'video']
+    contexts: ['link', 'page', 'video', 'selection']
   });
 
   browser.contextMenus.create({
     id: 'send-to-stash-image',
     title: 'As Image',
     parentId: 'send-to-stash',
-    contexts: ['link', 'image']
+    contexts: ['link', 'image', 'selection']
   });
 
   browser.contextMenus.create({
     id: 'send-to-stash-gallery',
     title: 'As Gallery',
     parentId: 'send-to-stash',
-    contexts: ['link', 'page']
+    contexts: ['link', 'page', 'selection']
   });
 });
 
 // Handle context menu clicks
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
-  const url = info.linkUrl || info.srcUrl || info.pageUrl;
+  // Check selection first - user may have highlighted a URL
+  let url = null;
+
+  if (info.selectionText) {
+    // Trim and check if selection looks like a URL
+    const selection = info.selectionText.trim();
+    if (selection.match(/^https?:\/\//i) || selection.match(/^www\./i)) {
+      // Add protocol if missing
+      url = selection.startsWith('www.') ? 'https://' + selection : selection;
+    }
+  }
+
+  // Fall back to link/src/page URL
+  if (!url) {
+    url = info.linkUrl || info.srcUrl || info.pageUrl;
+  }
 
   let contentType = 'Video';
   if (info.menuItemId === 'send-to-stash-image') contentType = 'Image';
