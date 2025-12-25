@@ -265,27 +265,27 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
 
     cmd.append(url)
 
-    log.debug(f"Extracting metadata from: {url}")
+    log.warning(f"Starting yt-dlp metadata extraction: {url[:80]}...")  # Always visible
     log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout:
-            log.debug("✓ Metadata extraction successful")
+            log.warning("✓ Metadata extraction successful")  # Always visible
             return json.loads(result.stdout)
         else:
             # Enhanced error logging with proxy context
             error_msg = result.stderr or result.stdout or "Unknown error"
             if proxy:
-                log.error(f"yt-dlp metadata extraction failed (using proxy {proxy}): {error_msg}")
+                log.error(f"yt-dlp extraction FAILED (proxy {proxy}): {error_msg[:200]}")
             else:
-                log.error(f"yt-dlp metadata extraction failed (no proxy): {error_msg}")
+                log.error(f"yt-dlp extraction FAILED (no proxy): {error_msg[:200]}")
             return None
     except subprocess.TimeoutExpired:
-        timeout_msg = "yt-dlp metadata extraction timed out"
+        timeout_msg = f"yt-dlp TIMED OUT after 60s extracting: {url[:80]}"
         if proxy:
-            timeout_msg += f" (using proxy {proxy})"
+            timeout_msg += f" (proxy: {proxy})"
         log.error(timeout_msg)
         return None
     except json.JSONDecodeError as e:
