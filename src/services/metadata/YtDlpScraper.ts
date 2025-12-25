@@ -86,6 +86,12 @@ export class YtDlpScraper implements IMetadataScraper {
         log.debug('No HTTP proxy configured - using direct connection');
       }
 
+      // Check if Stash is busy with scans/generates (can block plugin tasks)
+      const runningJobs = await stashService.getRunningJobs();
+      if (runningJobs.length > 0) {
+        log.warn(`⚠️ Stash is busy: ${runningJobs.join(', ')} - this may cause timeouts`);
+      }
+
       taskResult = await stashService.runPluginTaskAndWait(
         PLUGIN_ID,
         'Extract Metadata',

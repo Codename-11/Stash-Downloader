@@ -52,8 +52,9 @@ export function useExternalQueue({ onUrlReceived }: UseExternalQueueOptions) {
         options?: Record<string, unknown>;
       }>;
 
-      log.debug(`[ExternalQueue] CustomEvent received, detail:`, JSON.stringify(customEvent.detail));
+      // Avoid JSON.stringify on detail (causes cross-context security errors in Firefox)
       const { url, contentType } = customEvent.detail;
+      log.debug(`[ExternalQueue] CustomEvent received: ${url} (${contentType})`);
 
       // Deduplicate
       if (processedUrls.current.has(url)) {

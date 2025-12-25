@@ -843,6 +843,31 @@ export class StashGraphQLService {
   }
 
   /**
+   * Check if Stash is currently running a scan or generate task
+   * Returns array of running job descriptions (e.g., "Scanning...", "Generating sprites...")
+   */
+  async getRunningJobs(): Promise<string[]> {
+    const query = `
+      query JobQueue {
+        jobQueue {
+          id
+          status
+          description
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ jobQueue: Array<{ id: string; status: string; description: string }> }>(query);
+      const runningJobs = result.data?.jobQueue?.filter(job => job.status === 'RUNNING') || [];
+      return runningJobs.map(job => job.description);
+    } catch (error) {
+      log.error(`getRunningJobs failed: ${String(error)}`);
+      return [];
+    }
+  }
+
+  /**
    * Poll for job completion and return result
    * Uses runPluginTask and polls findJob until complete
    */
