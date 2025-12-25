@@ -48,7 +48,7 @@ A Firefox extension for sending URLs directly to your Stash Downloader queue.
 
 ## Requirements
 
-- Firefox 57+
+- Firefox 142+ (or latest version recommended)
 - Stash with the Stash Downloader plugin installed
 - The Stash Downloader page should be open for real-time updates (otherwise it will open a new tab)
 
@@ -66,8 +66,13 @@ If the Stash Downloader page isn't open, it falls back to opening the page with 
 To create a signed extension for permanent installation:
 
 1. Create a Mozilla Add-ons account
-2. Package the extension: `cd browser-extension && zip -r stash-downloader-extension.zip *`
-3. Upload to [addons.mozilla.org](https://addons.mozilla.org/developers/)
+2. Package the extension:
+   ```bash
+   cd browser-extension
+   zip -r stash-downloader-extension.zip * -x "*.DS_Store"
+   ```
+   **Important**: The ZIP must contain files at root level (manifest.json, background.js, etc.), not inside a folder.
+3. Upload `stash-downloader-extension.zip` to [addons.mozilla.org](https://addons.mozilla.org/developers/)
 
 ## Troubleshooting
 
