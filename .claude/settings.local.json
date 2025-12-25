@@ -8,6 +8,7 @@
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "context7"
+    "context7",
+    "chrome-devtools"
   ]
 }

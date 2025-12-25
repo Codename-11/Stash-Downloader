@@ -19,6 +19,16 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 | `npm run type-check` | TypeScript check |
 | `npm run lint` | ESLint check |
 
+## Release & Dev Workflow
+
+| Task | How |
+|------|-----|
+| **Stable release** | Create PR → merge → `git tag vX.Y.Z && git push origin vX.Y.Z` |
+| **Dev build** | Push to `dev` branch, or manual workflow dispatch with "Deploy as dev build" |
+| **Quick release** | Direct on main: bump version → commit → tag → push |
+
+Use `/release` skill for guided release process. See `.claude/conventions.md` for full details.
+
 ## Tech Stack
 
 - **Frontend**: React 18 + TypeScript

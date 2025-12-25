@@ -521,6 +521,43 @@ interface: raw
 - Stash detects updates by comparing versions
 - Format: `MAJOR.MINOR.PATCH` (semver)
 
+## CI/CD Pipeline
+
+### Workflow Overview
+Single workflow (`.github/workflows/publish.yml`) with conditional stages:
+
+| Job | Trigger | Purpose |
+|-----|---------|---------|
+| `test` | All pushes + PRs | Runs type-check, lint, tests, build |
+| `deploy` | Tags (`v*`) or `dev` branch | Builds plugin, deploys to GitHub Pages |
+| `release` | Tags only (`v*`) | Creates GitHub Release with ZIP |
+
+**Flow:**
+```
+PR to main       → test only
+Push to main     → test only
+Push to dev      → test → deploy (dev version)
+Tag push (v*)    → test → deploy (stable) → release
+Manual dispatch  → test → deploy (dev if checkbox enabled)
+```
+
+### Stable vs Dev Channels
+
+Both channels are served from the same `index.yml`:
+
+| Channel | Plugin ID | Version Format | Trigger |
+|---------|-----------|----------------|---------|
+| Stable | `stash-downloader` | `X.Y.Z` | Tag push (`v*`) |
+| Dev | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` | Push to `dev` branch |
+
+**In Stash**, users see both plugins from the same source:
+- "Stash Downloader" - stable releases
+- "Stash Downloader (Dev)" - development builds
+
+**Manual dev deploy**: Use workflow_dispatch with "Deploy as dev build" checkbox.
+
+This ensures the stable plugin only updates on actual releases, while dev builds can be tested independently.
+
 ## GitHub Pages Deployment
 
 ### Required Files
@@ -531,9 +568,9 @@ interface: raw
 1. Go to repo **Settings → Pages**
 2. Under "Build and deployment"
 3. Select **Source: GitHub Actions** (not "Deploy from a branch")
-4. Workflow deploys to `https://username.github.io/repo-name/index.yml`
+4. Workflow deploys to `https://username.github.io/repo-name/index.yml` on tag push
 
-### Workflow Key Steps
+### Workflow Key Steps (Deploy Job)
 ```yaml
 - name: Build plugin
   run: npm run build

@@ -5,7 +5,7 @@ description: Create a new version release with git tag and GitHub Release. Use w
 
 # Release Skill
 
-Create a new version release with proper versioning, git tagging, and GitHub Release automation.
+Create a new version release using a PR-based workflow for Claude review.
 
 ## When to Use
 
@@ -22,20 +22,13 @@ Before creating a release, verify:
 3. No uncommitted changes: `git status`
 4. On main branch: `git branch --show-current`
 
-## Process
+## Release Process (PR-Based)
+
+### Step 1: Determine Version Bump
 
 1. **Check current version**: Read `package.json` version field
 2. **Review commits since last tag**: `git log $(git describe --tags --abbrev=0)..HEAD --oneline`
-3. **Determine version bump**:
-   - `feat!:` or `BREAKING CHANGE` → MAJOR (0.1.0 → 1.0.0)
-   - `feat:` commits → MINOR (0.1.0 → 0.2.0)
-   - `fix:`, `docs:`, etc. → PATCH (0.1.0 → 0.1.1)
-4. **Update package.json** with new version
-5. **Commit version bump**: `🔖 chore: release vX.Y.Z`
-6. **Create tag**: `git tag vX.Y.Z`
-7. **Push with tags**: `git push origin main --tags`
-
-## Version Bump Rules
+3. **Determine bump type**:
 
 | Commit Types | Bump | Example |
 |--------------|------|---------|
@@ -43,33 +36,19 @@ Before creating a release, verify:
 | New features (`feat:`) | MINOR | 0.1.0 → 0.2.0 |
 | Bug fixes, patches (`fix:`, `docs:`, `chore:`) | PATCH | 0.1.0 → 0.1.1 |
 
-## Release Commit Format
-
-```
-🔖 chore: release vX.Y.Z
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
-```
-
-## What Happens After Push
-
-GitHub Actions automatically:
-1. Runs CI (type-check, lint, tests)
-2. Builds the plugin
-3. Updates GitHub Pages (Stash plugin index)
-4. Creates GitHub Release with ZIP attached
-
-## Example Commands
+### Step 2: Create Release Branch & PR
 
 ```bash
-# Update version in package.json (e.g., 0.1.0 → 0.2.0)
-# Then:
+# Create release branch
+git checkout -b release/vX.Y.Z
 
+# Update version in package.json
+# (edit the file)
+
+# Commit the version bump
 git add package.json
 git commit -m "$(cat <<'COMMIT'
-🔖 chore: release v0.2.0
+🔖 chore: release vX.Y.Z
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -77,7 +56,63 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 COMMIT
 )"
 
-git tag v0.2.0
+# Push branch
+git push -u origin release/vX.Y.Z
+
+# Create PR for review
+gh pr create --title "🔖 Release vX.Y.Z" --body "$(cat <<'EOF'
+## Release vX.Y.Z
+
+### Changes
+<!-- Summary of changes in this release -->
+
+### Checklist
+- [ ] Version bumped in package.json
+- [ ] Tests pass
+- [ ] Build succeeds
+
+---
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+### Step 3: After PR Merge - Create Tag
+
+Once the PR is reviewed and merged:
+
+```bash
+# Switch to main and pull
+git checkout main
+git pull origin main
+
+# Create and push tag
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+## What Happens After Tag Push
+
+GitHub Actions automatically:
+1. Runs CI (type-check, lint, tests)
+2. Builds the plugin
+3. Updates GitHub Pages (Stash plugin index) - **only on tags**
+4. Creates GitHub Release with:
+   - Auto-generated changelog from PR titles/commits
+   - Installation instructions
+   - ZIP file attached
+
+**Note:** Regular pushes to main only run tests. The plugin index is NOT updated on every push - this prevents false "update available" notifications in Stash.
+
+## Quick Release (Skip PR)
+
+For urgent patches where PR review isn't needed:
+
+```bash
+# On main branch, update package.json version, then:
+git add package.json
+git commit -m "🔖 chore: release vX.Y.Z"
+git tag vX.Y.Z
 git push origin main --tags
 ```
 
@@ -85,6 +120,6 @@ git push origin main --tags
 
 - Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
 - Version in `package.json` must match tag (without `v` prefix)
-- Always ensure you're on main branch
+- PR workflow allows Claude to review changes before release
 - Release will fail if CI checks don't pass
-- Verify release succeeded in GitHub Actions after pushing
+- Verify release succeeded in GitHub Actions after pushing tag

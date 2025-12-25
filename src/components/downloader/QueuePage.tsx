@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { InfoModal } from '@/components/common/InfoModal';
 import { ItemLogModal } from '@/components/common/ItemLogModal';
 import { RescrapeModal } from '@/components/common/RescrapeModal';
+import { AboutModal } from '@/components/common/AboutModal';
 import { URLInputForm, type ContentTypeOption } from './URLInputForm';
 import { QueueItem } from './QueueItem';
 import { BatchImport } from './BatchImport';
@@ -39,6 +40,7 @@ export const QueuePage: React.FC = () => {
   const [urlFieldValue, setUrlFieldValue] = useState('');
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // Re-scrape modal state
   const [rescrapeItem, setRescrapeItem] = useState<IDownloadItem | null>(null);
@@ -495,13 +497,28 @@ export const QueuePage: React.FC = () => {
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
         <div className="d-flex flex-column gap-3">
-          {/* Logo */}
-          <div className="d-flex align-items-center gap-3 mb-2" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
-            <img
-              src={logoSvg}
-              alt="Stash Downloader Logo"
-              style={{ width: '40px', height: '40px' }}
-            />
+          {/* Logo and Info Button */}
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <div className="d-flex align-items-center gap-3" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
+              <img
+                src={logoSvg}
+                alt="Stash Downloader Logo"
+                style={{ width: '40px', height: '40px' }}
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => setShowAboutModal(true)}
+              title="About Stash Downloader"
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 14.5a6.5 6.5 0 110-13 6.5 6.5 0 010 13z" />
+                <path d="M8 6a1 1 0 110-2 1 1 0 010 2zm1.5 5.5a.5.5 0 01-.5.5H7a.5.5 0 010-1h.5V8H7a.5.5 0 010-1h1.5a.5.5 0 01.5.5v3.5h.5a.5.5 0 010 1z" />
+              </svg>
+              About
+            </button>
           </div>
 
           {/* Proxy and Server Status */}
@@ -798,6 +815,12 @@ export const QueuePage: React.FC = () => {
         onApply={handleRescrapeApply}
         isLoading={rescrapeLoading}
         error={rescrapeError}
+      />
+
+      {/* About Modal */}
+      <AboutModal
+        open={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
       />
     </div>
   );

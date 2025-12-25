@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { readFileSync } from 'fs';
+
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const appVersion = packageJson.version;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -11,6 +16,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
       'process.env': JSON.stringify({}),
+      __APP_VERSION__: JSON.stringify(appVersion),
     },
 
     resolve: {

@@ -256,6 +256,26 @@ BREAKING CHANGE: Response now returns array instead of object
 - `fix/description` - Bug fixes
 - `docs/description` - Documentation
 - `refactor/description` - Code refactoring
+- `release/vX.Y.Z` - Release preparation
+- `dev` - Development channel (auto-deploys dev builds)
+
+### Development Workflow (PR-Based)
+
+All changes should go through pull requests for Claude review:
+
+```
+1. Create branch    → git checkout -b feature/my-feature
+2. Make changes     → edit files, commit
+3. Push branch      → git push -u origin feature/my-feature
+4. Create PR        → gh pr create
+5. Claude reviews   → Automatic via claude.yml workflow
+6. Merge PR         → After approval
+```
+
+**Benefits:**
+- Claude reviews all changes before merge
+- CI runs on every PR
+- Clean commit history on main
 
 ### Pull Requests
 Include:
@@ -264,21 +284,30 @@ Include:
 - Breaking changes (if any)
 - Related issues (closes #123)
 
-### Releasing (Tag-Based)
+### Releasing (PR + Tag-Based)
 
-This project uses **tag-based releases**. When the user asks to create a release:
+This project uses **PR-based releases** with tag triggers:
 
-**Steps to Create a Release:**
+**Step 1: Create Release PR**
 ```bash
-# 1. Determine version bump (major/minor/patch based on changes)
-# 2. Update package.json version
-# 3. Commit the version bump
+# Create release branch
+git checkout -b release/vX.Y.Z
+
+# Update package.json version, then commit
 git add package.json
 git commit -m "🔖 chore: release vX.Y.Z"
 
-# 4. Create and push the tag
+# Push and create PR
+git push -u origin release/vX.Y.Z
+gh pr create --title "🔖 Release vX.Y.Z" --body "Release vX.Y.Z"
+```
+
+**Step 2: After PR Merge - Create Tag**
+```bash
+git checkout main
+git pull origin main
 git tag vX.Y.Z
-git push origin main --tags
+git push origin vX.Y.Z
 ```
 
 **Version Bump Rules:**
@@ -288,16 +317,44 @@ git push origin main --tags
 | New features, enhancements | MINOR | 0.1.0 → 0.2.0 |
 | Bug fixes, patches | PATCH | 0.1.0 → 0.1.1 |
 
-**What Happens Automatically:**
+**What Happens Automatically (on tag push):**
 1. GitHub Actions runs CI (tests, lint, type-check)
 2. Plugin is built and packaged
-3. GitHub Pages index.yml is updated
-4. GitHub Release is created with ZIP attached
+3. GitHub Pages index.yml is updated (only on tags, not on regular pushes)
+4. GitHub Release is created with auto-generated changelog + ZIP attached
+
+**Note:** Regular pushes to main only run the test job. The plugin index is NOT updated on every push - this prevents false "update available" notifications in Stash.
 
 **Important:**
 - Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
 - Version in `package.json` should match tag (without `v` prefix)
-- Always push both the commit AND the tag: `git push origin main --tags`
+- PR workflow allows Claude to review release before publishing
+
+### Development Builds (Dev Channel)
+
+For testing changes before release, use the `dev` branch:
+
+```bash
+# Merge changes to dev branch
+git checkout dev
+git merge feature/my-feature
+git push origin dev
+```
+
+**What happens:**
+- Deploys `stash-downloader-dev.zip` to GitHub Pages
+- Version: `X.Y.Z-dev.{commit-sha}`
+- Shows as "Stash Downloader (Dev)" in Stash plugin manager
+
+**Manual dev deploy** (from any branch):
+- Go to Actions → CI/CD → Run workflow
+- Check "Deploy as dev build"
+- Click "Run workflow"
+
+**In Stash**, both stable and dev appear in the same source:
+```
+https://codename-11.github.io/Stash-Downloader/index.yml
+```
 
 ### Extension vs Plugin Versioning
 

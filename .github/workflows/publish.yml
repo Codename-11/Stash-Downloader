@@ -1,12 +1,18 @@
-name: Build and Publish Plugin
+name: CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, dev]
     tags:
       - 'v*'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_dev:
+        description: 'Deploy as dev build'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -18,10 +24,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,12 +48,59 @@ jobs:
       - name: Run tests
         run: npm test -- --run
 
+      - name: Build
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.ref == 'refs/heads/dev' ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_dev)
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_dev: ${{ steps.check.outputs.is_dev }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check build type
+        id: check
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/dev" ]] || [[ "${{ inputs.deploy_dev }}" == "true" ]]; then
+            echo "is_dev=true" >> $GITHUB_OUTPUT
+            echo "Building DEV version"
+          else
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "Building STABLE version"
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build plugin
         run: npm run build
 
       - name: Get version
         id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
+          else
+            VERSION="${BASE_VERSION}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
 
       - name: Create plugin package
         run: |
@@ -65,28 +116,114 @@ jobs:
 
           # Create ZIP file (contents at root, not nested in folder)
           cd _package
-          zip -r ../stash-downloader.zip .
+          if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
+            zip -r ../stash-downloader-dev.zip .
+          else
+            zip -r ../stash-downloader.zip .
+          fi
           cd ..
 
           # Move ZIP to _site directory
-          mv stash-downloader.zip _site/
+          mv stash-downloader*.zip _site/
 
-      - name: Generate plugin index
+      - name: Fetch existing GitHub Pages content
+        continue-on-error: true
+        run: |
+          PAGES_URL="https://codename-11.github.io/Stash-Downloader"
+
+          # Always try to preserve the other channel's zip
+          if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
+            curl -fsSL "${PAGES_URL}/stash-downloader.zip" -o _site/stash-downloader.zip || echo "No existing stable zip"
+          else
+            curl -fsSL "${PAGES_URL}/stash-downloader-dev.zip" -o _site/stash-downloader-dev.zip || echo "No existing dev zip"
+          fi
+
+          # Fetch existing index to get the other channel's entry
+          curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || echo "No existing index"
+
+      - name: Generate combined plugin index
         run: |
           CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
-          SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
           VERSION=${{ steps.version.outputs.version }}
+          BASE_VERSION=${{ steps.version.outputs.base_version }}
 
-          cat > _site/index.yml << EOF
+          # Start fresh index
+          > _site/index.yml
+
+          if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
+            # Building dev: add new dev entry
+            DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
+
+            cat >> _site/index.yml << EOF
+          - id: stash-downloader-dev
+            name: Stash Downloader (Dev)
+            version: ${VERSION}
+            date: ${CURRENT_DATETIME}
+            path: stash-downloader-dev.zip
+            sha256: ${DEV_SHA256}
+            description: "[DEV] Download images/videos with metadata extraction - Development build"
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+
+            # Preserve stable entry if it exists
+            if [[ -f _site/stash-downloader.zip ]]; then
+              STABLE_SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
+              # Extract stable version from existing index
+              STABLE_VERSION=$(grep -A1 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${BASE_VERSION}")
+              STABLE_DATE=$(grep -A3 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+
+              cat >> _site/index.yml << EOF
+          - id: stash-downloader
+            name: Stash Downloader
+            version: ${STABLE_VERSION}
+            date: ${STABLE_DATE}
+            path: stash-downloader.zip
+            sha256: ${STABLE_SHA256}
+            description: Download images and videos from URLs with automatic metadata extraction
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+            fi
+
+          else
+            # Building stable: add new stable entry first
+            STABLE_SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
+
+            cat >> _site/index.yml << EOF
           - id: stash-downloader
             name: Stash Downloader
             version: ${VERSION}
             date: ${CURRENT_DATETIME}
             path: stash-downloader.zip
-            sha256: ${SHA256}
-            description: Download images and videos from URLs with automatic metadata extraction and organization
+            sha256: ${STABLE_SHA256}
+            description: Download images and videos from URLs with automatic metadata extraction
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
+
+            # Preserve dev entry if it exists
+            if [[ -f _site/stash-downloader-dev.zip ]]; then
+              DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
+              # Extract dev version from existing index
+              DEV_VERSION=$(grep -A1 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${BASE_VERSION}-dev")
+              DEV_DATE=$(grep -A3 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+
+              cat >> _site/index.yml << EOF
+          - id: stash-downloader-dev
+            name: Stash Downloader (Dev)
+            version: ${DEV_VERSION}
+            date: ${DEV_DATE}
+            path: stash-downloader-dev.zip
+            sha256: ${DEV_SHA256}
+            description: "[DEV] Download images/videos with metadata extraction - Development build"
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+            fi
+          fi
+
+          echo "Generated index.yml:"
+          cat _site/index.yml
+
+      - name: List _site contents
+        run: ls -la _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -100,15 +237,14 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      # Upload ZIP for release job
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-zip
-          path: _site/stash-downloader.zip
+          path: _site/stash-downloader*.zip
 
   release:
-    needs: build
+    needs: deploy
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -123,11 +259,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ needs.build.outputs.version }}
+          name: v${{ needs.deploy.outputs.version }}
+          generate_release_notes: true
           body: |
-            ## Stash Downloader v${{ needs.build.outputs.version }}
+            ## 🚀 Stash Downloader v${{ needs.deploy.outputs.version }}
 
-            ### Installation
+            ### 📦 Installation
 
             **Via Stash Plugin Manager (Recommended):**
             1. Settings → Plugins → Available Plugins → Add Source
@@ -139,9 +276,13 @@ jobs:
             2. Extract to `~/.stash/plugins/stash-downloader/`
             3. Reload plugins in Stash
 
-            ### Requirements
+            ### 📋 Requirements
             - Stash v0.20+
             - Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+
+            ---
+
+          append_body: true
           files: stash-downloader.zip
           draft: false
           prerelease: false
