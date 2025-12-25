@@ -88,22 +88,35 @@ jobs:
       - name: Modify source for dev build
         if: steps.check.outputs.is_dev == 'true'
         run: |
-          echo "Modifying source files for dev build..."
+          echo "=== MODIFYING SOURCE FILES FOR DEV BUILD ==="
+
+          echo "Before modification (constants):"
+          grep -n "PLUGIN_ID\|MAIN:" src/constants/index.ts | head -5
 
           # Update constants - plugin ID, name, routes, storage keys
-          sed -i "s/stash-downloader/stash-downloader-dev/g" src/constants/index.ts
-          sed -i "s/Stash Downloader/Stash Downloader (Dev)/g" src/constants/index.ts
+          sed -i 's/stash-downloader/stash-downloader-dev/g' src/constants/index.ts
+          sed -i 's/Stash Downloader/Stash Downloader (Dev)/g' src/constants/index.ts
 
           # Update index.tsx - style ID and nav button ID
-          sed -i "s/stash-downloader-styles/stash-downloader-dev-styles/g" src/index.tsx
-          sed -i "s/stash-downloader-nav-button/stash-downloader-dev-nav-button/g" src/index.tsx
+          sed -i 's/stash-downloader-styles/stash-downloader-dev-styles/g' src/index.tsx
+          sed -i 's/stash-downloader-nav-button/stash-downloader-dev-nav-button/g' src/index.tsx
 
           # Update plugin YAML
-          sed -i "s/name: Stash Downloader/name: Stash Downloader (Dev)/g" stash-downloader.yml
+          sed -i 's/name: Stash Downloader$/name: Stash Downloader (Dev)/g' stash-downloader.yml
 
-          echo "Modified files for dev build:"
-          grep -n "stash-downloader-dev" src/constants/index.ts | head -5
-          grep -n "Dev" stash-downloader.yml | head -2
+          echo ""
+          echo "After modification (constants):"
+          grep -n "PLUGIN_ID\|MAIN:" src/constants/index.ts | head -5
+
+          echo ""
+          echo "After modification (index.tsx):"
+          grep -n "stash-downloader-dev" src/index.tsx | head -3
+
+          echo ""
+          echo "After modification (YAML):"
+          grep -n "name:" stash-downloader.yml | head -2
+
+          echo "=== MODIFICATION COMPLETE ==="
 
       - name: Build plugin
         run: npm run build
