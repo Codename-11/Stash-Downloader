@@ -6,12 +6,14 @@ const EXTERNAL_QUEUE_KEY = 'stash-downloader-external-queue';
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'addToQueue') {
     // Dispatch custom event that the Downloader page listens for
+    // Use cloneInto() to safely pass data from content script to page context (Firefox security)
+    const detail = {
+      url: message.url,
+      contentType: message.contentType,
+      options: message.options || {}
+    };
     const event = new CustomEvent('stash-downloader-add-url', {
-      detail: {
-        url: message.url,
-        contentType: message.contentType,
-        options: message.options || {}
-      }
+      detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail
     });
     window.dispatchEvent(event);
 
