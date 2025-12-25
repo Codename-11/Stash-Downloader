@@ -1,50 +1,114 @@
-name: Claude Code
+name: Claude Assistant
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   issue_comment:
     types: [created]
   pull_request_review_comment:
     types: [created]
-  issues:
-    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
+  issues:
+    types: [opened, assigned]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
 
 jobs:
-  claude:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+  # Stage 1: Validation - Determine what action to take
+  validate:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-      issues: read
-      id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+    outputs:
+      should_review: ${{ steps.check.outputs.should_review }}
+      should_respond: ${{ steps.check.outputs.should_respond }}
+      is_pr: ${{ steps.check.outputs.is_pr }}
     steps:
-      - name: Checkout repository
+      - name: Check triggers
+        id: check
+        run: |
+          # Check if this is a PR that needs review
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "should_review=true" >> $GITHUB_OUTPUT
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_review=false" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if @claude was mentioned
+          MENTIONED=false
+          if [[ "${{ github.event_name }}" == "issue_comment" && "${{ contains(github.event.comment.body, '@claude') }}" == "true" ]]; then
+            MENTIONED=true
+          elif [[ "${{ github.event_name }}" == "pull_request_review_comment" && "${{ contains(github.event.comment.body, '@claude') }}" == "true" ]]; then
+            MENTIONED=true
+          elif [[ "${{ github.event_name }}" == "pull_request_review" && "${{ contains(github.event.review.body, '@claude') }}" == "true" ]]; then
+            MENTIONED=true
+          elif [[ "${{ github.event_name }}" == "issues" && ("${{ contains(github.event.issue.body, '@claude') }}" == "true" || "${{ contains(github.event.issue.title, '@claude') }}" == "true") ]]; then
+            MENTIONED=true
+          fi
+
+          echo "should_respond=$MENTIONED" >> $GITHUB_OUTPUT
+
+          echo "Should review: ${{ github.event_name == 'pull_request' }}"
+          echo "Should respond: $MENTIONED"
+
+  # Stage 2: Code Review - Automated PR review
+  code-review:
+    needs: validate
+    if: needs.validate.outputs.should_review == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code
-        id: claude
+      - name: Wait for CI
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+        continue-on-error: true
+
+      - name: Claude Code Review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR: ${{ github.event.pull_request.number }}
 
-          # This is an optional setting that allows Claude to read CI results on PRs
+            Review this PR against CLAUDE.md standards:
+            - Code quality & best practices
+            - Potential bugs or security issues
+            - Test coverage
+            - Documentation updates
+
+            Be concise and constructive. Use `gh pr comment` to post your review.
+          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*)" --max-turns 3'
+
+  # Stage 3: Interactive Response - Respond to @claude mentions
+  respond:
+    needs: validate
+    if: needs.validate.outputs.should_respond == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Claude Response
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             actions: read
-
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
-
+          # No prompt - Claude will respond to the mention naturally

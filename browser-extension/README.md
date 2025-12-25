@@ -12,20 +12,20 @@ A Firefox extension for sending URLs directly to your Stash Downloader queue.
 
 ## Installation
 
-### 1. Generate Icons
+### Firefox Add-ons (Recommended)
 
-1. Open `icons/generate-icons.html` in a browser
-2. Click "Download All Icons"
-3. Save the PNG files to the `icons/` folder
+**Coming Soon** - The extension is pending review on [Firefox Add-ons](https://addons.mozilla.org/). Once approved, you'll be able to install it directly from the store.
 
-### 2. Load in Firefox
+### Manual Installation (Temporary)
 
 1. Open Firefox and go to `about:debugging`
 2. Click "This Firefox" in the sidebar
 3. Click "Load Temporary Add-on..."
-4. Select the `manifest.json` file from this folder
+4. Select the `manifest.json` file from the `browser-extension/` folder
 
-### 3. Configure
+> **Note:** Temporary add-ons are removed when Firefox closes.
+
+### Configure
 
 1. Click the extension icon in the toolbar
 2. Click "Config" to open settings

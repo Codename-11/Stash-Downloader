@@ -1,8 +1,10 @@
 {
   "manifest_version": 2,
   "name": "Stash Downloader",
-  "version": "1.0.0",
-  "description": "Send URLs directly to your Stash Downloader queue",
+  "version": "0.1.0",
+  "description": "Send URLs directly to your Stash Downloader queue with one click. Right-click any link to download videos and images to your Stash library.",
+  "author": "Codename-11",
+  "homepage_url": "https://github.com/Codename-11/Stash-Downloader",
   "browser_specific_settings": {
     "gecko": {
       "id": "stash-downloader@extension.local",
