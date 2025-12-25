@@ -299,6 +299,27 @@ git push origin main --tags
 - Version in `package.json` should match tag (without `v` prefix)
 - Always push both the commit AND the tag: `git push origin main --tags`
 
+### Extension vs Plugin Versioning
+
+**Independent Versioning Strategy:**
+- `package.json` version = Plugin version (Stash plugin releases)
+- `browser-extension/manifest.json` version = Extension version (Firefox/Chrome store)
+- Versions are **independent** - they don't need to match
+
+**Version Bump Rules:**
+- Plugin changes only → Bump `package.json` only
+- Extension changes only → Bump `browser-extension/manifest.json` only
+- Both changed → Bump both versions
+
+**Release Tags:**
+- Git tags (`vX.Y.Z`) follow the **plugin version** in `package.json`
+- GitHub Actions packages both plugin and extension on every release
+
+**Browser Store Uploads:**
+- **Manual uploads only** - Upload to Firefox Add-ons / Chrome Web Store when `browser-extension/manifest.json` version changes
+- Do NOT upload on every plugin release if extension hasn't changed
+- Future TODO: Automate with CI change detection (web-ext sign with AMO API keys)
+
 ## Documentation
 - **Code Comments**: Explain "why", not "what"
 - **JSDoc**: Document public APIs and complex functions

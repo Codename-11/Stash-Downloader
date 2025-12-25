@@ -141,6 +141,27 @@ To add support for a new website:
 
 See [DEVELOPMENT.md](docs/DEVELOPMENT.md#adding-new-scrapers) for details.
 
+## Releases and Versioning
+
+### Plugin vs Extension Versions
+
+This project has **two independent version numbers**:
+
+- **Plugin**: `package.json` version (for Stash plugin)
+- **Extension**: `browser-extension/manifest.json` version (for Firefox/Chrome stores)
+
+**When to bump each:**
+- Plugin changes → Bump `package.json` only
+- Extension changes → Bump extension manifest only
+- Both changed → Bump both
+
+**Release process:**
+1. Git tags (`vX.Y.Z`) follow the plugin version
+2. GitHub Actions packages both on every release
+3. **Manually upload** to browser stores only when extension version changes
+
+See [.claude/conventions.md](.claude/conventions.md#extension-vs-plugin-versioning) for details.
+
 ## Questions?
 
 - Check existing [issues](https://github.com/Codename-11/Stash-Downloader/issues)
