@@ -168,26 +168,72 @@ export class ScraperRegistry {
   }
 
   /**
-   * Log extracted metadata details
+   * Log extracted metadata details with actual values for troubleshooting
    */
   private logExtractedMetadata(scraperName: string, metadata: IScrapedMetadata, url?: string): void {
-    const extracted: string[] = [];
-    if (metadata.title) extracted.push('title');
-    if (metadata.description) extracted.push('description');
-    if (metadata.thumbnailUrl) extracted.push('thumbnail');
-    if (metadata.videoUrl) extracted.push('video URL');
-    if (metadata.imageUrl) extracted.push('image URL');
-    if (metadata.performers?.length) extracted.push(`${metadata.performers.length} performers`);
-    if (metadata.tags?.length) extracted.push(`${metadata.tags.length} tags`);
-    if (metadata.studio) extracted.push('studio');
-    if (metadata.duration) extracted.push('duration');
-    if (metadata.date) extracted.push('date');
+    const details: string[] = [];
+
+    // Source URL
+    if (url) {
+      details.push(`Source: ${url}`);
+    }
+
+    // Title
+    details.push(`Title: ${metadata.title || 'N/A'}`);
+
+    // Video/Image URL (truncated for readability)
+    if (metadata.videoUrl) {
+      const truncated = metadata.videoUrl.length > 100
+        ? metadata.videoUrl.substring(0, 100) + '...'
+        : metadata.videoUrl;
+      details.push(`Video URL: ${truncated}`);
+    }
+    if (metadata.imageUrl) {
+      const truncated = metadata.imageUrl.length > 100
+        ? metadata.imageUrl.substring(0, 100) + '...'
+        : metadata.imageUrl;
+      details.push(`Image URL: ${truncated}`);
+    }
+
+    // Quality info
+    if (metadata.quality) {
+      details.push(`Quality: ${metadata.quality}`);
+    }
+    if (metadata.availableQualities?.length) {
+      details.push(`Available: ${metadata.availableQualities.join(', ')}`);
+    }
+
+    // Duration
+    if (metadata.duration) {
+      const mins = Math.floor(metadata.duration / 60);
+      const secs = Math.round(metadata.duration % 60);
+      details.push(`Duration: ${mins}m ${secs}s`);
+    }
+
+    // Performers
+    if (metadata.performers?.length) {
+      const performerList = metadata.performers.slice(0, 5).join(', ');
+      const suffix = metadata.performers.length > 5 ? ` (+${metadata.performers.length - 5} more)` : '';
+      details.push(`Performers: ${performerList}${suffix}`);
+    }
+
+    // Tags (just count, too many to list)
+    if (metadata.tags?.length) {
+      details.push(`Tags: ${metadata.tags.length}`);
+    }
+
+    // Studio
+    if (metadata.studio) {
+      details.push(`Studio: ${metadata.studio}`);
+    }
+
+    // Date
+    if (metadata.date) {
+      details.push(`Date: ${metadata.date}`);
+    }
 
     const title = metadata.title || 'Untitled';
-    const summary = extracted.length > 0 ? extracted.join(', ') : 'minimal data';
-    const details = url ? `URL: ${url}\nExtracted: ${summary}` : `Extracted: ${summary}`;
-
-    log.success(`${scraperName} extracted: ${title}`, details);
+    log.success(`${scraperName} extracted: ${title}`, details.join('\n'));
   }
 
   /**
