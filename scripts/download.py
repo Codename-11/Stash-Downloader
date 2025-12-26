@@ -30,11 +30,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 # Configure logging
-# Note: Stash treats all stderr output as errors, so we only log WARNING+ by default
-# Set STASH_DOWNLOADER_DEBUG=1 environment variable to enable verbose logging
+# Stash shows stderr in its logs. Use INFO by default so messages appear correctly.
+# Set STASH_DOWNLOADER_DEBUG=1 for verbose DEBUG logging.
 DEBUG_MODE = os.environ.get("STASH_DOWNLOADER_DEBUG", "").lower() in ("1", "true", "yes")
 logging.basicConfig(
-    level=logging.DEBUG if DEBUG_MODE else logging.WARNING,
+    level=logging.DEBUG if DEBUG_MODE else logging.INFO,
     format="[stash-downloader] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stderr)],
 )

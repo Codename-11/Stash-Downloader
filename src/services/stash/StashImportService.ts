@@ -110,6 +110,13 @@ export class StashImportService {
       if (onLog) onLog('info', 'Fallback URL set for retry attempts');
     }
 
+    // Pass the title as filename so yt-dlp uses it instead of extracting from page
+    // (some sites don't have proper title metadata, resulting in names like "2160p.av1.mp4")
+    const downloadFilename = item.editedMetadata?.title || item.metadata?.title;
+    if (downloadFilename) {
+      log.debug('Using custom filename for download:', downloadFilename);
+    }
+
     const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
         log.debug('Download progress:',
@@ -118,6 +125,7 @@ export class StashImportService {
         if (onProgress) onProgress(progress);
       },
       fallbackUrl, // Original page URL for yt-dlp if direct download fails
+      filename: downloadFilename, // Use scraped title as filename
     });
 
     // Check if this was a server-side download (file already on disk)
