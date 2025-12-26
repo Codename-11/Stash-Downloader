@@ -129,9 +129,13 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       // Import to Stash with progress callbacks
       const result = await importService.importToStash(itemWithMetadata, {
         onProgress: (progress) => {
+          // Include lastActivityAt from progress for stale detection
+          const progressWithActivity = 'lastActivityAt' in progress ? progress : progress;
           onUpdateItem(item.id, {
-            progress,
+            progress: progressWithActivity,
             status: DownloadStatus.Downloading,
+            // Update lastActivityAt from progress heartbeat
+            lastActivityAt: (progress as { lastActivityAt?: Date }).lastActivityAt || new Date(),
           });
         },
         onStatusChange: (status) => {
@@ -148,6 +152,13 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           onUpdateItem(item.id, (currentItem) => ({
             logs: [...(currentItem.logs || []), newLog],
           }));
+        },
+        onJobStart: (jobId) => {
+          debugLog.debug('Job started with ID:', jobId);
+          onUpdateItem(item.id, {
+            stashJobId: jobId,
+            lastActivityAt: new Date(),
+          });
         },
       });
 

@@ -149,6 +149,8 @@ export interface IDownloadItem {
   // Download tracking (for reconnecting after navigation)
   downloadProgressId?: string; // Progress file ID for polling
   downloadResultId?: string; // Result file ID for completion check
+  stashJobId?: string; // Stash job ID for cancellation
+  lastActivityAt?: Date; // Last progress update timestamp (for stale detection)
 
   // Logs for this specific item
   logs?: IItemLogEntry[];

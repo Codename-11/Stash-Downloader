@@ -18,9 +18,14 @@ interface QueueItemProps {
   onViewLogs?: (id: string) => void;
   onRescrapeClick?: (id: string, scraperName: string) => void;
   onRetry?: (id: string) => void;
+  onCancel?: (id: string) => void;
   availableScrapers?: Array<{ name: string; canHandle: boolean; supportsContentType: boolean }>;
   showThumbnail?: boolean;
 }
+
+// Thresholds for stale detection (in seconds)
+const STALE_WARNING_THRESHOLD = 30; // Show warning after 30s
+const STALE_CRITICAL_THRESHOLD = 60; // Show critical warning after 60s
 
 // Helper to format elapsed time
 function formatElapsedTime(seconds: number): string {
@@ -30,15 +35,21 @@ function formatElapsedTime(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, onRetry, availableScrapers, showThumbnail = true }) => {
+export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, onRetry, onCancel, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
   const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = React.useState(false);
   const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0 });
   const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const [secondsSinceActivity, setSecondsSinceActivity] = React.useState(0);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Calculate stale status
+  const isActiveDownload = item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing;
+  const isStaleWarning = isActiveDownload && secondsSinceActivity >= STALE_WARNING_THRESHOLD;
+  const isStaleCritical = isActiveDownload && secondsSinceActivity >= STALE_CRITICAL_THRESHOLD;
 
   // Track elapsed time during download
   React.useEffect(() => {
@@ -52,6 +63,29 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
     }, 1000);
     return () => clearInterval(interval);
   }, [item.status]);
+
+  // Track time since last activity (for stale detection)
+  React.useEffect(() => {
+    if (!isActiveDownload) {
+      setSecondsSinceActivity(0);
+      return;
+    }
+
+    const updateActivityAge = () => {
+      if (item.lastActivityAt) {
+        const lastActivity = new Date(item.lastActivityAt).getTime();
+        const now = Date.now();
+        setSecondsSinceActivity(Math.floor((now - lastActivity) / 1000));
+      } else {
+        // No lastActivityAt yet - use elapsed time as proxy
+        setSecondsSinceActivity(elapsedSeconds);
+      }
+    };
+
+    updateActivityAge();
+    const interval = setInterval(updateActivityAge, 1000);
+    return () => clearInterval(interval);
+  }, [isActiveDownload, item.lastActivityAt, elapsedSeconds]);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -151,11 +185,18 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
       const { percentage, bytesDownloaded, totalBytes, speed } = item.progress;
       const hasRealProgress = totalBytes > 0 || bytesDownloaded > 0 || speed > 0;
 
+      // Build stale indicator suffix
+      const staleIndicator = isStaleCritical
+        ? ` • ⚠️ Stalled (${formatElapsedTime(secondsSinceActivity)})`
+        : isStaleWarning
+          ? ` • ⏳ ${formatElapsedTime(secondsSinceActivity)} since activity`
+          : '';
+
       return (
         <div className="mt-2">
           <div className="progress" style={{ height: '8px' }}>
             <div
-              className={`progress-bar ${totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''}`}
+              className={`progress-bar ${totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''} ${isStaleCritical ? 'bg-danger' : isStaleWarning ? 'bg-warning' : ''}`}
               role="progressbar"
               style={{ width: `${totalBytes > 0 ? percentage : 100}%` }}
               aria-valuenow={percentage}
@@ -163,13 +204,13 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               aria-valuemax={100}
             ></div>
           </div>
-          <small className="text-muted d-block mt-1">
+          <small className={`d-block mt-1 ${isStaleCritical ? 'text-danger' : isStaleWarning ? 'text-warning' : 'text-muted'}`}>
             {totalBytes > 0
-              ? `${percentage.toFixed(1)}% • ${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)`
+              ? `${percentage.toFixed(1)}% • ${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)${staleIndicator}`
               : hasRealProgress
-                ? `Downloaded: ${formatBytes(bytesDownloaded)}${speed > 0 ? ` (${formatBytes(speed)}/s)` : ''}`
+                ? `Downloaded: ${formatBytes(bytesDownloaded)}${speed > 0 ? ` (${formatBytes(speed)}/s)` : ''}${staleIndicator}`
                 : elapsedSeconds > 0
-                  ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
+                  ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}${staleIndicator}`
                   : 'Starting download...'
             }
           </small>
@@ -181,12 +222,19 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
     return (
       <div className="mt-2">
         <div className="progress" style={{ height: '8px' }}>
-          <div className="progress-bar progress-bar-striped progress-bar-animated w-100" role="progressbar"></div>
+          <div
+            className={`progress-bar progress-bar-striped progress-bar-animated w-100 ${isStaleCritical ? 'bg-danger' : isStaleWarning ? 'bg-warning' : ''}`}
+            role="progressbar"
+          ></div>
         </div>
-        <small className="text-muted d-block mt-1">
-          {elapsedSeconds > 0
-            ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
-            : item.status === DownloadStatus.Downloading ? 'Starting download...' : 'Processing...'}
+        <small className={`d-block mt-1 ${isStaleCritical ? 'text-danger' : isStaleWarning ? 'text-warning' : 'text-muted'}`}>
+          {isStaleCritical
+            ? `⚠️ No activity for ${formatElapsedTime(secondsSinceActivity)} - may be stalled`
+            : isStaleWarning
+              ? `⏳ Last activity: ${formatElapsedTime(secondsSinceActivity)} ago`
+              : elapsedSeconds > 0
+                ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
+                : item.status === DownloadStatus.Downloading ? 'Starting download...' : 'Processing...'}
         </small>
       </div>
     );
@@ -488,6 +536,16 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                 title="Retry failed download"
               >
                 🔄 Retry
+              </button>
+            )}
+            {/* Cancel button for active downloads */}
+            {onCancel && isActiveDownload && item.stashJobId && (
+              <button
+                className={`btn btn-sm ${isStaleCritical ? 'btn-danger' : 'btn-outline-danger'}`}
+                onClick={() => onCancel(item.id)}
+                title={isStaleCritical ? "Cancel stalled download" : "Cancel download"}
+              >
+                ⏹️ Cancel
               </button>
             )}
             {/* Re-scrape dropdown */}

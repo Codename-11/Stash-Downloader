@@ -885,6 +885,8 @@ export class StashGraphQLService {
       pollIntervalMs?: number;
       maxWaitMs?: number;
       onProgress?: (progress: number) => void;
+      /** Called immediately when job starts, with the jobId for potential cancellation */
+      onJobStart?: (jobId: string) => void;
     }
   ): Promise<{ success: boolean; error?: string; jobId?: string }> {
     const pollInterval = options?.pollIntervalMs || 500;
@@ -899,6 +901,11 @@ export class StashGraphQLService {
     }
 
     log.debug(`Task started with job ID: ${jobId}`);
+
+    // Notify caller of jobId immediately (for cancellation support)
+    if (options?.onJobStart) {
+      options.onJobStart(jobId);
+    }
 
     // Poll for completion
     const startTime = Date.now();

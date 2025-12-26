@@ -510,6 +510,39 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  // Handle cancel for active downloads
+  const handleCancel = async (itemId: string) => {
+    const item = queue.items.find((i) => i.id === itemId);
+    if (!item || !item.stashJobId) {
+      toast.showToast('warning', 'Cannot Cancel', 'No active job to cancel');
+      return;
+    }
+
+    debugLog.debug(`Cancelling download job: ${item.stashJobId}`);
+    toast.showToast('info', 'Cancelling', 'Cancelling download...');
+
+    try {
+      const success = await stashService.stopJob(item.stashJobId);
+
+      if (success) {
+        queue.updateItem(itemId, {
+          status: DownloadStatus.Cancelled,
+          error: 'Download cancelled by user',
+          stashJobId: undefined,
+        });
+
+        log.addLog('warning', 'download', `Download cancelled: ${item.metadata?.title || item.url}`);
+        toast.showToast('success', 'Cancelled', 'Download cancelled successfully');
+      } else {
+        toast.showToast('warning', 'Cancel Failed', 'Could not cancel the job - it may have already completed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      debugLog.error('Cancel error:', errorMessage);
+      toast.showToast('error', 'Cancel Error', errorMessage);
+    }
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
@@ -738,6 +771,7 @@ export const QueuePage: React.FC = () => {
                   }}
                   onRescrapeClick={handleRescrapeClick}
                   onRetry={handleRetry}
+                  onCancel={handleCancel}
                   availableScrapers={scraperRegistry.getAvailableScrapersForUrl(item.url, item.metadata?.contentType)}
                   showThumbnail={settings.showThumbnailPreviews}
                 />

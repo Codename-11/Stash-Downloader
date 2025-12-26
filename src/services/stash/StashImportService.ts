@@ -45,9 +45,11 @@ export class StashImportService {
       onProgress?: (progress: IDownloadProgress) => void;
       onStatusChange?: (status: string) => void;
       onLog?: (level: IItemLogEntry['level'], message: string, details?: string) => void;
+      /** Called when the Stash job starts, with the jobId for potential cancellation */
+      onJobStart?: (jobId: string) => void;
     }
   ): Promise<IStashScene | IStashImage> {
-    const { onProgress, onStatusChange, onLog } = callbacks || {};
+    const { onProgress, onStatusChange, onLog, onJobStart } = callbacks || {};
     if (!item.editedMetadata) {
       throw new Error('Item must have edited metadata before import');
     }
@@ -125,6 +127,10 @@ export class StashImportService {
           `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
         );
         if (onProgress) onProgress(progress);
+      },
+      onJobStart: (jobId) => {
+        log.debug('Download job started:', jobId);
+        if (onJobStart) onJobStart(jobId);
       },
       fallbackUrl, // Original page URL for yt-dlp if direct download fails
       filename: downloadFilename, // Use scraped title as filename

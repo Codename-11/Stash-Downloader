@@ -461,6 +461,7 @@ def download_direct_file(
                 "percentage": 0,
                 "downloaded_bytes": 0,
                 "total_bytes": total_size,
+                "last_updated": time.time(),
             })
 
         with open(output_path, "wb") as f:
@@ -478,6 +479,7 @@ def download_direct_file(
                             "percentage": pct,
                             "downloaded_bytes": downloaded,
                             "total_bytes": total_size,
+                            "last_updated": current_time,
                         })
                         last_progress_update = current_time
                         log.info(f"Direct download progress: {pct:.1f}% ({downloaded}/{total_size} bytes)")
@@ -633,6 +635,7 @@ def download_video(
             "percentage": 0,
             "downloaded_bytes": 0,
             "total_bytes": 0,
+            "last_updated": time.time(),
         }
         save_success = save_result(progress_file_id, initial_progress)
         log.info(f"Progress file created: {save_success}")
@@ -711,6 +714,7 @@ def download_video(
                         # Update progress file periodically (not on every line)
                         if progress_id and (current_time - last_progress_update) >= progress_update_interval:
                             progress["status"] = "downloading"
+                            progress["last_updated"] = current_time
                             save_result(f"progress-{progress_id}", progress)
                             last_progress_update = current_time
                             log.info(f"Progress: {progress['percentage']:.1f}% ({progress.get('downloaded_bytes', 0)}/{progress.get('total_bytes', 0)} bytes)")
@@ -721,6 +725,15 @@ def download_video(
                         # Log non-progress lines at debug level
                         if "[download]" in line or "[info]" in line:
                             log.debug(f"yt-dlp: {line}")
+                            # Update heartbeat even without progress data (for HLS/DASH streams)
+                            current_time = time.time()
+                            if progress_id and (current_time - last_progress_update) >= progress_update_interval:
+                                save_result(f"progress-{progress_id}", {
+                                    "status": "downloading",
+                                    "last_updated": current_time,
+                                    "message": line[:100],  # Include last status message
+                                })
+                                last_progress_update = current_time
                         elif "ERROR" in line or "error" in line.lower():
                             log.error(f"yt-dlp: {line}")
 
@@ -741,6 +754,7 @@ def download_video(
                         "status": "complete",
                         "percentage": 100,
                         "file_path": file_path,
+                        "last_updated": time.time(),
                     })
                 return file_path
             else:
@@ -755,6 +769,7 @@ def download_video(
                             "status": "complete",
                             "percentage": 100,
                             "file_path": str(newest),
+                            "last_updated": time.time(),
                         })
                     return str(newest)
 
@@ -764,6 +779,7 @@ def download_video(
             save_result(f"progress-{progress_id}", {
                 "status": "error",
                 "error": error_msg,
+                "last_updated": time.time(),
             })
 
         if proxy:
@@ -778,7 +794,7 @@ def download_video(
             timeout_msg += f" (using proxy {proxy})"
         log.error(timeout_msg)
         if progress_id:
-            save_result(f"progress-{progress_id}", {"status": "error", "error": timeout_msg})
+            save_result(f"progress-{progress_id}", {"status": "error", "error": timeout_msg, "last_updated": time.time()})
         return None
     except Exception as e:
         error_msg = f"Download error: {e}"
@@ -786,7 +802,7 @@ def download_video(
             error_msg += f" (using proxy {proxy})"
         log.error(error_msg, exc_info=True)
         if progress_id:
-            save_result(f"progress-{progress_id}", {"status": "error", "error": str(e)})
+            save_result(f"progress-{progress_id}", {"status": "error", "error": str(e), "last_updated": time.time()})
         return None
 
 

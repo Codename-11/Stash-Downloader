@@ -17,8 +17,15 @@ import type { IPluginSettings } from '@/types';
 
 const log = createLogger('DownloadService');
 
+export interface IDownloadProgressWithActivity extends IDownloadProgress {
+  lastActivityAt?: Date;
+  statusMessage?: string;
+}
+
 export interface IDownloadOptions {
-  onProgress?: (progress: IDownloadProgress) => void;
+  onProgress?: (progress: IDownloadProgressWithActivity) => void;
+  /** Called when the Stash job starts, with the jobId for potential cancellation */
+  onJobStart?: (jobId: string) => void;
   signal?: AbortSignal;
   outputDir?: string;
   filename?: string;
@@ -32,6 +39,7 @@ export interface IServerDownloadResult {
   file_path?: string;
   file_size?: number;
   error?: string;
+  jobId?: string;
 }
 
 export interface IGalleryDownloadResult {
@@ -133,14 +141,17 @@ export class DownloadService {
               const status = progressResult.status;
               // Update progress for downloading or starting status
               if (status === 'downloading' || status === 'starting') {
-                const progress = {
+                const progress: IDownloadProgressWithActivity = {
                   bytesDownloaded: progressResult.downloaded_bytes || 0,
                   totalBytes: progressResult.total_bytes || 0,
                   percentage: progressResult.percentage || 0,
                   speed: progressResult.speed || 0,
                   timeRemaining: progressResult.eta,
+                  // Include heartbeat timestamp for stale detection
+                  lastActivityAt: progressResult.last_updated ? new Date(progressResult.last_updated * 1000) : new Date(),
+                  statusMessage: progressResult.message,
                 };
-                log.debug(`Progress update: ${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`);
+                log.debug(`Progress update: ${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes (activity: ${progress.lastActivityAt?.toISOString()})`);
                 options.onProgress!(progress);
               }
             }
@@ -174,6 +185,12 @@ export class DownloadService {
             // This is Stash job progress (usually stays at 0), not download progress
             // Real progress comes from progress polling above
           },
+          onJobStart: (jobId) => {
+            log.debug(`Download job started with ID: ${jobId}`);
+            if (options.onJobStart) {
+              options.onJobStart(jobId);
+            }
+          },
         }
       );
 
@@ -190,9 +207,12 @@ export class DownloadService {
 
       log.debug('Task result:', JSON.stringify(taskResult));
 
+      // Capture jobId for potential cancellation
+      const jobId = taskResult.jobId;
+
       if (!taskResult.success) {
         log.error('Download task failed:', taskResult.error || 'Unknown error');
-        return { success: false, error: taskResult.error || 'Download task failed' };
+        return { success: false, error: taskResult.error || 'Download task failed', jobId };
       }
 
       log.info('Server-side download task completed, reading result...');
@@ -207,19 +227,19 @@ export class DownloadService {
 
       if (!result) {
         log.error('Failed to read download result - got null/undefined');
-        return { success: false, error: 'Failed to read download result' };
+        return { success: false, error: 'Failed to read download result', jobId };
       }
 
       // Check for task_error (renamed from result_error/error to avoid GraphQL error interpretation)
       if (result.task_error) {
         log.error('Download task error:', result.task_error);
-        return { success: false, error: result.task_error };
+        return { success: false, error: result.task_error, jobId };
       }
 
       // Legacy check for error field (shouldn't happen with updated Python script)
       if (result.error) {
         log.error('Download error:', result.error);
-        return { success: false, error: result.error };
+        return { success: false, error: result.error, jobId };
       }
 
       const filePath = result.file_path;
@@ -227,7 +247,7 @@ export class DownloadService {
 
       if (!filePath) {
         log.error('Download completed but no file_path in result');
-        return { success: false, error: 'Download completed but no file_path in result' };
+        return { success: false, error: 'Download completed but no file_path in result', jobId };
       }
 
       log.success('Server-side download succeeded', filePath);
@@ -244,6 +264,7 @@ export class DownloadService {
         success: true,
         file_path: filePath,
         file_size: fileSize,
+        jobId,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
