@@ -3,6 +3,7 @@
  * These types describe the globally available window.PluginApi object
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- PluginApi is external; types are unknown at compile time */
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
 
 import type React from 'react';

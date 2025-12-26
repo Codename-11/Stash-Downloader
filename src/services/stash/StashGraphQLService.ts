@@ -85,10 +85,12 @@ export class StashGraphQLService {
 
     // Check for GraphQL errors and log detailed information
     if (result.errors && result.errors.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL error shape varies
       const errorMessages = result.errors.map((e: any) => e.message || JSON.stringify(e));
       log.error('GraphQL errors:', JSON.stringify(errorMessages));
 
       // Log full error details for debugging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL error shape varies
       result.errors.forEach((error: any, index: number) => {
         log.error(`Error ${index + 1}:`, JSON.stringify({
           message: error.message,
@@ -317,7 +319,7 @@ export class StashGraphQLService {
           id
           name
           disambiguation
-          aliases
+          alias_list
           image_path
         }
       }
@@ -735,6 +737,7 @@ export class StashGraphQLService {
    * - This is a JSON object like {"stash-downloader": {"httpProxy": "...", ...}}
    * - The plugins field accepts an optional include parameter to filter by plugin ID
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Plugin settings are dynamic key-value pairs
   async getPluginSettings(pluginId: string): Promise<Record<string, any> | null> {
     // Query configuration.plugins - this returns a PluginConfigMap scalar
     // PluginConfigMap is defined as "A plugin ID -> Map (String -> Any map) map"
@@ -748,6 +751,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
           plugins?: Record<string, Record<string, any>>;
@@ -769,8 +773,8 @@ export class StashGraphQLService {
         log.debug('Plugin found but no settings configured');
         return {};
       }
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       log.warn(`configuration.plugins query failed: ${errorMsg}`);
     }
 
@@ -784,6 +788,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
           plugins?: Record<string, Record<string, any>>;
@@ -802,8 +807,8 @@ export class StashGraphQLService {
         log.debug('Plugin found but no settings configured (fallback)');
         return {};
       }
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       log.warn(`configuration.plugins fallback query failed: ${errorMsg}`);
     }
 
@@ -834,6 +839,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Job type is complex and varies by operation
       const result = await this.gqlRequest<{ findJob: any }>(query, { input: { id: jobId } });
       return result.data?.findJob || null;
     } catch (error) {
@@ -942,6 +948,7 @@ export class StashGraphQLService {
    * Check if we're running in Stash (vs test-app)
    */
   isStashEnvironment(): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- __TEST_APP__ is test-app specific, not in Window type
     return !!(window.PluginApi && !(window as any).__TEST_APP__);
   }
 
@@ -1036,6 +1043,296 @@ export class StashGraphQLService {
     const directory = lastSlash > 0 ? filePath.substring(0, lastSlash) : filePath;
     log.debug('Triggering scan for directory:', directory);
     return this.triggerScan([directory]);
+  }
+
+  /**
+   * Wait for a job to complete
+   * Returns true if job finished successfully, false otherwise
+   */
+  async waitForJob(
+    jobId: string,
+    options?: {
+      pollIntervalMs?: number;
+      maxWaitMs?: number;
+      onProgress?: (progress: number) => void;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    const pollInterval = options?.pollIntervalMs || 500;
+    const maxWait = options?.maxWaitMs || 120000; // 2 minutes default
+
+    log.debug(`Waiting for job: ${jobId}`);
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      const job = await this.findJob(jobId);
+      if (!job) {
+        // Job not found - may have completed very quickly
+        log.debug(`Job ${jobId} not found, assuming completed`);
+        return { success: true };
+      }
+
+      log.debug(`Job ${jobId} status: ${job.status}, progress: ${job.progress || 0}`);
+
+      if (options?.onProgress && job.progress !== undefined) {
+        options.onProgress(job.progress);
+      }
+
+      switch (job.status) {
+        case 'FINISHED':
+          log.debug(`Job ${jobId} finished successfully`);
+          return { success: true };
+
+        case 'FAILED':
+          log.error(`Job ${jobId} failed: ${job.error || 'Unknown error'}`);
+          return { success: false, error: job.error || 'Job failed' };
+
+        case 'CANCELLED':
+        case 'STOPPING':
+          log.warn(`Job ${jobId} was cancelled`);
+          return { success: false, error: 'Job was cancelled' };
+
+        case 'READY':
+        case 'RUNNING':
+          // Continue polling
+          break;
+      }
+    }
+
+    // Timeout
+    log.warn(`Job ${jobId} timed out after ${maxWait}ms`);
+    return { success: false, error: 'Job timed out' };
+  }
+
+  /**
+   * Find a scene by file path
+   */
+  async findSceneByPath(filePath: string): Promise<IStashScene | null> {
+    const query = `
+      query FindSceneByPath($path: String!) {
+        findScenes(
+          scene_filter: { path: { value: $path, modifier: EQUALS } }
+          filter: { per_page: 1 }
+        ) {
+          scenes {
+            id
+            title
+            details
+            url
+            date
+            rating100
+            organized
+            created_at
+            updated_at
+            files {
+              path
+            }
+            performers {
+              id
+              name
+            }
+            tags {
+              id
+              name
+            }
+            studio {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ findScenes: { scenes: IStashScene[] } }>(
+        query,
+        { path: filePath }
+      );
+      const scenes = result.data?.findScenes?.scenes || [];
+      if (scenes.length > 0) {
+        log.debug(`Found scene by path: ${scenes[0]!.id}`);
+        return scenes[0]!;
+      }
+      log.debug(`No scene found for path: ${filePath}`);
+      return null;
+    } catch (error) {
+      log.error(`findSceneByPath failed: ${String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing scene with metadata
+   */
+  async updateScene(sceneId: string, input: {
+    title?: string;
+    details?: string;
+    url?: string;
+    date?: string;
+    rating100?: number;
+    organized?: boolean;
+    performer_ids?: string[];
+    tag_ids?: string[];
+    studio_id?: string | null;
+    cover_image?: string; // Base64 encoded image
+  }): Promise<IStashScene> {
+    const mutation = `
+      mutation SceneUpdate($input: SceneUpdateInput!) {
+        sceneUpdate(input: $input) {
+          id
+          title
+          details
+          url
+          date
+          rating100
+          organized
+          created_at
+          updated_at
+          performers {
+            id
+            name
+          }
+          tags {
+            id
+            name
+          }
+          studio {
+            id
+            name
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ sceneUpdate: IStashScene }>(mutation, {
+      input: { id: sceneId, ...input },
+    });
+
+    if (!result.data?.sceneUpdate) {
+      throw new Error('Failed to update scene');
+    }
+
+    log.info(`Updated scene ${sceneId} with metadata`);
+    return result.data.sceneUpdate;
+  }
+
+  /**
+   * Trigger Stash's Identify on specific scenes
+   * Uses StashDB fingerprints and installed scrapers to match metadata
+   * Returns job ID for tracking
+   */
+  async identifyScenes(sceneIds: string[], options?: {
+    includeMalePerformers?: boolean;
+    setCoverImage?: boolean;
+    setOrganized?: boolean;
+  }): Promise<string | null> {
+    const mutation = `
+      mutation MetadataIdentify($input: IdentifyMetadataInput!) {
+        metadataIdentify(input: $input)
+      }
+    `;
+
+    try {
+      const input: Record<string, unknown> = {
+        sceneIDs: sceneIds,
+      };
+
+      // Add options if provided
+      if (options) {
+        input.options = {
+          includeMalePerformers: options.includeMalePerformers ?? true,
+          setCoverImage: options.setCoverImage ?? true,
+          setOrganized: options.setOrganized ?? false,
+        };
+      }
+
+      const result = await this.gqlRequest<{ metadataIdentify: string }>(mutation, { input });
+      const jobId = result.data?.metadataIdentify;
+
+      if (jobId) {
+        log.info(`Identify triggered for ${sceneIds.length} scene(s), job ID: ${jobId}`);
+      }
+
+      return jobId || null;
+    } catch (error) {
+      log.error(`identifyScenes failed: ${String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape a single existing scene using a scraper
+   * Can scrape by scene ID (uses fingerprints) or by URL
+   */
+  async scrapeSingleSceneByURL(sceneId: string, url: string): Promise<IStashScrapedScene | null> {
+    // First, try to scrape the URL directly
+    const scraped = await this.scrapeSceneURL(url);
+
+    if (!scraped) {
+      log.warn(`No scraper found for URL: ${url}`);
+      return null;
+    }
+
+    // Apply the scraped data to the scene
+    log.info(`Scraped metadata for scene ${sceneId} from URL: ${url}`);
+    return scraped;
+  }
+
+  /**
+   * Apply scraped metadata to an existing scene
+   * Resolves performers/tags/studios and updates the scene
+   */
+  async applyScrapedMetadata(sceneId: string, scraped: IStashScrapedScene): Promise<IStashScene> {
+    const updateInput: Record<string, unknown> = {
+      title: scraped.title,
+      details: scraped.details,
+      url: scraped.url,
+      date: scraped.date,
+    };
+
+    // Resolve performers - use stored_id if available, otherwise create
+    if (scraped.performers && scraped.performers.length > 0) {
+      const performerIds: string[] = [];
+      for (const p of scraped.performers) {
+        if (p.stored_id) {
+          performerIds.push(p.stored_id);
+        } else if (p.name) {
+          // Try to find or create performer
+          const performer = await this.getOrCreatePerformer(p.name);
+          performerIds.push(performer.id);
+        }
+      }
+      updateInput.performer_ids = performerIds;
+    }
+
+    // Resolve tags - use stored_id if available, otherwise create
+    if (scraped.tags && scraped.tags.length > 0) {
+      const tagIds: string[] = [];
+      for (const t of scraped.tags) {
+        if (t.stored_id) {
+          tagIds.push(t.stored_id);
+        } else if (t.name) {
+          const tag = await this.getOrCreateTag(t.name);
+          tagIds.push(tag.id);
+        }
+      }
+      updateInput.tag_ids = tagIds;
+    }
+
+    // Resolve studio - use stored_id if available, otherwise create
+    if (scraped.studio) {
+      if (scraped.studio.stored_id) {
+        updateInput.studio_id = scraped.studio.stored_id;
+      } else if (scraped.studio.name) {
+        const studio = await this.getOrCreateStudio(scraped.studio.name);
+        updateInput.studio_id = studio.id;
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updateInput built dynamically from scraped data
+    return this.updateScene(sceneId, updateInput as any);
   }
 }
 

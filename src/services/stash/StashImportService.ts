@@ -11,12 +11,14 @@ import type {
   IStashStudio,
   IDownloadProgress,
   IItemLogEntry,
+  PostImportAction,
 } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from './StashGraphQLService';
 import { getDownloadService } from '@/services/download';
 import { getBrowserDownloadService } from '@/services/download/BrowserDownloadService';
 import { createLogger } from '@/utils';
+import { PLUGIN_ID } from '@/constants';
 
 const log = createLogger('StashImport');
 
@@ -110,6 +112,13 @@ export class StashImportService {
       if (onLog) onLog('info', 'Fallback URL set for retry attempts');
     }
 
+    // Pass the title as filename so yt-dlp uses it instead of extracting from page
+    // (some sites don't have proper title metadata, resulting in names like "2160p.av1.mp4")
+    const downloadFilename = item.editedMetadata?.title || item.metadata?.title;
+    if (downloadFilename) {
+      log.debug('Using custom filename for download:', downloadFilename);
+    }
+
     const blob = await this.downloadService.download(downloadUrl, {
       onProgress: (progress) => {
         log.debug('Download progress:',
@@ -118,11 +127,15 @@ export class StashImportService {
         if (onProgress) onProgress(progress);
       },
       fallbackUrl, // Original page URL for yt-dlp if direct download fails
+      filename: downloadFilename, // Use scraped title as filename
     });
 
     // Check if this was a server-side download (file already on disk)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const serverFilePath = (blob as any).__serverFilePath;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const libraryPath = (blob as any).__libraryPath;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const scanJobId = (blob as any).__scanJobId;
 
     if (serverFilePath) {
@@ -137,27 +150,196 @@ export class StashImportService {
 
       if (onLog) onLog('success', `File saved: ${serverFilePath}`);
 
-      // Log scan status
+      // Wait for scan to complete if we have a job ID
       if (scanJobId) {
-        if (onLog) onLog('info', `Stash scan triggered (Job: ${scanJobId})`);
-        if (onLog) onLog('success', 'Scene will be indexed automatically');
-      } else if (libraryPath) {
-        if (onLog) onLog('warning', 'Scan not triggered - run manual scan in Stash');
+        if (onLog) onLog('info', `Waiting for Stash scan to complete (Job: ${scanJobId})...`);
+        if (onStatusChange) onStatusChange('Waiting for scan...');
+
+        const scanResult = await this.stashService.waitForJob(scanJobId, {
+          pollIntervalMs: 1000,
+          maxWaitMs: 60000, // 1 minute max for scan
+        });
+
+        if (!scanResult.success) {
+          log.warn('Scan job did not complete successfully:', scanResult.error);
+          if (onLog) onLog('warning', `Scan may not have completed: ${scanResult.error}`);
+        } else {
+          if (onLog) onLog('success', 'Scan completed');
+        }
       }
 
-      // For server-side downloads, return a placeholder result
-      // The file is on disk and Stash scan will index it
-      // Metadata can be applied after scan finds the scene
-      return {
-        id: `pending-scan-${Date.now()}`,
-        title: item.editedMetadata?.title || 'Pending scan',
-        path: serverFilePath,
-        organized: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        files: [],
-        paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
-      } as IStashScene;
+      // Find the scene by file path
+      if (onStatusChange) onStatusChange('Finding scene in Stash...');
+      if (onLog) onLog('info', 'Looking for scene in Stash...');
+
+      // Try a few times with delay (scan might take a moment to index)
+      let scene: IStashScene | null = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        scene = await this.stashService.findSceneByPath(serverFilePath);
+        if (scene) break;
+
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        log.debug(`Retry ${attempt + 1}/5 finding scene by path`);
+      }
+
+      if (!scene) {
+        log.warn('Could not find scene by path after scan');
+        if (onLog) onLog('warning', 'Scene not found in Stash - metadata will not be applied');
+        if (onLog) onLog('info', 'You may need to run a manual scan and apply metadata');
+
+        // Return placeholder since we couldn't find the scene
+        return {
+          id: `pending-scan-${Date.now()}`,
+          title: item.editedMetadata?.title || 'Pending scan',
+          path: serverFilePath,
+          organized: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          files: [],
+          paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
+        } as IStashScene;
+      }
+
+      if (onLog) onLog('success', `Found scene in Stash (ID: ${scene.id})`);
+      log.info('Found scene after scan:', scene.id);
+
+      // Apply edited metadata (performers, tags, studio)
+      // Use edited values if available, otherwise fall back to scraped metadata
+      if (onStatusChange) onStatusChange('Applying metadata...');
+      if (onLog) onLog('info', 'Applying metadata (performers, tags, studio)...');
+
+      const editedMeta = item.editedMetadata;
+      const scrapedMeta = item.metadata;
+      const updateInput: Record<string, unknown> = {
+        title: editedMeta?.title || scrapedMeta?.title,
+        details: editedMeta?.description || scrapedMeta?.description,
+        url: item.url,
+        date: editedMeta?.date || scrapedMeta?.date,
+      };
+
+      // Use edited performer names if available, otherwise use scraped
+      const performerNames = editedMeta?.performerNames || scrapedMeta?.performers || [];
+      if (performerNames.length > 0) {
+        if (onLog) onLog('info', `Resolving ${performerNames.length} performer(s)...`);
+        const performerIds: string[] = [];
+        for (const name of performerNames) {
+          try {
+            const performer = await this.stashService.getOrCreatePerformer(name);
+            performerIds.push(performer.id);
+            log.debug(`Resolved performer: ${name} -> ${performer.id}`);
+          } catch (err) {
+            log.warn(`Failed to resolve performer "${name}": ${String(err)}`);
+          }
+        }
+        if (performerIds.length > 0) {
+          updateInput.performer_ids = performerIds;
+          if (onLog) onLog('success', `Linked ${performerIds.length} performer(s)`);
+        }
+      }
+
+      // Use edited tag names if available, otherwise use scraped
+      const tagNames = editedMeta?.tagNames || scrapedMeta?.tags || [];
+      if (tagNames.length > 0) {
+        if (onLog) onLog('info', `Resolving ${tagNames.length} tag(s)...`);
+        const tagIds: string[] = [];
+        for (const name of tagNames) {
+          try {
+            const tag = await this.stashService.getOrCreateTag(name);
+            tagIds.push(tag.id);
+            log.debug(`Resolved tag: ${name} -> ${tag.id}`);
+          } catch (err) {
+            log.warn(`Failed to resolve tag "${name}": ${String(err)}`);
+          }
+        }
+        if (tagIds.length > 0) {
+          updateInput.tag_ids = tagIds;
+          if (onLog) onLog('success', `Linked ${tagIds.length} tag(s)`);
+        }
+      }
+
+      // Use edited studio name if available, otherwise use scraped
+      const studioName = editedMeta?.studioName || scrapedMeta?.studio;
+      if (studioName) {
+        if (onLog) onLog('info', `Resolving studio: ${studioName}...`);
+        try {
+          const studio = await this.stashService.getOrCreateStudio(studioName);
+          updateInput.studio_id = studio.id;
+          log.debug(`Resolved studio: ${studioName} -> ${studio.id}`);
+          if (onLog) onLog('success', `Linked studio: ${studio.name}`);
+        } catch (err) {
+          log.warn(`Failed to resolve studio "${studioName}": ${String(err)}`);
+        }
+      }
+
+      // Set cover image from thumbnail if available
+      if (scrapedMeta?.thumbnailUrl) {
+        if (onLog) onLog('info', 'Fetching cover image...');
+        try {
+          const coverBase64 = await this.fetchImageAsBase64(scrapedMeta.thumbnailUrl);
+          if (coverBase64) {
+            updateInput.cover_image = coverBase64;
+            log.debug('Cover image fetched successfully');
+            if (onLog) onLog('success', 'Cover image set');
+          }
+        } catch (err) {
+          log.warn(`Failed to fetch cover image: ${String(err)}`);
+          if (onLog) onLog('warning', 'Could not set cover image');
+        }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updateInput built dynamically from optional fields
+      let updatedScene = await this.stashService.updateScene(scene.id, updateInput as any);
+
+      if (onLog) onLog('success', 'Metadata applied');
+
+      // Execute post-import action (optional additional processing)
+      const postImportAction: PostImportAction = item.postImportAction || 'none';
+
+      if (postImportAction === 'identify') {
+        // Trigger Stash's Identify (StashDB + scrapers)
+        if (onStatusChange) onStatusChange('Running Identify...');
+        if (onLog) onLog('info', 'Triggering Stash Identify (StashDB + scrapers)...');
+
+        const identifyJobId = await this.stashService.identifyScenes([scene.id]);
+        if (identifyJobId) {
+          if (onLog) onLog('info', `Identify job started (ID: ${identifyJobId})`);
+
+          // Wait for identify to complete
+          const identifyResult = await this.stashService.waitForJob(identifyJobId, {
+            pollIntervalMs: 1000,
+            maxWaitMs: 120000, // 2 minutes for identify
+          });
+
+          if (identifyResult.success) {
+            if (onLog) onLog('success', 'Identify completed - metadata matched from StashDB/scrapers');
+          } else {
+            if (onLog) onLog('warning', `Identify may not have found matches: ${identifyResult.error}`);
+          }
+        } else {
+          if (onLog) onLog('warning', 'Could not start Identify job');
+        }
+      } else if (postImportAction === 'scrape_url') {
+        // Scrape using the source URL
+        if (onStatusChange) onStatusChange('Scraping URL...');
+        if (onLog) onLog('info', `Scraping metadata from URL: ${item.url}`);
+
+        const scraped = await this.stashService.scrapeSingleSceneByURL(scene.id, item.url);
+        if (scraped) {
+          if (onLog) onLog('info', 'Applying scraped metadata (performers, tags, studio)...');
+          updatedScene = await this.stashService.applyScrapedMetadata(scene.id, scraped);
+          if (onLog) onLog('success', 'Scraped metadata applied successfully');
+        } else {
+          if (onLog) onLog('warning', 'No scraper found for this URL - metadata not applied');
+        }
+      } else {
+        if (onLog) onLog('info', 'Post-import action: None - edit metadata in Stash if needed');
+      }
+
+      if (onLog) onLog('success', 'Import completed successfully!');
+      log.info('Scene import complete:', updatedScene.id);
+
+      return updatedScene;
     }
 
     log.info('Download complete, file size:', `${blob.size} bytes`);
@@ -320,6 +502,7 @@ export class StashImportService {
    * Create scene in Stash
    */
   private async createScene(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type varies by caller
     input: any,
     _fileData?: string
   ): Promise<IStashScene> {
@@ -331,6 +514,7 @@ export class StashImportService {
   /**
    * Create image in Stash
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type varies by caller
   private async createImage(input: any, _fileData?: string): Promise<IStashImage> {
     return await this.stashService.createImage(input);
   }
@@ -350,6 +534,46 @@ export class StashImportService {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+
+  /**
+   * Fetch an image URL and convert to base64 via server-side
+   * Used for setting cover images from thumbnails (bypasses browser CSP)
+   */
+  private async fetchImageAsBase64(imageUrl: string): Promise<string | null> {
+    try {
+      // Use server-side fetch via Python backend to bypass CSP restrictions
+
+      // Get proxy settings
+      const settings = await this.stashService.getPluginSettings(PLUGIN_ID);
+      const proxy = settings?.httpProxy || undefined;
+
+      log.debug('Fetching cover image via server-side...');
+
+      interface FetchImageResult {
+        success?: boolean;
+        image_base64?: string;
+        result_error?: string;
+      }
+
+      const result = await this.stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'fetch_image',
+        url: imageUrl,
+        proxy,
+      }) as FetchImageResult | null;
+
+      if (result?.success && result?.image_base64) {
+        log.debug('Cover image fetched successfully via server');
+        return result.image_base64;
+      }
+
+      const errorMsg = result?.result_error || 'Unknown error';
+      log.warn(`Server-side image fetch failed: ${errorMsg}`);
+      return null;
+    } catch (err) {
+      log.warn(`Error fetching image: ${String(err)}`);
+      return null;
+    }
   }
 
 }

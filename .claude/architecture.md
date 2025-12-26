@@ -52,7 +52,9 @@ All external interactions go through dedicated services:
 - Plugin settings: `getPluginSettings()` - queries `configuration { plugins }` (PluginConfigMap scalar)
 - Server-side scraping: `scrapeSceneURL()`, `scrapeGalleryURL()`, `scrapeImageURL()`
 - Plugin task execution: `runPluginTask()`, `runPluginOperation()`
-- Job management: `stopJob()`
+- Job management: `stopJob()`, `waitForJob()`
+- Post-import actions: `identifyScenes()`, `scrapeSingleSceneByURL()`, `applyScrapedMetadata()`
+- Scene operations: `findSceneByPath()`, `updateScene()`
 - Environment detection: `isStashEnvironment()`
 - Handles authentication via localStorage API key
 
@@ -107,12 +109,14 @@ query GetPluginSettings($include: [ID!]) {
 - Server-side downloads using yt-dlp
 - Quality selection (best, 1080p, 720p, 480p)
 - Metadata extraction without downloading
+- **Cover image fetching**: Fetches thumbnail URLs server-side (bypasses browser CSP)
 - Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
 - Configurable download directory via `serverDownloadPath` setting (default: `/data/StashDownloader`)
 - HTTP/HTTPS/SOCKS proxy support via `httpProxy` setting (for bypassing geo-restrictions, IP blocks, rate limits)
 - SSL certificate verification disabled when using proxy (many proxies use self-signed certs or do SSL interception)
 - Proxy URL format: `http://user:pass@host:port`, `https://user:pass@host:port`, `socks5://user:pass@host:port`, `socks5h://user:pass@host:port`
+- **SOCKS fallback**: Image fetching falls back to direct connection if PySocks not installed (yt-dlp has built-in SOCKS support for video downloads)
 
 ### PluginOutput Format (Critical for `runPluginOperation`)
 
@@ -294,16 +298,17 @@ DownloaderPlugin (Route Container)
 │   └── QueueItem (repeat)
 │       ├── Edit button
 │       ├── Logs button (per-item logs)
-│       ├── Retry button (for failed items)
-│       └── Re-scrape dropdown (for pending items)
+│       └── Retry button (for failed items)
 ├── LogViewer (Activity Log with filters)
 ├── EditMetadataModal (when editing)
-│   ├── MetadataEditorForm
-│   │   ├── PerformerSelector
-│   │   ├── TagSelector
-│   │   └── StudioSelector
-│   └── ActionButtons
-└── Modals (InfoModal, ItemLogModal, RescrapeModal)
+│   └── MetadataEditorForm
+│       ├── Thumbnail preview (clickable for full size)
+│       ├── Title editor
+│       ├── Performers section (collapsible, add/remove)
+│       ├── Tags section (collapsible, add/remove)
+│       ├── Studio input (editable text)
+│       └── Post-import action selector (None/Identify/Scrape URL)
+└── Modals (InfoModal, ItemLogModal, AboutModal)
 ```
 
 ### Component Types
@@ -321,7 +326,7 @@ DownloaderPlugin (Route Container)
 
 **Hook Components**
 - Custom hooks for shared logic
-- Example: `useDownloadQueue`, `useStashData`, `useMetadataMapping`
+- Example: `useDownloadQueue`, `useStashData`, `useSettings`
 
 ## API Design
 
@@ -400,7 +405,7 @@ If a scraper throws an error, the registry tries the next one.
 
 ### Settings-Driven Configuration
 - Scrapers can be enabled/disabled via settings
-- Metadata mapping rules configurable by user
+- Post-import action configurable per item (None, Identify, Scrape URL)
 - No code changes needed for common customizations
 
 ## Error Handling Strategy

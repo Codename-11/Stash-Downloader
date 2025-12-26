@@ -56,6 +56,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   const formatTimestamp = (date: Date): string => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fractionalSecondDigits not in older TS types
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
@@ -65,6 +66,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   const formatFullTimestamp = (date: Date): string => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fractionalSecondDigits not in older TS types
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'long',

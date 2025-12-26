@@ -344,7 +344,7 @@ export const QueuePage: React.FC = () => {
       try {
         await handleAddUrl(url);
         successCount++;
-      } catch (error) {
+      } catch (_error) {
         errorCount++;
       }
     }

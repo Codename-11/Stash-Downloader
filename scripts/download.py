@@ -30,11 +30,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 # Configure logging
-# Note: Stash treats all stderr output as errors, so we only log WARNING+ by default
-# Set STASH_DOWNLOADER_DEBUG=1 environment variable to enable verbose logging
+# Stash shows stderr in its logs. Use INFO by default so messages appear correctly.
+# Set STASH_DOWNLOADER_DEBUG=1 for verbose DEBUG logging.
 DEBUG_MODE = os.environ.get("STASH_DOWNLOADER_DEBUG", "").lower() in ("1", "true", "yes")
 logging.basicConfig(
-    level=logging.DEBUG if DEBUG_MODE else logging.WARNING,
+    level=logging.DEBUG if DEBUG_MODE else logging.INFO,
     format="[stash-downloader] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stderr)],
 )
@@ -78,15 +78,21 @@ def save_result(result_id: str, data: dict) -> bool:
         return False
 
 
-def load_result(result_id: str) -> Optional[dict]:
-    """Load a result from file."""
+def load_result(result_id: str, silent: bool = False) -> Optional[dict]:
+    """Load a result from file.
+
+    Args:
+        result_id: ID of the result to load
+        silent: If True, don't log warnings for missing files (used for progress polling)
+    """
     try:
         result_path = get_result_path(result_id)
         if os.path.exists(result_path):
             with open(result_path, "r") as f:
                 return json.load(f)
         else:
-            log.warning(f"Result file not found: {result_path}")
+            if not silent:
+                log.debug(f"Result file not found: {result_path}")
             return None
     except Exception as e:
         log.error(f"Failed to load result: {e}")
@@ -268,14 +274,14 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
 
     cmd.append(url)
 
-    log.warning(f"Starting yt-dlp metadata extraction: {url[:80]}...")  # Always visible
+    log.info(f"Extracting metadata: {url[:60]}...")
     log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout:
-            log.warning("✓ Metadata extraction successful")  # Always visible
+            log.info("✓ Metadata extracted")
             return json.loads(result.stdout)
         else:
             # Enhanced error logging with proxy context
@@ -353,7 +359,8 @@ def is_direct_file_url(url: str) -> bool:
 
 
 def download_direct_file(
-    url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None
+    url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None,
+    progress_id: Optional[str] = None
 ) -> Optional[str]:
     """
     Download a direct file URL using requests (no yt-dlp).
@@ -363,10 +370,12 @@ def download_direct_file(
         output_dir: Directory to save the file
         filename: Optional custom filename (will extract from URL if not provided)
         proxy: Optional HTTP/HTTPS/SOCKS proxy
+        progress_id: Optional ID for progress file updates (for frontend polling)
 
     Returns:
         Path to downloaded file, or None if failed
     """
+    import time
     import requests
     from urllib.parse import urlparse, unquote, parse_qs
 
@@ -376,10 +385,11 @@ def download_direct_file(
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
 
+        # Parse URL (needed for filename extraction and Referer header)
+        parsed = urlparse(url)
+
         # Determine filename
         if not filename:
-            parsed = urlparse(url)
-
             # Try to get filename from query params (e.g., download_filename=...)
             query_params = parse_qs(parsed.query)
             if "download_filename" in query_params:
@@ -440,16 +450,39 @@ def download_direct_file(
         # Get content length for progress
         total_size = int(response.headers.get("content-length", 0))
         downloaded = 0
+        last_progress_update = 0
+        progress_update_interval = 0.5  # Update every 0.5 seconds
+
+        # Create initial progress file
+        if progress_id:
+            log.info(f"Creating progress file for direct download: progress-{progress_id}")
+            save_result(f"progress-{progress_id}", {
+                "status": "starting",
+                "percentage": 0,
+                "downloaded_bytes": 0,
+                "total_bytes": total_size,
+            })
 
         with open(output_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
-                    if total_size > 0:
-                        progress = (downloaded / total_size) * 100
-                        if downloaded % (1024 * 1024) < 8192:  # Log every ~1MB
-                            log.debug(f"Download progress: {progress:.1f}% ({downloaded}/{total_size} bytes)")
+
+                    # Update progress file periodically
+                    current_time = time.time()
+                    if progress_id and total_size > 0 and (current_time - last_progress_update) >= progress_update_interval:
+                        pct = (downloaded / total_size) * 100
+                        save_result(f"progress-{progress_id}", {
+                            "status": "downloading",
+                            "percentage": pct,
+                            "downloaded_bytes": downloaded,
+                            "total_bytes": total_size,
+                        })
+                        last_progress_update = current_time
+                        log.info(f"Direct download progress: {pct:.1f}% ({downloaded}/{total_size} bytes)")
+                    elif total_size > 0 and downloaded % (1024 * 1024) < 8192:  # Log every ~1MB
+                        log.debug(f"Download progress: {(downloaded / total_size) * 100:.1f}% ({downloaded}/{total_size} bytes)")
 
         log.debug(f"Direct download complete: {output_path} ({downloaded} bytes)")
         return output_path
@@ -462,6 +495,63 @@ def download_direct_file(
         return None
 
 
+def parse_ytdlp_progress(line: str) -> Optional[dict]:
+    """
+    Parse yt-dlp progress output line.
+
+    Example lines:
+    [download]  50.0% of 100.00MiB at 5.00MiB/s ETA 00:10
+    [download]  50.0% of ~100.00MiB at 5.00MiB/s ETA 00:10 (frag 5/10)
+    [download] Destination: /path/to/file.mp4
+
+    Returns dict with progress info or None if not a progress line.
+    """
+    if not line.startswith("[download]"):
+        return None
+
+    # Match percentage progress line
+    # Pattern: [download]  XX.X% of [~]XXX.XXMIB at XXX.XXMIB/s ETA XX:XX
+    import re
+
+    progress_match = re.search(
+        r"\[download\]\s+(\d+\.?\d*)%\s+of\s+~?(\d+\.?\d*)(Ki?B|Mi?B|Gi?B)",
+        line,
+    )
+    if progress_match:
+        percentage = float(progress_match.group(1))
+        size_value = float(progress_match.group(2))
+        size_unit = progress_match.group(3)
+
+        # Convert to bytes
+        multipliers = {"KiB": 1024, "KB": 1000, "MiB": 1024 * 1024, "MB": 1000 * 1000, "GiB": 1024 * 1024 * 1024, "GB": 1000 * 1000 * 1000}
+        total_bytes = int(size_value * multipliers.get(size_unit, 1))
+        downloaded_bytes = int(total_bytes * percentage / 100)
+
+        result = {
+            "percentage": percentage,
+            "downloaded_bytes": downloaded_bytes,
+            "total_bytes": total_bytes,
+        }
+
+        # Try to parse speed
+        speed_match = re.search(r"at\s+(\d+\.?\d*)(Ki?B|Mi?B|Gi?B)/s", line)
+        if speed_match:
+            speed_value = float(speed_match.group(1))
+            speed_unit = speed_match.group(2)
+            result["speed"] = int(speed_value * multipliers.get(speed_unit, 1))
+
+        # Try to parse ETA
+        eta_match = re.search(r"ETA\s+(\d+):(\d+)", line)
+        if eta_match:
+            minutes = int(eta_match.group(1))
+            seconds = int(eta_match.group(2))
+            result["eta"] = minutes * 60 + seconds
+
+        return result
+
+    return None
+
+
 def download_video(
     url: str,
     output_dir: str,
@@ -469,9 +559,10 @@ def download_video(
     quality: str = "best",
     progress_callback: Optional[callable] = None,
     proxy: Optional[str] = None,
+    progress_id: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Download video using yt-dlp.
+    Download video using yt-dlp with real-time progress reporting.
 
     Args:
         url: Video URL to download
@@ -480,6 +571,7 @@ def download_video(
         quality: Quality preference (best, 1080p, 720p, 480p)
         progress_callback: Optional callback for progress updates
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
+        progress_id: Optional ID for progress file updates (for frontend polling)
 
     Returns:
         Path to downloaded file, or None if failed
@@ -505,10 +597,18 @@ def download_video(
         "-o",
         output_template,
         "--no-playlist",
-        "--newline",  # For progress parsing
+        "--newline",  # Output progress on new lines for parsing
+        "--progress",  # Show progress bar
+        # Use progress template to ensure consistent output format
+        "--progress-template", "download:[download] %(progress._percent_str)s of %(progress._total_bytes_str)s at %(progress._speed_str)s ETA %(progress._eta_str)s",
         "--print",
         "after_move:filepath",  # Print final path
     ]
+
+    # Set TERM environment variable to trick yt-dlp into outputting progress
+    # (yt-dlp suppresses progress when not in a TTY; this makes it think it is)
+    env = os.environ.copy()
+    env["TERM"] = "xterm"
 
     # Add proxy if provided (yt-dlp supports http://, https://, socks4://, socks5://)
     if proxy:
@@ -519,26 +619,129 @@ def download_video(
 
     cmd.append(url)
 
-    log.debug(f"Starting download: {url}")
+    log.info(f"Downloading: {url[:60]}...")
     log.debug(f"Output directory: {output_dir}")
     log.debug(f"Quality: {quality}")
-    log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
+    log.debug(f"yt-dlp command: {' '.join(cmd)}")
+
+    # Create initial progress file so frontend knows download has started
+    if progress_id:
+        progress_file_id = f"progress-{progress_id}"
+        log.info(f"Creating progress file: {progress_file_id}")
+        initial_progress = {
+            "status": "starting",
+            "percentage": 0,
+            "downloaded_bytes": 0,
+            "total_bytes": 0,
+        }
+        save_success = save_result(progress_file_id, initial_progress)
+        log.info(f"Progress file created: {save_success}")
+        # Verify file was created
+        result_path = get_result_path(progress_file_id)
+        log.info(f"Progress file path: {result_path}, exists: {os.path.exists(result_path)}")
+    else:
+        log.warning("No progress_id provided - progress tracking disabled")
 
     try:
-        result = subprocess.run(
+        # Use Popen for streaming output to get real-time progress
+        # Merge stderr into stdout so we get all output in one stream
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
-            text=True,
-            timeout=3600,  # 1 hour timeout
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
+            env=env,  # Pass environment with TERM=xterm to enable progress output
         )
 
-        if result.returncode == 0:
+        import time
+
+        stdout_lines = []  # To capture the final file path
+        last_progress_update = 0
+        progress_update_interval = 0.5  # Update progress file every 0.5 seconds
+
+        # Read combined stdout/stderr for progress updates
+        # yt-dlp uses \r (carriage return) to update progress in place
+        # We need to read in chunks and split on both \r and \n
+        lines_read = 0
+        progress_updates = 0
+        log.info("Reading yt-dlp output for progress updates...")
+
+        output_buffer = ""
+        if process.stdout:
+            while True:
+                # Read in small chunks to handle progress updates in real-time
+                chunk = process.stdout.read(256)
+                if not chunk:
+                    break
+
+                # Decode and add to buffer
+                output_buffer += chunk.decode('utf-8', errors='replace')
+
+                # Split on both \r and \n to get progress lines
+                # yt-dlp uses \r to overwrite progress lines
+                while '\r' in output_buffer or '\n' in output_buffer:
+                    # Find the first line terminator
+                    r_pos = output_buffer.find('\r')
+                    n_pos = output_buffer.find('\n')
+
+                    if r_pos == -1:
+                        split_pos = n_pos
+                    elif n_pos == -1:
+                        split_pos = r_pos
+                    else:
+                        split_pos = min(r_pos, n_pos)
+
+                    line = output_buffer[:split_pos].strip()
+                    output_buffer = output_buffer[split_pos + 1:]
+
+                    if not line:
+                        continue
+                    lines_read += 1
+
+                    # Check if this is the final file path (from --print after_move:filepath)
+                    if line.startswith('/') or (len(line) > 2 and line[1] == ':'):  # Unix or Windows path
+                        stdout_lines.append(line)
+                        log.debug(f"Captured output path: {line}")
+                        continue
+
+                    # Parse progress from yt-dlp output
+                    progress = parse_ytdlp_progress(line)
+                    if progress:
+                        progress_updates += 1
+                        current_time = time.time()
+                        # Update progress file periodically (not on every line)
+                        if progress_id and (current_time - last_progress_update) >= progress_update_interval:
+                            progress["status"] = "downloading"
+                            save_result(f"progress-{progress_id}", progress)
+                            last_progress_update = current_time
+                            log.info(f"Progress: {progress['percentage']:.1f}% ({progress.get('downloaded_bytes', 0)}/{progress.get('total_bytes', 0)} bytes)")
+
+                        if progress_callback:
+                            progress_callback(progress)
+                    else:
+                        # Log non-progress lines at debug level
+                        if "[download]" in line or "[info]" in line:
+                            log.debug(f"yt-dlp: {line}")
+                        elif "ERROR" in line or "error" in line.lower():
+                            log.error(f"yt-dlp: {line}")
+
+        log.info(f"Finished reading output: {lines_read} lines, {progress_updates} progress updates")
+
+        # Wait for process to complete
+        process.wait()
+
+        if process.returncode == 0:
             # Last line of stdout should be the file path
-            lines = result.stdout.strip().split("\n")
-            file_path = lines[-1] if lines else None
+            file_path = stdout_lines[-1] if stdout_lines else None
 
             if file_path and os.path.exists(file_path):
-                log.debug(f"Download complete: {file_path}")
+                log.info(f"✓ Download complete: {os.path.basename(file_path)}")
+                # Update progress to 100%
+                if progress_id:
+                    save_result(f"progress-{progress_id}", {
+                        "status": "complete",
+                        "percentage": 100,
+                        "file_path": file_path,
+                    })
                 return file_path
             else:
                 # Try to find the file in output directory
@@ -547,14 +750,26 @@ def download_video(
                 if files:
                     newest = max(files, key=os.path.getmtime)
                     log.debug(f"Found downloaded file: {newest}")
+                    if progress_id:
+                        save_result(f"progress-{progress_id}", {
+                            "status": "complete",
+                            "percentage": 100,
+                            "file_path": str(newest),
+                        })
                     return str(newest)
 
-        # Enhanced error logging with proxy context
-        error_msg = result.stderr or result.stdout or "Unknown error"
+        # Failed - update progress with error
+        error_msg = "Download failed"
+        if progress_id:
+            save_result(f"progress-{progress_id}", {
+                "status": "error",
+                "error": error_msg,
+            })
+
         if proxy:
-            log.error(f"yt-dlp download failed (using proxy {proxy}): {error_msg}")
+            log.error(f"yt-dlp download failed (using proxy {proxy})")
         else:
-            log.error(f"yt-dlp download failed (no proxy): {error_msg}")
+            log.error(f"yt-dlp download failed (no proxy)")
         return None
 
     except subprocess.TimeoutExpired:
@@ -562,12 +777,16 @@ def download_video(
         if proxy:
             timeout_msg += f" (using proxy {proxy})"
         log.error(timeout_msg)
+        if progress_id:
+            save_result(f"progress-{progress_id}", {"status": "error", "error": timeout_msg})
         return None
     except Exception as e:
         error_msg = f"Download error: {e}"
         if proxy:
             error_msg += f" (using proxy {proxy})"
         log.error(error_msg, exc_info=True)
+        if progress_id:
+            save_result(f"progress-{progress_id}", {"status": "error", "error": str(e)})
         return None
 
 
@@ -583,6 +802,7 @@ def task_download(args: dict) -> dict:
         quality: Quality preference (best, 1080p, 720p, 480p)
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         result_id: Optional ID for storing result (for async retrieval)
+        progress_id: Optional ID for progress updates (frontend can poll this)
 
     Returns:
         Dict with file_path on success, error on failure.
@@ -596,8 +816,11 @@ def task_download(args: dict) -> dict:
     quality = args.get("quality", "best")
     proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
     result_id = args.get("result_id")
+    progress_id = args.get("progress_id")  # For real-time progress updates
 
-    # Log configuration for troubleshooting
+    # Log all received args for debugging
+    log.info(f"Download task received args: {list(args.keys())}")
+    log.info(f"Download task started: progress_id={progress_id}, result_id={result_id}")
     log.debug(f"[task_download] URL: {url}")
     if fallback_url:
         log.debug(f"[task_download] Fallback URL for yt-dlp: {fallback_url}")
@@ -617,8 +840,8 @@ def task_download(args: dict) -> dict:
 
     # Check if this is a direct file URL (try direct download first, fallback to yt-dlp)
     if is_direct_file_url(url):
-        log.debug(f"[task_download] Detected direct file URL, trying direct download first")
-        file_path = download_direct_file(url, output_dir, filename, proxy=proxy)
+        log.info(f"Detected direct file URL, trying direct download first")
+        file_path = download_direct_file(url, output_dir, filename, proxy=proxy, progress_id=progress_id)
 
         if file_path:
             file_size = os.path.getsize(file_path)
@@ -631,7 +854,7 @@ def task_download(args: dict) -> dict:
             # Direct download failed (likely 403/hotlink protection)
             # Fall back to yt-dlp with the original page URL (if provided)
             if fallback_url:
-                log.warning(f"[task_download] Direct download failed, falling back to yt-dlp with page URL: {fallback_url}")
+                log.info(f"Direct download failed, using yt-dlp fallback")
                 ytdlp_url = fallback_url
             else:
                 log.warning("[task_download] Direct download failed, no fallback URL - trying yt-dlp with direct URL")
@@ -653,7 +876,7 @@ def task_download(args: dict) -> dict:
 
     # Download using yt-dlp (with proxy if provided)
     # Use ytdlp_url which may be the original page URL if direct download failed
-    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy)
+    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id)
 
     if file_path:
         file_size = os.path.getsize(file_path)
@@ -813,31 +1036,31 @@ def task_read_result(args: dict) -> dict:
     """
     result_id = args.get("result_id")
 
-    log.debug(f"Reading result for result_id: {result_id}")
-    log.debug(f"Result directory: {RESULT_DIR}")
+    # Only log progress file reads at debug level (they're frequent during download)
+    is_progress_read = result_id and result_id.startswith("progress-")
+    if is_progress_read:
+        log.debug(f"Reading progress file: {result_id}")
+    else:
+        log.debug(f"Reading result for result_id: {result_id}")
 
     if not result_id:
         log.error("No result_id provided to read_result")
         # Don't use 'error' field - Stash treats it as GraphQL error
         return {"success": False, "result_error": "No result_id provided", "retrieved": False}
 
+    # For progress files, missing file is expected (download may not have started yet)
+    # Don't log errors for these - just return not found quietly
+    is_progress_file = result_id.startswith("progress-")
+
     # Check if result directory exists
     if not os.path.exists(RESULT_DIR):
-        log.error(f"Result directory does not exist: {RESULT_DIR}")
-        return {"success": False, "result_error": f"Result directory not found: {RESULT_DIR}", "retrieved": False}
+        if not is_progress_file:
+            log.error(f"Result directory does not exist: {RESULT_DIR}")
+        return {"success": True, "retrieved": False, "not_found": True}
 
-    # List all files in result directory for debugging
-    try:
-        files = os.listdir(RESULT_DIR)
-        log.debug(f"Files in result directory: {files}")
-    except Exception as e:
-        log.warning(f"Could not list result directory: {e}")
-
-    data = load_result(result_id)
+    data = load_result(result_id, silent=is_progress_file)
     if data:
         log.debug(f"Successfully loaded result for {result_id}")
-        log.debug(f"Loaded data keys: {list(data.keys())}")
-        log.debug(f"Loaded data (first 500 chars): {json.dumps(data, default=str)[:500]}")
 
         # Return the data as-is, but ensure we don't have any field that would
         # cause write_output to set the 'error' field in PluginOutput
@@ -849,28 +1072,23 @@ def task_read_result(args: dict) -> dict:
         # The caller should check 'task_error' field instead
         if "result_error" in result:
             result["task_error"] = result.pop("result_error")
-            log.debug(f"Renamed 'result_error' to 'task_error' to avoid GraphQL error interpretation")
 
         # Also rename 'error' field if present
         if "error" in result:
             result["task_error"] = result.pop("error")
-            log.debug(f"Renamed 'error' to 'task_error' to avoid GraphQL error interpretation")
 
         # Ensure we always have a 'success' field for consistency
         if "success" not in result:
             # If there's a task_error, success should be False, otherwise True
             result["success"] = "task_error" not in result
 
-        log.debug(f"Final result keys: {list(result.keys())}")
-        log.debug(f"Final result (first 500 chars): {json.dumps(result, default=str)[:500]}")
-
         return result
     else:
-        log.error(f"Result not found for result_id: {result_id}")
-        result_path = get_result_path(result_id)
-        log.error(f"Expected result file path: {result_path}")
-        log.error(f"File exists: {os.path.exists(result_path)}")
-        return {"success": False, "result_error": f"Result not found for result_id: {result_id}", "retrieved": False}
+        # File not found - for progress files this is expected, don't log error
+        if not is_progress_file:
+            log.debug(f"Result not found for result_id: {result_id}")
+        # Return success:true but retrieved:false - this is not an error condition
+        return {"success": True, "retrieved": False, "not_found": True}
 
 
 def task_cleanup_result(args: dict) -> dict:
@@ -977,6 +1195,96 @@ def task_test_proxy(args: dict) -> dict:
         return {"result_error": f"Proxy test error: {str(e)}", "success": False, "url": url, "proxy": proxy}
 
 
+def task_fetch_image(args: dict) -> dict:
+    """
+    Fetch an image URL and return as base64.
+    Used for setting cover images from thumbnails (bypasses browser CSP).
+
+    Args:
+        url: Image URL to fetch
+        proxy: Optional HTTP/HTTPS/SOCKS proxy URL
+
+    Returns:
+        {success: True, image_base64: "data:image/...;base64,..."}
+        or {success: False, result_error: "..."}
+    """
+    import base64
+    import requests
+    from urllib.parse import urlparse
+
+    url = args.get("url")
+    proxy = args.get("proxy")
+
+    if not url:
+        return {"result_error": "No URL provided", "success": False}
+
+    log.info(f"Fetching image: {url[:100]}...")
+
+    # Build headers
+    parsed = urlparse(url)
+    referer = f"{parsed.scheme}://{parsed.netloc}/"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "image/*,*/*",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": referer,
+    }
+
+    def do_fetch(use_proxy: bool) -> requests.Response:
+        """Helper to fetch with or without proxy."""
+        proxies = None
+        if use_proxy and proxy:
+            log.debug(f"Using proxy for image fetch: {proxy}")
+            proxies = {"http": proxy, "https": proxy}
+        return requests.get(
+            url,
+            headers=headers,
+            proxies=proxies,
+            timeout=30,
+            allow_redirects=True,
+        )
+
+    try:
+        # Try with proxy first (if provided)
+        response = do_fetch(use_proxy=bool(proxy))
+        response.raise_for_status()
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        # If SOCKS proxy failed (missing PySocks), retry without proxy
+        # Image CDNs usually don't need proxies anyway
+        if proxy and ("socks" in error_msg or "missing dependencies" in error_msg):
+            log.warning(f"Proxy failed for image fetch (SOCKS issue), retrying without proxy...")
+            try:
+                response = do_fetch(use_proxy=False)
+                response.raise_for_status()
+                log.info("✓ Image fetched successfully without proxy")
+            except Exception as retry_e:
+                log.error(f"Failed to fetch image (retry without proxy): {retry_e}")
+                return {"result_error": f"Failed to fetch image: {str(retry_e)}", "success": False}
+        else:
+            log.error(f"Failed to fetch image: {e}")
+            return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
+
+    try:
+        # Get content type
+        content_type = response.headers.get("Content-Type", "image/jpeg")
+        if ";" in content_type:
+            content_type = content_type.split(";")[0].strip()
+
+        # Convert to base64
+        image_data = base64.b64encode(response.content).decode("utf-8")
+        data_url = f"data:{content_type};base64,{image_data}"
+
+        log.info(f"✓ Image fetched successfully ({len(response.content)} bytes)")
+        return {"success": True, "image_base64": data_url}
+
+    except Exception as e:
+        log.error(f"Failed to process image: {e}")
+        return {"result_error": f"Failed to process image: {str(e)}", "success": False}
+
+
 def main():
     """Main entry point."""
     try:
@@ -1010,6 +1318,7 @@ def main():
             "cleanup_result": task_cleanup_result,
             "check_ytdlp": task_check_ytdlp,
             "test_proxy": task_test_proxy,
+            "fetch_image": task_fetch_image,
         }
 
         handler = tasks.get(task_name)

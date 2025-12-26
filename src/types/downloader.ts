@@ -19,6 +19,11 @@ export enum ContentType {
   Gallery = 'gallery',
 }
 
+/**
+ * Post-import action to apply metadata via Stash's systems
+ */
+export type PostImportAction = 'none' | 'identify' | 'scrape_url';
+
 export interface IDownloadProgress {
   bytesDownloaded: number;
   totalBytes: number;
@@ -81,16 +86,21 @@ export interface IScrapedMetadata {
 }
 
 /**
- * User-edited metadata with full Stash entity objects.
- * Stores full objects so we can create new entities if they have temp IDs.
+ * User-edited metadata.
+ * Supports both simple name strings (from scraper) and full Stash entity objects.
  */
 export interface IEditedMetadata {
   title?: string;
   description?: string;
   date?: string;
-  performers?: IStashPerformer[]; // Full objects (may include temp-* IDs for new entities)
-  tags?: IStashTag[]; // Full objects (may include temp-* IDs for new entities)
-  studio?: IStashStudio; // Full object (may include temp-* ID for new entity)
+  // Name-based metadata (resolved during import)
+  performerNames?: string[];
+  tagNames?: string[];
+  studioName?: string;
+  // Full objects (legacy support, may include temp-* IDs for new entities)
+  performers?: IStashPerformer[];
+  tags?: IStashTag[];
+  studio?: IStashStudio;
   rating?: number;
 }
 
@@ -134,6 +144,7 @@ export interface IDownloadItem {
   // Stash integration
   stashId?: string; // Scene/Image/Gallery ID after creation
   existsInStash?: { id: string; title?: string }; // If scene already exists in Stash before import
+  postImportAction?: PostImportAction; // Action to take after import (none, identify, scrape_url)
 
   // Logs for this specific item
   logs?: IItemLogEntry[];
