@@ -83,8 +83,12 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
   const settings = await getSettings();
   const stashOrigin = new URL(settings.stashUrl).origin;
 
+  console.log('[Stash Downloader] Looking for tabs matching:', `${stashOrigin}/*`);
+
   // Find tabs on the Stash domain
   const stashTabs = await browser.tabs.query({ url: `${stashOrigin}/*` });
+
+  console.log('[Stash Downloader] Found', stashTabs.length, 'Stash tab(s)');
 
   let sent = false;
 
@@ -92,6 +96,7 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
     // Try to send to content script on Stash tab(s)
     for (const tab of stashTabs) {
       try {
+        console.log('[Stash Downloader] Sending to tab', tab.id, tab.url);
         await browser.tabs.sendMessage(tab.id, {
           action: 'addToQueue',
           url: url,
@@ -99,10 +104,13 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
           options: options
         });
         sent = true;
+        console.log('[Stash Downloader] Successfully sent to tab', tab.id);
       } catch (e) {
-        console.log('Failed to send to tab', tab.id, e);
+        console.warn('[Stash Downloader] Failed to send to tab', tab.id, ':', e.message);
       }
     }
+  } else {
+    console.log('[Stash Downloader] No Stash tabs found - will open new tab');
   }
 
   if (sent) {
@@ -159,8 +167,10 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
             // Wait for React to mount, then dispatch custom event
             function dispatchAddUrl() {
               console.log('[Stash Downloader Extension] Dispatching event with URL:', urlToQueue);
+              // Use cloneInto() to safely pass data across Firefox security boundaries
+              const detail = { url: urlToQueue, contentType: contentType };
               window.dispatchEvent(new CustomEvent('stash-downloader-add-url', {
-                detail: { url: urlToQueue, contentType: contentType }
+                detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail
               }));
             }
 
