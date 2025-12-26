@@ -307,11 +307,35 @@ git commit -m "🔖 chore: release vX.Y.Z"
 git tag vX.Y.Z
 git push origin main --tags
 
-# Return to dev
+# Sync version back to dev (WAIT for main workflow to complete first!)
+# Check: https://github.com/Codename-11/Stash-Downloader/actions
 git checkout dev
+git merge main
+git push origin dev
 ```
 
 Or use `/release` skill for guided release.
+
+**⚠️ CRITICAL: GitHub Pages Concurrency**
+
+Do NOT push `main` and `dev` simultaneously or in quick succession. The GitHub Pages deployment uses concurrency control that will **cancel** whichever workflow started first.
+
+```yaml
+concurrency:
+  group: "pages"
+  cancel-in-progress: false  # But still cancels if new deployment starts
+```
+
+**Correct sequence:**
+1. Push `main` with tag
+2. **Wait for workflow to complete** (check Actions tab)
+3. Then sync `dev` with version bump
+
+**If release was cancelled:** Re-push the tag to trigger the workflow again:
+```bash
+git push origin --delete vX.Y.Z
+git push origin vX.Y.Z
+```
 
 **Version Bump Rules:**
 | Changes | Bump | Example |
