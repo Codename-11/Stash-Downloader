@@ -274,14 +274,14 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
 
     cmd.append(url)
 
-    log.debug(f"Starting yt-dlp metadata extraction: {url[:80]}...")
+    log.info(f"Extracting metadata: {url[:60]}...")
     log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout:
-            log.debug("✓ Metadata extraction successful")
+            log.info("✓ Metadata extracted")
             return json.loads(result.stdout)
         else:
             # Enhanced error logging with proxy context
@@ -586,7 +586,7 @@ def download_video(
 
     cmd.append(url)
 
-    log.debug(f"Starting download: {url}")
+    log.info(f"Downloading: {url[:60]}...")
     log.debug(f"Output directory: {output_dir}")
     log.debug(f"Quality: {quality}")
     log.debug(f"yt-dlp command: {' '.join(cmd)}")
@@ -665,7 +665,7 @@ def download_video(
             file_path = stdout_lines[-1] if stdout_lines else None
 
             if file_path and os.path.exists(file_path):
-                log.debug(f"Download complete: {file_path}")
+                log.info(f"✓ Download complete: {os.path.basename(file_path)}")
                 # Update progress to 100%
                 if progress_id:
                     save_result(f"progress-{progress_id}", {
@@ -783,7 +783,7 @@ def task_download(args: dict) -> dict:
             # Direct download failed (likely 403/hotlink protection)
             # Fall back to yt-dlp with the original page URL (if provided)
             if fallback_url:
-                log.warning(f"[task_download] Direct download failed, falling back to yt-dlp with page URL: {fallback_url}")
+                log.info(f"Direct download failed, using yt-dlp fallback")
                 ytdlp_url = fallback_url
             else:
                 log.warning("[task_download] Direct download failed, no fallback URL - trying yt-dlp with direct URL")
