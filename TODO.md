@@ -1,12 +1,5 @@
 # TODO
 
-## Ideas
-- [ ] Add a way to add custom scrapers via plugin settings
-
-## In Progress
-
-- [ ] Fix stable release to contain version in index.yml
-
 ## Backlog
 
 ### CI/CD
@@ -21,7 +14,6 @@
 - [ ] Resume interrupted downloads
 - [ ] Concurrent download limit UI control
 - [ ] Download history view
-- [ ] Export/import queue
 
 ### UI/UX
 - [ ] Keyboard shortcuts (using Mousetrap from PluginApi)
@@ -33,7 +25,6 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
-
 - [x] Retry button for failed queue items
 - [x] Navbar icon for quick access to downloader
 - [x] Queue position indicator in edit modal (1 of X)

@@ -148,16 +148,30 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     <div className="card text-light" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
       <div className="card-header d-flex justify-content-between align-items-center" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
         <h6 className="mb-0">{readOnly ? 'Imported Metadata' : 'Import Preview'}</h6>
-        {!readOnly && onRemove && (
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-danger"
-            onClick={onRemove}
-            title="Remove from queue"
-          >
-            🗑️ Remove
-          </button>
-        )}
+        <div className="d-flex gap-2">
+          {/* View in Stash link for imported items */}
+          {readOnly && item.stashId && (
+            <a
+              href={`/${item.metadata?.contentType === ContentType.Image ? 'images' : item.metadata?.contentType === ContentType.Gallery ? 'galleries' : 'scenes'}/${item.stashId}`}
+              className="btn btn-sm btn-outline-success"
+              title="Open in Stash"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              🔗 View in Stash
+            </a>
+          )}
+          {!readOnly && onRemove && (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-danger"
+              onClick={onRemove}
+              title="Remove from queue"
+            >
+              🗑️ Remove
+            </button>
+          )}
+        </div>
       </div>
       <div className="card-body">
         <form onSubmit={handleSubmit}>

@@ -377,6 +377,24 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
                   ⚠️ Exists
                 </span>
               )}
+              {/* Link to imported item in Stash */}
+              {item.stashId && item.status === DownloadStatus.Complete && (
+                <a
+                  href={`/${item.metadata?.contentType === ContentType.Image ? 'images' : item.metadata?.contentType === ContentType.Gallery ? 'galleries' : 'scenes'}/${item.stashId}`}
+                  className="badge text-decoration-none"
+                  style={{
+                    backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                    color: '#75b798',
+                    border: '1px solid #198754',
+                    cursor: 'pointer',
+                  }}
+                  title="Open in Stash"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  🔗 View in Stash
+                </a>
+              )}
               {isScrapingMetadata ? null : (
                 <>
                   {item.metadata?.contentType && (
