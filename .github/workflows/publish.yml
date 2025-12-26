@@ -126,7 +126,7 @@ jobs:
 
       - name: Generate plugin index
         run: |
-          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %I:%M:%S %p %Z')
+          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %H:%M:%S')
           VERSION=${{ steps.version.outputs.version }}
           STABLE_SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
 
@@ -145,8 +145,11 @@ jobs:
           # Append dev entry if it exists
           if [[ -f _site/stash-downloader-dev.zip ]]; then
             DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
-            DEV_VERSION=$(grep -A1 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${VERSION}-dev")
-            DEV_DATE=$(grep -A3 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+            DEV_VERSION=$(grep -A1 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}')
+            DEV_DATE=$(grep -A3 "id: stash-downloader-dev" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //')
+            # Use fallback if version/date are empty
+            [[ -z "$DEV_VERSION" ]] && DEV_VERSION="${VERSION}-dev"
+            [[ -z "$DEV_DATE" ]] && DEV_DATE="${CURRENT_DATETIME}"
 
             cat >> _site/index.yml << EOF
           - id: stash-downloader-dev
@@ -299,7 +302,7 @@ jobs:
 
       - name: Generate plugin index
         run: |
-          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %I:%M:%S %p %Z')
+          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %H:%M:%S')
           VERSION=${{ steps.version.outputs.version }}
           BASE_VERSION=$(node -p "require('./package.json').version")
           DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
@@ -319,8 +322,11 @@ jobs:
           # Append stable entry if it exists
           if [[ -f _site/stash-downloader.zip ]]; then
             STABLE_SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
-            STABLE_VERSION=$(grep -A1 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${BASE_VERSION}")
-            STABLE_DATE=$(grep -A3 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+            STABLE_VERSION=$(grep -A1 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}')
+            STABLE_DATE=$(grep -A3 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //')
+            # Use fallback if version/date are empty
+            [[ -z "$STABLE_VERSION" ]] && STABLE_VERSION="${BASE_VERSION}"
+            [[ -z "$STABLE_DATE" ]] && STABLE_DATE="${CURRENT_DATETIME}"
 
             cat >> _site/index.yml << EOF
           - id: stash-downloader
