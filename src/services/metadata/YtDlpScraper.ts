@@ -138,13 +138,7 @@ export class YtDlpScraper implements IMetadataScraper {
 
       // The result is already the extracted data from PluginOutput.output
       readResult = operationResult;
-
-      // Validate we got valid data
-      if (!readResult.title && readResult.success === false) {
-        throw new Error('Invalid result data from Python script - missing title and success is false');
-      }
-
-      log.debug('Successfully extracted readResult:', JSON.stringify(readResult, null, 2));
+      log.debug('Successfully read result:', JSON.stringify(readResult, null, 2));
     } catch (readError) {
       log.error(`Read result error: ${String(readError)}`);
       throw readError;
@@ -160,15 +154,17 @@ export class YtDlpScraper implements IMetadataScraper {
 
     log.debug('Parsing result data...');
 
-    // Check for error in result
+    // Check for error in result FIRST (this contains the actual error message)
     if (readResult.result_error || readResult.error) {
-      throw new Error(`yt-dlp extraction failed: ${readResult.result_error || readResult.error}`);
+      const errorMsg = readResult.result_error || readResult.error;
+      log.error(`yt-dlp extraction failed: ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
     // Check success flag
     if (readResult.success === false || (readResult.success === undefined && !readResult.title)) {
       log.error('Result missing success flag or failed:', JSON.stringify(readResult));
-      throw new Error(`yt-dlp extraction did not succeed: ${readResult.result_error || readResult.error || 'Unknown error'}`);
+      throw new Error('yt-dlp extraction failed - no metadata returned');
     }
 
     log.debug('Got metadata from server-side yt-dlp:', readResult.title);

@@ -241,13 +241,16 @@ def check_ytdlp() -> bool:
         return False
 
 
-def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
+def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
     """
     Extract metadata using yt-dlp without downloading.
 
     Args:
         url: URL to extract metadata from
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
+
+    Returns:
+        dict with metadata on success, or dict with 'extraction_error' key on failure
     """
     cmd = [
         "yt-dlp",
@@ -277,26 +280,28 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> Optional[dict]:
         else:
             # Enhanced error logging with proxy context
             error_msg = result.stderr or result.stdout or "Unknown error"
+            # Clean up yt-dlp error message for display
+            clean_error = error_msg.strip().split('\n')[-1] if error_msg else "Unknown error"
             if proxy:
                 log.error(f"yt-dlp extraction FAILED (proxy {proxy}): {error_msg[:200]}")
             else:
                 log.error(f"yt-dlp extraction FAILED (no proxy): {error_msg[:200]}")
-            return None
+            return {"extraction_error": clean_error, "used_proxy": bool(proxy)}
     except subprocess.TimeoutExpired:
-        timeout_msg = f"yt-dlp TIMED OUT after 60s extracting: {url[:80]}"
+        timeout_msg = f"Timed out after 60s"
         if proxy:
             timeout_msg += f" (proxy: {proxy})"
-        log.error(timeout_msg)
-        return None
+        log.error(f"yt-dlp TIMED OUT: {timeout_msg}")
+        return {"extraction_error": timeout_msg, "used_proxy": bool(proxy)}
     except json.JSONDecodeError as e:
         log.error(f"Failed to parse yt-dlp output: {e}", exc_info=True)
-        return None
+        return {"extraction_error": f"Failed to parse yt-dlp output: {e}", "used_proxy": bool(proxy)}
     except Exception as e:
-        error_msg = f"Metadata extraction error: {e}"
+        error_msg = f"Extraction error: {e}"
         if proxy:
-            error_msg += f" (using proxy {proxy})"
+            error_msg += f" (proxy: {proxy})"
         log.error(error_msg, exc_info=True)
-        return None
+        return {"extraction_error": str(e), "used_proxy": bool(proxy)}
 
 
 def is_direct_file_url(url: str) -> bool:
@@ -702,6 +707,17 @@ def task_extract_metadata(args: dict) -> dict:
 
     metadata = extract_metadata(url, proxy=proxy)
 
+    # Check if extraction returned an error
+    if "extraction_error" in metadata:
+        error_msg = metadata["extraction_error"]
+        # Add hint about proxy if not used
+        if not metadata.get("used_proxy") and not proxy:
+            error_msg += " (tip: try configuring a proxy in settings)"
+        result = {"result_error": error_msg, "success": False}
+        if result_id:
+            save_result(result_id, result)
+        return result
+
     if metadata:
         # Extract all formats with their URLs (important for HLS streams)
         # For HLS, yt-dlp may include URLs in formats or only at top level
@@ -772,8 +788,6 @@ def task_extract_metadata(args: dict) -> dict:
             log.debug(f"Top-level URL available: {result['url'][:100]}...")
         else:
             log.warning("No top-level URL found in yt-dlp output")
-    else:
-        result = {"result_error": "Failed to extract metadata", "success": False}
 
     # Save result for async retrieval if result_id provided
     if result_id:
