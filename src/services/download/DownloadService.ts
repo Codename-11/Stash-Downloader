@@ -73,9 +73,12 @@ export class DownloadService {
         return { success: false, error: 'Not in Stash environment' };
       }
 
-      // Generate result_id for async result retrieval
-      const resultId = `download-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      // Generate IDs for result and progress tracking
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const resultId = `download-${uniqueId}`;
+      const progressId = uniqueId; // Progress file will be "progress-{uniqueId}"
       log.debug('Result ID:', resultId);
+      log.debug('Progress ID:', progressId);
 
       // Get server download path and proxy from settings
       // Priority: plugin setting > Stash library > default
@@ -105,6 +108,31 @@ export class DownloadService {
         has_proxy: !!httpProxy,
       }));
 
+      // Start progress polling in background
+      let progressPollInterval: ReturnType<typeof setInterval> | null = null;
+      if (options.onProgress) {
+        progressPollInterval = setInterval(async () => {
+          try {
+            const progressResult = await stashService.runPluginOperation(PLUGIN_ID, {
+              mode: 'read_result',
+              result_id: `progress-${progressId}`,
+            }) as any;
+
+            if (progressResult?.retrieved && progressResult.status === 'downloading') {
+              options.onProgress!({
+                bytesDownloaded: progressResult.downloaded_bytes || 0,
+                totalBytes: progressResult.total_bytes || 0,
+                percentage: progressResult.percentage || 0,
+                speed: progressResult.speed || 0,
+                timeRemaining: progressResult.eta,
+              });
+            }
+          } catch {
+            // Ignore progress polling errors - file might not exist yet
+          }
+        }, 1000); // Poll every second
+      }
+
       const taskResult = await stashService.runPluginTaskAndWait(
         PLUGIN_ID,
         'Download Video',
@@ -116,23 +144,28 @@ export class DownloadService {
           filename: options.filename,
           quality: options.quality || 'best',
           result_id: resultId,
+          progress_id: progressId, // For real-time progress updates
           proxy: httpProxy,
         },
         {
           maxWaitMs: 600000, // 10 minutes for large downloads
-          onProgress: (progress) => {
-            if (options.onProgress) {
-              options.onProgress({
-                bytesDownloaded: 0,
-                totalBytes: 0,
-                percentage: progress,
-                speed: 0,
-                timeRemaining: undefined,
-              });
-            }
+          onProgress: (_stashJobProgress) => {
+            // This is Stash job progress (usually stays at 0), not download progress
+            // Real progress comes from progress polling above
           },
         }
       );
+
+      // Stop progress polling
+      if (progressPollInterval) {
+        clearInterval(progressPollInterval);
+      }
+
+      // Cleanup progress file
+      stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'cleanup_result',
+        result_id: `progress-${progressId}`,
+      }).catch(() => { /* ignore cleanup errors */ });
 
       log.debug('Task result:', JSON.stringify(taskResult));
 

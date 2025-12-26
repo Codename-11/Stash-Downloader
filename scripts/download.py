@@ -462,6 +462,63 @@ def download_direct_file(
         return None
 
 
+def parse_ytdlp_progress(line: str) -> Optional[dict]:
+    """
+    Parse yt-dlp progress output line.
+
+    Example lines:
+    [download]  50.0% of 100.00MiB at 5.00MiB/s ETA 00:10
+    [download]  50.0% of ~100.00MiB at 5.00MiB/s ETA 00:10 (frag 5/10)
+    [download] Destination: /path/to/file.mp4
+
+    Returns dict with progress info or None if not a progress line.
+    """
+    if not line.startswith("[download]"):
+        return None
+
+    # Match percentage progress line
+    # Pattern: [download]  XX.X% of [~]XXX.XXMIB at XXX.XXMIB/s ETA XX:XX
+    import re
+
+    progress_match = re.search(
+        r"\[download\]\s+(\d+\.?\d*)%\s+of\s+~?(\d+\.?\d*)(Ki?B|Mi?B|Gi?B)",
+        line,
+    )
+    if progress_match:
+        percentage = float(progress_match.group(1))
+        size_value = float(progress_match.group(2))
+        size_unit = progress_match.group(3)
+
+        # Convert to bytes
+        multipliers = {"KiB": 1024, "KB": 1000, "MiB": 1024 * 1024, "MB": 1000 * 1000, "GiB": 1024 * 1024 * 1024, "GB": 1000 * 1000 * 1000}
+        total_bytes = int(size_value * multipliers.get(size_unit, 1))
+        downloaded_bytes = int(total_bytes * percentage / 100)
+
+        result = {
+            "percentage": percentage,
+            "downloaded_bytes": downloaded_bytes,
+            "total_bytes": total_bytes,
+        }
+
+        # Try to parse speed
+        speed_match = re.search(r"at\s+(\d+\.?\d*)(Ki?B|Mi?B|Gi?B)/s", line)
+        if speed_match:
+            speed_value = float(speed_match.group(1))
+            speed_unit = speed_match.group(2)
+            result["speed"] = int(speed_value * multipliers.get(speed_unit, 1))
+
+        # Try to parse ETA
+        eta_match = re.search(r"ETA\s+(\d+):(\d+)", line)
+        if eta_match:
+            minutes = int(eta_match.group(1))
+            seconds = int(eta_match.group(2))
+            result["eta"] = minutes * 60 + seconds
+
+        return result
+
+    return None
+
+
 def download_video(
     url: str,
     output_dir: str,
@@ -469,9 +526,10 @@ def download_video(
     quality: str = "best",
     progress_callback: Optional[callable] = None,
     proxy: Optional[str] = None,
+    progress_id: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Download video using yt-dlp.
+    Download video using yt-dlp with real-time progress reporting.
 
     Args:
         url: Video URL to download
@@ -480,6 +538,7 @@ def download_video(
         quality: Quality preference (best, 1080p, 720p, 480p)
         progress_callback: Optional callback for progress updates
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
+        progress_id: Optional ID for progress file updates (for frontend polling)
 
     Returns:
         Path to downloaded file, or None if failed
@@ -505,7 +564,8 @@ def download_video(
         "-o",
         output_template,
         "--no-playlist",
-        "--newline",  # For progress parsing
+        "--newline",  # Output progress on new lines for parsing
+        "--progress",  # Show progress
         "--print",
         "after_move:filepath",  # Print final path
     ]
@@ -522,23 +582,81 @@ def download_video(
     log.debug(f"Starting download: {url}")
     log.debug(f"Output directory: {output_dir}")
     log.debug(f"Quality: {quality}")
-    log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
+    log.debug(f"yt-dlp command: {' '.join(cmd)}")
 
     try:
-        result = subprocess.run(
+        # Use Popen for streaming output to get real-time progress
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=3600,  # 1 hour timeout
+            bufsize=1,  # Line buffered
         )
 
-        if result.returncode == 0:
+        stdout_lines = []
+        last_progress_update = 0
+        progress_update_interval = 0.5  # Update progress file every 0.5 seconds
+
+        # Read stderr for progress (yt-dlp outputs progress to stderr)
+        import time
+        import select
+        import threading
+
+        # Collect stdout in a separate thread
+        def read_stdout():
+            if process.stdout:
+                for line in process.stdout:
+                    stdout_lines.append(line.strip())
+
+        stdout_thread = threading.Thread(target=read_stdout)
+        stdout_thread.daemon = True
+        stdout_thread.start()
+
+        # Read stderr for progress updates
+        if process.stderr:
+            for line in process.stderr:
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Parse progress from yt-dlp output
+                progress = parse_ytdlp_progress(line)
+                if progress:
+                    current_time = time.time()
+                    # Update progress file periodically (not on every line)
+                    if progress_id and (current_time - last_progress_update) >= progress_update_interval:
+                        progress["status"] = "downloading"
+                        save_result(f"progress-{progress_id}", progress)
+                        last_progress_update = current_time
+                        log.debug(f"Progress: {progress['percentage']:.1f}% ({progress.get('speed', 0) / 1024 / 1024:.1f} MB/s)")
+
+                    if progress_callback:
+                        progress_callback(progress)
+                else:
+                    # Log non-progress stderr lines at debug level
+                    if "[download]" in line or "[info]" in line:
+                        log.debug(f"yt-dlp: {line}")
+                    elif "ERROR" in line or "error" in line.lower():
+                        log.error(f"yt-dlp: {line}")
+
+        # Wait for process to complete
+        process.wait()
+        stdout_thread.join(timeout=5)
+
+        if process.returncode == 0:
             # Last line of stdout should be the file path
-            lines = result.stdout.strip().split("\n")
-            file_path = lines[-1] if lines else None
+            file_path = stdout_lines[-1] if stdout_lines else None
 
             if file_path and os.path.exists(file_path):
                 log.debug(f"Download complete: {file_path}")
+                # Update progress to 100%
+                if progress_id:
+                    save_result(f"progress-{progress_id}", {
+                        "status": "complete",
+                        "percentage": 100,
+                        "file_path": file_path,
+                    })
                 return file_path
             else:
                 # Try to find the file in output directory
@@ -547,14 +665,26 @@ def download_video(
                 if files:
                     newest = max(files, key=os.path.getmtime)
                     log.debug(f"Found downloaded file: {newest}")
+                    if progress_id:
+                        save_result(f"progress-{progress_id}", {
+                            "status": "complete",
+                            "percentage": 100,
+                            "file_path": str(newest),
+                        })
                     return str(newest)
 
-        # Enhanced error logging with proxy context
-        error_msg = result.stderr or result.stdout or "Unknown error"
+        # Failed - update progress with error
+        error_msg = "Download failed"
+        if progress_id:
+            save_result(f"progress-{progress_id}", {
+                "status": "error",
+                "error": error_msg,
+            })
+
         if proxy:
-            log.error(f"yt-dlp download failed (using proxy {proxy}): {error_msg}")
+            log.error(f"yt-dlp download failed (using proxy {proxy})")
         else:
-            log.error(f"yt-dlp download failed (no proxy): {error_msg}")
+            log.error(f"yt-dlp download failed (no proxy)")
         return None
 
     except subprocess.TimeoutExpired:
@@ -562,12 +692,16 @@ def download_video(
         if proxy:
             timeout_msg += f" (using proxy {proxy})"
         log.error(timeout_msg)
+        if progress_id:
+            save_result(f"progress-{progress_id}", {"status": "error", "error": timeout_msg})
         return None
     except Exception as e:
         error_msg = f"Download error: {e}"
         if proxy:
             error_msg += f" (using proxy {proxy})"
         log.error(error_msg, exc_info=True)
+        if progress_id:
+            save_result(f"progress-{progress_id}", {"status": "error", "error": str(e)})
         return None
 
 
@@ -583,6 +717,7 @@ def task_download(args: dict) -> dict:
         quality: Quality preference (best, 1080p, 720p, 480p)
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         result_id: Optional ID for storing result (for async retrieval)
+        progress_id: Optional ID for progress updates (frontend can poll this)
 
     Returns:
         Dict with file_path on success, error on failure.
@@ -596,6 +731,7 @@ def task_download(args: dict) -> dict:
     quality = args.get("quality", "best")
     proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
     result_id = args.get("result_id")
+    progress_id = args.get("progress_id")  # For real-time progress updates
 
     # Log configuration for troubleshooting
     log.debug(f"[task_download] URL: {url}")
@@ -653,7 +789,7 @@ def task_download(args: dict) -> dict:
 
     # Download using yt-dlp (with proxy if provided)
     # Use ytdlp_url which may be the original page URL if direct download failed
-    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy)
+    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id)
 
     if file_path:
         file_size = os.path.getsize(file_path)
