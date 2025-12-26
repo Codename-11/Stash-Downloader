@@ -18,6 +18,7 @@ import { getStashService } from './StashGraphQLService';
 import { getDownloadService } from '@/services/download';
 import { getBrowserDownloadService } from '@/services/download/BrowserDownloadService';
 import { createLogger } from '@/utils';
+import { PLUGIN_ID } from '@/constants';
 
 const log = createLogger('StashImport');
 
@@ -530,24 +531,33 @@ export class StashImportService {
   }
 
   /**
-   * Fetch an image URL and convert to base64
-   * Used for setting cover images from thumbnails
+   * Fetch an image URL and convert to base64 via server-side
+   * Used for setting cover images from thumbnails (bypasses browser CSP)
    */
   private async fetchImageAsBase64(imageUrl: string): Promise<string | null> {
     try {
-      // Use the download service to fetch the image (handles CORS via server-side)
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        log.warn(`Failed to fetch image: ${response.status}`);
-        return null;
+      // Use server-side fetch via Python backend to bypass CSP restrictions
+
+      // Get proxy settings
+      const settings = await this.stashService.getPluginSettings(PLUGIN_ID);
+      const proxy = settings?.httpProxy || undefined;
+
+      log.debug('Fetching cover image via server-side...');
+
+      const result = await this.stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'fetch_image',
+        url: imageUrl,
+        proxy,
+      });
+
+      if (result && (result as any).success && (result as any).image_base64) {
+        log.debug('Cover image fetched successfully via server');
+        return (result as any).image_base64;
       }
 
-      const blob = await response.blob();
-      const base64 = await this.blobToBase64(blob);
-
-      // Return with data URL prefix that Stash expects
-      const mimeType = blob.type || 'image/jpeg';
-      return `data:${mimeType};base64,${base64}`;
+      const errorMsg = (result as any)?.result_error || 'Unknown error';
+      log.warn(`Server-side image fetch failed: ${errorMsg}`);
+      return null;
     } catch (err) {
       log.warn(`Error fetching image: ${String(err)}`);
       return null;

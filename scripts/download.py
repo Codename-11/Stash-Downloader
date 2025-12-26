@@ -1195,6 +1195,78 @@ def task_test_proxy(args: dict) -> dict:
         return {"result_error": f"Proxy test error: {str(e)}", "success": False, "url": url, "proxy": proxy}
 
 
+def task_fetch_image(args: dict) -> dict:
+    """
+    Fetch an image URL and return as base64.
+    Used for setting cover images from thumbnails (bypasses browser CSP).
+
+    Args:
+        url: Image URL to fetch
+        proxy: Optional HTTP/HTTPS/SOCKS proxy URL
+
+    Returns:
+        {success: True, image_base64: "data:image/...;base64,..."}
+        or {success: False, result_error: "..."}
+    """
+    import base64
+    from urllib.parse import urlparse
+
+    url = args.get("url")
+    proxy = args.get("proxy")
+
+    if not url:
+        return {"result_error": "No URL provided", "success": False}
+
+    log.info(f"Fetching image: {url[:100]}...")
+
+    try:
+        # Build headers
+        parsed = urlparse(url)
+        referer = f"{parsed.scheme}://{parsed.netloc}/"
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/*,*/*",
+            "Accept-Encoding": "gzip, deflate",
+            "Referer": referer,
+        }
+
+        # Configure proxy
+        proxies = None
+        if proxy:
+            log.debug(f"Using proxy for image fetch: {proxy}")
+            proxies = {"http": proxy, "https": proxy}
+
+        # Fetch the image
+        response = requests.get(
+            url,
+            headers=headers,
+            proxies=proxies,
+            timeout=30,
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+
+        # Get content type
+        content_type = response.headers.get("Content-Type", "image/jpeg")
+        if ";" in content_type:
+            content_type = content_type.split(";")[0].strip()
+
+        # Convert to base64
+        image_data = base64.b64encode(response.content).decode("utf-8")
+        data_url = f"data:{content_type};base64,{image_data}"
+
+        log.info(f"✓ Image fetched successfully ({len(response.content)} bytes)")
+        return {"success": True, "image_base64": data_url}
+
+    except requests.exceptions.RequestException as e:
+        log.error(f"Failed to fetch image (network error): {e}")
+        return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
+    except Exception as e:
+        log.error(f"Failed to fetch image: {e}")
+        return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
+
+
 def main():
     """Main entry point."""
     try:
@@ -1228,6 +1300,7 @@ def main():
             "cleanup_result": task_cleanup_result,
             "check_ytdlp": task_check_ytdlp,
             "test_proxy": task_test_proxy,
+            "fetch_image": task_fetch_image,
         }
 
         handler = tasks.get(task_name)
