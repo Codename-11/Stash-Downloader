@@ -598,7 +598,8 @@ def download_video(
         output_template,
         "--no-playlist",
         "--newline",  # Output progress on new lines for parsing
-        "--progress",  # Show progress
+        "--progress",  # Show progress bar
+        "--force-progress",  # Force progress output even when not in TTY (critical for non-terminal execution)
         "--print",
         "after_move:filepath",  # Print final path
     ]
