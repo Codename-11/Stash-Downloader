@@ -14,13 +14,16 @@
 ## Features
 
 - **URL-based Downloads** - Paste URLs to download videos and images
-- **Automatic Metadata** - Extracts titles, thumbnails, duration via yt-dlp
+- **Automatic Metadata** - Extracts titles, thumbnails, performers, tags, studio via yt-dlp
+- **Editable Metadata** - Review and edit performers, tags, studio before import
+- **Cover Images** - Scraped thumbnails automatically set as scene covers
 - **Browser Extension** - Right-click any link to send directly to your queue
 - **Batch Import** - Import multiple URLs from clipboard
 - **Post-Import Actions** - Choose how Stash handles metadata after import:
   - **Identify** - Match via StashDB fingerprints + installed scrapers
   - **Scrape URL** - Use Stash's scrapers for the source URL
   - **None** - Just import, edit metadata in Stash later
+- **Auto-Create** - Missing performers/tags/studios automatically created in Stash
 - **Queue Management** - Track downloads with progress indicators
 - **Persistent Queue** - Queue survives page refresh and navigation
 
@@ -108,10 +111,12 @@ Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
 | Setting | Description |
 |---------|-------------|
 | **Server Download Path** | Where to save files (default: `/data/StashDownloader`) |
-| **HTTP Proxy** | Proxy for geo-restricted content (`socks5://host:port`) |
+| **HTTP Proxy** | Proxy for geo-restricted content (`http://`, `socks5://`) |
 | **Concurrent Downloads** | Max simultaneous downloads (default: 3) |
 | **Auto-Create** | Automatically create performers/tags/studios |
 | **Download Quality** | Preferred video quality |
+
+> **Note**: Video downloads support SOCKS proxies via yt-dlp. Cover image fetching will fall back to direct connection if PySocks isn't installed (image CDNs typically don't require proxies).
 
 ---
 

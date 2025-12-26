@@ -56,6 +56,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
 
   // Get current state from item
   const isImporting = item?.status === DownloadStatus.Processing || item?.status === DownloadStatus.Downloading;
+  const isComplete = item?.status === DownloadStatus.Complete;
   const downloadProgress = item?.progress || null;
   const importStatus = item?.status === DownloadStatus.Downloading ? 'Downloading file...' :
                        item?.status === DownloadStatus.Processing ? 'Processing...' : 'Preparing...';
@@ -212,7 +213,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
             <div className="modal-header" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
               <div className="d-flex align-items-center gap-2">
                 <h5 className="modal-title text-light mb-0">
-                  Import to Stash
+                  {isComplete ? 'Import Details' : 'Import to Stash'}
                 </h5>
                 {queuePosition && totalPending && totalPending > 1 && (
                   <span className="badge bg-info" style={{ fontSize: '0.75rem' }}>
@@ -282,6 +283,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                     onSave={handleSave}
                     onCancel={handleCancel}
                     onRemove={onRemoveItem ? handleRemove : undefined}
+                    readOnly={isComplete}
                   />
                 </div>
               )}
@@ -290,9 +292,9 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
             {/* Modal Footer */}
             <div className="modal-footer" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
               <small className="flex-grow-1" style={{ color: '#8b9fad' }}>
-                {isImporting ? 'Please wait...' : 'Review and import to Stash'}
+                {isImporting ? 'Please wait...' : isComplete ? 'This item has been imported' : 'Review and import to Stash'}
               </small>
-              {!isImporting && onSkip && totalPending && totalPending > 1 && (
+              {!isImporting && !isComplete && onSkip && totalPending && totalPending > 1 && (
                 <button
                   type="button"
                   className="btn btn-outline-warning btn-sm"
@@ -300,6 +302,15 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                   title="Skip to next pending item"
                 >
                   Skip →
+                </button>
+              )}
+              {isComplete && (
+                <button
+                  type="button"
+                  className="btn btn-outline-light btn-sm"
+                  onClick={handleCancel}
+                >
+                  Close
                 </button>
               )}
             </div>

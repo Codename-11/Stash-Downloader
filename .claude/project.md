@@ -31,12 +31,14 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Server-side downloads via yt-dlp (bypasses CORS)
    - **Queue persistence**: Download queue survives navigation and page refresh via localStorage
 
-2. **Metadata Preview**
-   - Automatic metadata extraction from sources
-   - Server-side scraping via yt-dlp Python backend (no CORS issues)
-   - Extracts video URLs, thumbnails, descriptions, etc.
+2. **Metadata Extraction & Editing**
+   - Automatic metadata extraction from sources via yt-dlp
+   - Server-side scraping via Python backend (no CORS issues)
+   - Extracts video URLs, thumbnails, performers, tags, studio, etc.
    - Preview scraped metadata before import (title, thumbnail, duration, quality)
-   - Editable title field for customization
+   - **Editable metadata**: Title, performers, tags, studio - all editable before import
+   - **Auto-creation**: Missing performers/tags/studios are auto-created in Stash
+   - **Cover image**: Scraped thumbnail automatically set as scene cover
 
 3. **Content Type Support**
    - **Video**: Via YtDlpScraper (primary), supports most video sites
@@ -72,6 +74,7 @@ JavaScript Extension / Web-UI Plugin for Stash
    - HTTP/SOCKS proxy support for bypassing geo-restrictions and IP blocks
    - SSL certificate verification automatically disabled when using proxy (handles self-signed certs)
    - Configured via Stash plugin settings
+   - **SOCKS note**: Video downloads (yt-dlp) have built-in SOCKS support. Cover image fetching falls back to direct connection if PySocks isn't installed (image CDNs typically don't need proxies)
 
 8. **Browser Extension**
    - Firefox extension for sending URLs to queue from any page

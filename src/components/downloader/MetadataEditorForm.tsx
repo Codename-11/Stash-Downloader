@@ -21,6 +21,7 @@ interface MetadataEditorFormProps {
   onSave: (editedMetadata: IDownloadItem['editedMetadata'], postImportAction: PostImportAction) => void;
   onCancel: () => void;
   onRemove?: () => void;
+  readOnly?: boolean;
 }
 
 export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
@@ -28,6 +29,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   onSave,
   onCancel,
   onRemove,
+  readOnly = false,
 }) => {
   const { settings } = useSettings();
   const [title, setTitle] = useState(item.editedMetadata?.title || item.metadata?.title || '');
@@ -145,8 +147,8 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   return (
     <div className="card text-light" style={{ backgroundColor: '#30404d', borderColor: '#394b59' }}>
       <div className="card-header d-flex justify-content-between align-items-center" style={{ backgroundColor: '#243340', borderColor: '#394b59' }}>
-        <h6 className="mb-0">Import Preview</h6>
-        {onRemove && (
+        <h6 className="mb-0">{readOnly ? 'Imported Metadata' : 'Import Preview'}</h6>
+        {!readOnly && onRemove && (
           <button
             type="button"
             className="btn btn-sm btn-outline-danger"
@@ -251,7 +253,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
               />
             </div>
 
-            {/* Title (editable) */}
+            {/* Title (editable unless readOnly) */}
             <div>
               <label htmlFor="title" className="form-label" style={{ color: '#8b9fad' }}>
                 Title
@@ -262,32 +264,35 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                 className="form-control text-light"
                 style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => !readOnly && setTitle(e.target.value)}
                 placeholder="Enter title..."
+                readOnly={readOnly}
               />
             </div>
 
-            {/* Post-Import Action */}
-            <div>
-              <label className="form-label" style={{ color: '#8b9fad' }}>
-                Additional Processing
-              </label>
-              <select
-                className="form-select text-light"
-                style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
-                value={postImportAction}
-                onChange={(e) => setPostImportAction(e.target.value as PostImportAction)}
-              >
-                <option value="none">None - Keep scraped metadata only</option>
-                <option value="identify">Identify - Also match via StashDB fingerprints</option>
-                <option value="scrape_url">Scrape URL - Also try Stash scrapers</option>
-              </select>
-              <small className="text-muted d-block mt-1">
-                {postImportAction === 'none' && 'Scraped metadata (performers, tags, studio) will be applied. No additional processing.'}
-                {postImportAction === 'identify' && 'After applying scraped metadata, Stash will also match fingerprints against StashDB.'}
-                {postImportAction === 'scrape_url' && 'After applying scraped metadata, Stash will also try its scrapers (may find additional info).'}
-              </small>
-            </div>
+            {/* Post-Import Action - hide in read-only mode */}
+            {!readOnly && (
+              <div>
+                <label className="form-label" style={{ color: '#8b9fad' }}>
+                  Additional Processing
+                </label>
+                <select
+                  className="form-select text-light"
+                  style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
+                  value={postImportAction}
+                  onChange={(e) => setPostImportAction(e.target.value as PostImportAction)}
+                >
+                  <option value="none">None - Keep scraped metadata only</option>
+                  <option value="identify">Identify - Also match via StashDB fingerprints</option>
+                  <option value="scrape_url">Scrape URL - Also try Stash scrapers</option>
+                </select>
+                <small className="text-muted d-block mt-1">
+                  {postImportAction === 'none' && 'Scraped metadata (performers, tags, studio) will be applied. No additional processing.'}
+                  {postImportAction === 'identify' && 'After applying scraped metadata, Stash will also match fingerprints against StashDB.'}
+                  {postImportAction === 'scrape_url' && 'After applying scraped metadata, Stash will also try its scrapers (may find additional info).'}
+                </small>
+              </div>
+            )}
 
             {/* Performers Section */}
             <div className="p-3 rounded" style={{ backgroundColor: '#243340', border: '1px solid #394b59' }}>
@@ -315,13 +320,15 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                         style={{ fontSize: '0.85rem' }}
                       >
                         {name}
-                        <button
-                          type="button"
-                          className="btn-close btn-close-white"
-                          style={{ fontSize: '0.5rem', padding: '0.25rem' }}
-                          onClick={() => removePerformer(name)}
-                          title="Remove"
-                        />
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            className="btn-close btn-close-white"
+                            style={{ fontSize: '0.5rem', padding: '0.25rem' }}
+                            onClick={() => removePerformer(name)}
+                            title="Remove"
+                          />
+                        )}
                       </span>
                     ))}
                     {performers.length === 0 && (
@@ -329,26 +336,28 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                     )}
                   </div>
 
-                  {/* Add performer input */}
-                  <div className="input-group input-group-sm">
-                    <input
-                      type="text"
-                      className="form-control text-light"
-                      style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
-                      placeholder="Add performer..."
-                      value={newPerformer}
-                      onChange={(e) => setNewPerformer(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPerformer())}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-success"
-                      onClick={addPerformer}
-                      disabled={!newPerformer.trim()}
-                    >
-                      +
-                    </button>
-                  </div>
+                  {/* Add performer input - only in edit mode */}
+                  {!readOnly && (
+                    <div className="input-group input-group-sm">
+                      <input
+                        type="text"
+                        className="form-control text-light"
+                        style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
+                        placeholder="Add performer..."
+                        value={newPerformer}
+                        onChange={(e) => setNewPerformer(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPerformer())}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-success"
+                        onClick={addPerformer}
+                        disabled={!newPerformer.trim()}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -379,13 +388,15 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                         style={{ fontSize: '0.8rem' }}
                       >
                         {name}
-                        <button
-                          type="button"
-                          className="btn-close btn-close-white"
-                          style={{ fontSize: '0.45rem', padding: '0.2rem' }}
-                          onClick={() => removeTag(name)}
-                          title="Remove"
-                        />
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            className="btn-close btn-close-white"
+                            style={{ fontSize: '0.45rem', padding: '0.2rem' }}
+                            onClick={() => removeTag(name)}
+                            title="Remove"
+                          />
+                        )}
                       </span>
                     ))}
                     {tags.length === 0 && (
@@ -393,26 +404,28 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                     )}
                   </div>
 
-                  {/* Add tag input */}
-                  <div className="input-group input-group-sm">
-                    <input
-                      type="text"
-                      className="form-control text-light"
-                      style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
-                      placeholder="Add tag..."
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-success"
-                      onClick={addTag}
-                      disabled={!newTag.trim()}
-                    >
-                      +
-                    </button>
-                  </div>
+                  {/* Add tag input - only in edit mode */}
+                  {!readOnly && (
+                    <div className="input-group input-group-sm">
+                      <input
+                        type="text"
+                        className="form-control text-light"
+                        style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
+                        placeholder="Add tag..."
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline-success"
+                        onClick={addTag}
+                        disabled={!newTag.trim()}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -427,11 +440,12 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   type="text"
                   className="form-control text-light"
                   style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
-                  placeholder="Studio name..."
+                  placeholder={readOnly ? '(none)' : 'Studio name...'}
                   value={studio}
-                  onChange={(e) => setStudio(e.target.value)}
+                  onChange={(e) => !readOnly && setStudio(e.target.value)}
+                  readOnly={readOnly}
                 />
-                {studio && (
+                {!readOnly && studio && (
                   <button
                     type="button"
                     className="btn btn-outline-danger"
@@ -445,14 +459,16 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="d-flex gap-2">
-              <button type="submit" className="btn btn-success flex-grow-1">
-                📥 Import to Stash
-              </button>
-              <button type="button" className="btn btn-outline-light" onClick={onCancel}>
-                Cancel
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="d-flex gap-2">
+                <button type="submit" className="btn btn-success flex-grow-1">
+                  📥 Import to Stash
+                </button>
+                <button type="button" className="btn btn-outline-light" onClick={onCancel}>
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </form>
       </div>

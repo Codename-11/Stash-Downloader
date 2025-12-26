@@ -109,12 +109,14 @@ query GetPluginSettings($include: [ID!]) {
 - Server-side downloads using yt-dlp
 - Quality selection (best, 1080p, 720p, 480p)
 - Metadata extraction without downloading
+- **Cover image fetching**: Fetches thumbnail URLs server-side (bypasses browser CSP)
 - Invoked via Stash's `runPluginTask` and `runPluginOperation` mutations
 - File-based result passing: saves results to `{pluginDir}/results/` for async retrieval
 - Configurable download directory via `serverDownloadPath` setting (default: `/data/StashDownloader`)
 - HTTP/HTTPS/SOCKS proxy support via `httpProxy` setting (for bypassing geo-restrictions, IP blocks, rate limits)
 - SSL certificate verification disabled when using proxy (many proxies use self-signed certs or do SSL interception)
 - Proxy URL format: `http://user:pass@host:port`, `https://user:pass@host:port`, `socks5://user:pass@host:port`, `socks5h://user:pass@host:port`
+- **SOCKS fallback**: Image fetching falls back to direct connection if PySocks not installed (yt-dlp has built-in SOCKS support for video downloads)
 
 ### PluginOutput Format (Critical for `runPluginOperation`)
 
@@ -300,9 +302,12 @@ DownloaderPlugin (Route Container)
 ├── LogViewer (Activity Log with filters)
 ├── EditMetadataModal (when editing)
 │   └── MetadataEditorForm
-│       ├── Thumbnail preview
+│       ├── Thumbnail preview (clickable for full size)
 │       ├── Title editor
-│       └── Post-import action selector
+│       ├── Performers section (collapsible, add/remove)
+│       ├── Tags section (collapsible, add/remove)
+│       ├── Studio input (editable text)
+│       └── Post-import action selector (None/Identify/Scrape URL)
 └── Modals (InfoModal, ItemLogModal, AboutModal)
 ```
 
