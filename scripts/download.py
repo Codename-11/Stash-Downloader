@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -375,7 +376,6 @@ def download_direct_file(
     Returns:
         Path to downloaded file, or None if failed
     """
-    import time
     import requests
     from urllib.parse import urlparse, unquote, parse_qs
 
@@ -654,8 +654,6 @@ def download_video(
             stderr=subprocess.STDOUT,  # Merge stderr into stdout
             env=env,  # Pass environment with TERM=xterm to enable progress output
         )
-
-        import time
 
         stdout_lines = []  # To capture the final file path
         last_progress_update = 0

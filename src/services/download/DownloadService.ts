@@ -230,6 +230,12 @@ export class DownloadService {
         return { success: false, error: 'Failed to read download result', jobId };
       }
 
+      // Check if result file wasn't found (download may have failed before writing result)
+      if (result.retrieved === false || result.not_found) {
+        log.error('Download result file not found - download may have failed silently');
+        return { success: false, error: 'Download failed - no result file was created. Check Stash logs for details.', jobId };
+      }
+
       // Check for task_error (renamed from result_error/error to avoid GraphQL error interpretation)
       if (result.task_error) {
         log.error('Download task error:', result.task_error);
@@ -246,7 +252,8 @@ export class DownloadService {
       const fileSize = result.file_size;
 
       if (!filePath) {
-        log.error('Download completed but no file_path in result');
+        // Log full result for debugging
+        log.error('Download completed but no file_path in result. Full result:', JSON.stringify(result));
         return { success: false, error: 'Download completed but no file_path in result', jobId };
       }
 
