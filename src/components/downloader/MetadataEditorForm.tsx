@@ -159,7 +159,28 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       const scraperRegistry = getScraperRegistry();
       const metadata = await scraperRegistry.scrape(item.url);
 
-      log.addLog('success', 'scrape', `Successfully scraped metadata: ${metadata.title || item.url}`);
+      // Build detailed log for re-scrape
+      const logDetails: string[] = [
+        `Title: ${metadata.title || 'N/A'}`,
+      ];
+      if (metadata.videoUrl) {
+        const truncatedUrl = metadata.videoUrl.length > 80 ? metadata.videoUrl.substring(0, 80) + '...' : metadata.videoUrl;
+        logDetails.push(`Video URL: ${truncatedUrl}`);
+      }
+      if (metadata.quality) {
+        logDetails.push(`Quality: ${metadata.quality}`);
+      }
+      if (metadata.availableQualities?.length) {
+        logDetails.push(`Available Qualities: ${metadata.availableQualities.join(', ')}`);
+      }
+      if (metadata.performers?.length) {
+        logDetails.push(`Performers: ${metadata.performers.join(', ')}`);
+      }
+      if (metadata.tags?.length) {
+        logDetails.push(`Tags: ${metadata.tags.length}`);
+      }
+
+      log.addLog('success', 'scrape', `Re-scraped metadata: ${metadata.title || item.url}`, logDetails.join('\n'));
 
       // Update form fields with scraped data
       if (metadata.title) setTitle(metadata.title);

@@ -220,17 +220,34 @@ export const QueuePage: React.FC = () => {
           `Thumbnail: ${metadata.thumbnailUrl ? 'Available ✓' : 'N/A'}`,
         ];
 
-        // Video/Image URL info
+        // Video/Image URL info with actual URLs for troubleshooting
         if (metadata.videoUrl) {
-          logDetails.push(`Video URL: Extracted ✓`);
+          // Truncate URL but show enough to identify the source
+          const truncatedUrl = metadata.videoUrl.length > 80
+            ? metadata.videoUrl.substring(0, 80) + '...'
+            : metadata.videoUrl;
+          logDetails.push(`Video URL: ${truncatedUrl}`);
         }
         if (metadata.imageUrl) {
-          logDetails.push(`Image URL: Extracted ✓`);
+          const truncatedUrl = metadata.imageUrl.length > 80
+            ? metadata.imageUrl.substring(0, 80) + '...'
+            : metadata.imageUrl;
+          logDetails.push(`Image URL: ${truncatedUrl}`);
+        }
+
+        // Quality info
+        if (metadata.quality) {
+          logDetails.push(`Quality: ${metadata.quality}`);
+        }
+        if (metadata.availableQualities?.length) {
+          logDetails.push(`Available Qualities: ${metadata.availableQualities.join(', ')}`);
         }
 
         // Duration for videos
         if (metadata.duration) {
-          logDetails.push(`Duration: ${metadata.duration}s`);
+          const mins = Math.floor(metadata.duration / 60);
+          const secs = metadata.duration % 60;
+          logDetails.push(`Duration: ${mins}m ${secs}s`);
         }
 
         // Performers/Tags/Studio
