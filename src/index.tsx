@@ -81,7 +81,10 @@ function addNavButtonViaMutationObserver() {
     navButton.id = NAV_BUTTON_ID;
     navButton.className = 'btn nav-link d-flex align-items-center gap-1';
     navButton.type = 'button';
-    navButton.title = 'Open Stash Downloader';
+    navButton.title = `Open ${PLUGIN_NAME}`;
+
+    // Derive short name for navbar (e.g., "Downloader" or "Downloader-Dev")
+    const navLabel = PLUGIN_NAME.includes('(Dev)') ? 'Downloader-Dev' : 'Downloader';
 
     // Add download icon SVG
     navButton.innerHTML = `
@@ -89,7 +92,7 @@ function addNavButtonViaMutationObserver() {
         <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
         <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
       </svg>
-      <span>Downloader</span>
+      <span>${navLabel}</span>
     `;
 
     // Handle click to navigate via React Router

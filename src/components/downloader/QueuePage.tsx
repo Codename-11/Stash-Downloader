@@ -21,7 +21,7 @@ import { DownloadStatus } from '@/types';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
 import { createLogger } from '@/utils';
 import { useSettings } from '@/hooks';
-import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID } from '@/constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID, PLUGIN_NAME } from '@/constants';
 import type { IPluginSettings } from '@/types';
 import logoSvg from '@/assets/logo.svg';
 
@@ -497,21 +497,22 @@ export const QueuePage: React.FC = () => {
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
         <div className="d-flex flex-column gap-3">
-          {/* Logo and Info Button */}
+          {/* Logo, Title, and Info Button */}
           <div className="d-flex align-items-center justify-content-between mb-2">
-            <div className="d-flex align-items-center gap-3" style={{ border: '1px dashed rgba(255,255,255,0.3)', padding: '8px', borderRadius: '4px', width: 'fit-content' }}>
+            <div className="d-flex align-items-center gap-3">
               <img
                 src={logoSvg}
                 alt="Stash Downloader Logo"
                 style={{ width: '40px', height: '40px' }}
               />
+              <h4 className="mb-0 text-light">{PLUGIN_NAME}</h4>
             </div>
             <button
               type="button"
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-outline-light btn-sm"
               onClick={() => setShowAboutModal(true)}
-              title="About Stash Downloader"
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              title={`About ${PLUGIN_NAME}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 14.5a6.5 6.5 0 110-13 6.5 6.5 0 010 13z" />
