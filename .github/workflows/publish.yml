@@ -370,17 +370,17 @@ jobs:
           # Also save for fallback
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
 
-      - name: Generate release summary with Claude
+      - name: Generate release summary with Gemini
         id: summary
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           COMMITS=$(cat /tmp/commits.txt)
           VERSION="${{ needs.deploy-stable.outputs.version }}"
 
           # Skip if no API key configured
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "No ANTHROPIC_API_KEY configured, skipping AI summary"
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY configured, skipping AI summary"
             echo "has_summary=false" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -401,24 +401,21 @@ jobs:
           - Keep it brief - one line per bullet point
           - Output ONLY the bullet points, no headers or extra text"
 
-          # Call Claude API
-          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+          # Call Gemini API (free tier: 15 req/min, 1M tokens/day)
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
-            -H "x-api-key: $ANTHROPIC_API_KEY" \
-            -H "anthropic-version: 2023-06-01" \
             -d "$(jq -n \
               --arg prompt "$PROMPT" \
               '{
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 500,
-                messages: [{role: "user", content: $prompt}]
+                contents: [{parts: [{text: $prompt}]}],
+                generationConfig: {maxOutputTokens: 500}
               }')")
 
-          # Extract text from response
-          SUMMARY=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+          # Extract text from Gemini response
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
 
           if [ -z "$SUMMARY" ]; then
-            echo "Claude API error or empty response:"
+            echo "Gemini API error or empty response:"
             echo "$RESPONSE" | head -c 500
             echo "has_summary=false" >> $GITHUB_OUTPUT
           else

@@ -348,7 +348,17 @@ git push origin vX.Y.Z
 1. GitHub Actions runs CI (tests, lint, type-check)
 2. Plugin is built and packaged
 3. GitHub Pages index.yml is updated (only on tags, not on regular pushes)
-4. GitHub Release is created with auto-generated changelog + ZIP attached
+4. AI generates "What's New" summary (if `GOOGLE_API_KEY` configured)
+5. GitHub Release is created with release notes + ZIP attached
+
+**AI Release Notes (Optional):**
+Release notes are auto-generated using Google Gemini (free tier: 15 req/min, 1M tokens/day).
+
+To enable:
+1. Get API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Add `GOOGLE_API_KEY` as repository secret (Settings → Secrets → Actions)
+
+Without the key, releases still work but skip the "What's New" AI summary.
 
 **Note:** Regular pushes to main only run the test job. The plugin index is NOT updated on every push - this prevents false "update available" notifications in Stash.
 
