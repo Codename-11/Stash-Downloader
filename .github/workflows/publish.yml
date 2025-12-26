@@ -408,7 +408,7 @@ jobs:
               --arg prompt "$PROMPT" \
               '{
                 contents: [{parts: [{text: $prompt}]}],
-                generationConfig: {maxOutputTokens: 1024}
+                generationConfig: {maxOutputTokens: 10000}
               }')")
 
           # Debug: show finish reason

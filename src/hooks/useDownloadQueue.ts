@@ -115,9 +115,17 @@ export function useDownloadQueue() {
     setItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const updateItem = useCallback((id: string, updates: Partial<IDownloadItem>) => {
+  const updateItem = useCallback((
+    id: string,
+    updates: Partial<IDownloadItem> | ((currentItem: IDownloadItem) => Partial<IDownloadItem>)
+  ) => {
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        // Support functional updates to avoid stale closure issues
+        const actualUpdates = typeof updates === 'function' ? updates(item) : updates;
+        return { ...item, ...actualUpdates };
+      })
     );
   }, []);
 

@@ -28,7 +28,7 @@ interface EditMetadataModalProps {
   open: boolean;
   onClose: () => void;
   onComplete: (itemId: string, stashId: string) => void;
-  onUpdateItem?: (id: string, updates: Partial<IDownloadItem>) => void;
+  onUpdateItem?: (id: string, updates: Partial<IDownloadItem> | ((currentItem: IDownloadItem) => Partial<IDownloadItem>)) => void;
   // Queue position for multi-item workflow
   queuePosition?: number; // 1-indexed current position
   totalPending?: number; // Total pending items
@@ -214,17 +214,16 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         },
         onLog: (level, message, details) => {
           // Add log entry to item's logs array
-          const currentItem = item;
+          // Use functional update to avoid stale closure issues
           const newLog = {
             timestamp: new Date(),
             level,
             message,
             details,
           };
-          const existingLogs = currentItem.logs || [];
-          onUpdateItem(item.id, {
-            logs: [...existingLogs, newLog],
-          });
+          onUpdateItem(item.id, (currentItem) => ({
+            logs: [...(currentItem.logs || []), newLog],
+          }));
         },
       });
 
@@ -265,12 +264,12 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           message: `Import failed: ${formattedError}`,
           details: `URL: ${item.url}\nVideo URL: ${item.metadata?.videoUrl || 'none'}\n${errorStack || ''}`,
         };
-        const existingLogs = item.logs || [];
-        onUpdateItem(item.id, {
+        // Use functional update to avoid stale closure issues
+        onUpdateItem(item.id, (currentItem) => ({
           status: DownloadStatus.Failed,
           error: formattedError,
-          logs: [...existingLogs, errorLog],
-        });
+          logs: [...(currentItem.logs || []), errorLog],
+        }));
       }
     }
   };
