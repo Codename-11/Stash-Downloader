@@ -126,7 +126,7 @@ jobs:
 
       - name: Generate plugin index
         run: |
-          CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
+          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %I:%M:%S %p %Z')
           VERSION=${{ steps.version.outputs.version }}
           STABLE_SHA256=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
 
@@ -299,7 +299,7 @@ jobs:
 
       - name: Generate plugin index
         run: |
-          CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
+          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %I:%M:%S %p %Z')
           VERSION=${{ steps.version.outputs.version }}
           BASE_VERSION=$(node -p "require('./package.json').version")
           DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
