@@ -150,6 +150,18 @@ function initializePlugin() {
     // Uses .navbar-buttons selector like other community plugins
     addNavButtonViaMutationObserver();
 
+    // Handle direct URL navigation (bookmark/link to plugin route)
+    // When user navigates directly to /plugin/stash-downloader-dev, the route
+    // isn't registered yet when React Router first evaluates. Re-trigger navigation
+    // now that the route is registered.
+    if (window.location.pathname === ROUTES.MAIN) {
+      log.debug('Direct URL navigation detected, re-triggering route...');
+      // Small delay to ensure route registration is complete
+      setTimeout(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, 50);
+    }
+
   } catch (error) {
     log.error(`Failed to initialize: ${String(error)}`);
     throw error;
