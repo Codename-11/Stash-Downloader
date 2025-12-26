@@ -338,6 +338,89 @@
       user-select: all;
     }
 
+    /* Browser Extension */
+    .extension {
+      padding: 80px 0;
+    }
+
+    .extension-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    .extension-tagline {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+    }
+
+    .extension-features {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .ext-feature {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .ext-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .ext-feature strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .ext-feature p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .extension-cta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .ext-badge {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg-card);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .extension-preview {
+      display: flex;
+      justify-content: center;
+    }
+
+    .extension-img {
+      max-width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+    }
+
     /* Supported Sites */
     .sites {
       padding: 80px 0;
@@ -408,6 +491,18 @@
       .features-grid {
         grid-template-columns: 1fr;
       }
+
+      .extension-content {
+        grid-template-columns: 1fr;
+      }
+
+      .extension-preview {
+        order: -1;
+      }
+
+      .extension-img {
+        max-width: 300px;
+      }
     }
   </style>
 </head>
@@ -420,6 +515,7 @@
       </div>
       <nav class="nav-links">
         <a href="#features">Features</a>
+        <a href="#extension">Extension</a>
         <a href="#installation">Install</a>
         <a href="docs.html">Docs</a>
         <a href="https://github.com/Codename-11/Stash-Downloader" class="github-btn">
@@ -537,22 +633,92 @@
           <div class="install-step">
             <span class="step-number">1</span>
             <h4>Download Extension</h4>
-            <p>Get the latest extension from <a href="https://github.com/Codename-11/Stash-Downloader/releases">GitHub Releases</a></p>
+            <p>Get the latest <code>stash-downloader-extension.zip</code> from <a href="https://github.com/Codename-11/Stash-Downloader/releases">GitHub Releases</a></p>
           </div>
           <div class="install-step">
             <span class="step-number">2</span>
             <h4>Install in Firefox</h4>
-            <p>Go to <strong>about:addons</strong>, click the gear icon, and select "Install Add-on From File"</p>
+            <p>Navigate to <strong>about:addons</strong>, click the gear icon (&#9881;), and select <strong>"Install Add-on From File..."</strong></p>
+            <p>Select the downloaded ZIP file to install.</p>
           </div>
           <div class="install-step">
             <span class="step-number">3</span>
-            <h4>Configure Stash URL</h4>
-            <p>Click the extension icon and enter your Stash server URL (e.g., <code>http://localhost:9999</code>)</p>
+            <h4>Configure Connection</h4>
+            <p>Click the extension icon in your toolbar, then click the gear icon (&#9881;) to open settings:</p>
+            <ul style="margin-top: 8px; padding-left: 56px; color: var(--text-muted);">
+              <li><strong>Stash URL:</strong> Your Stash server address (e.g., <code>http://localhost:9999</code>)</li>
+              <li><strong>API Key:</strong> Required if Stash authentication is enabled (Settings → Security)</li>
+            </ul>
           </div>
           <div class="install-step">
             <span class="step-number">4</span>
-            <h4>Send URLs</h4>
-            <p>Right-click any link and select "Send to Stash Downloader" or use the extension popup</p>
+            <h4>Start Sending URLs</h4>
+            <p>You're ready! Use the extension in three ways:</p>
+            <ul style="margin-top: 8px; padding-left: 56px; color: var(--text-muted);">
+              <li><strong>Right-click a link</strong> → "Send to Stash Downloader" → Choose content type</li>
+              <li><strong>Highlight a URL</strong> → Right-click → "Send to Stash Downloader"</li>
+              <li><strong>Click extension icon</strong> → Send current page URL via popup</li>
+            </ul>
+          </div>
+          <div class="install-step" style="background: rgba(74, 158, 255, 0.1); border-color: var(--accent);">
+            <span class="step-number" style="background: var(--accent);">&#10003;</span>
+            <h4>Verify Connection</h4>
+            <p>The extension icon shows connection status: <strong style="color: #28a745;">green</strong> = connected, <strong style="color: #dc3545;">red</strong> = disconnected. URLs appear in your Stash Downloader queue instantly when connected!</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="extension" id="extension">
+      <div class="container">
+        <h2 class="section-title">Browser Extension</h2>
+        <div class="extension-content">
+          <div class="extension-info">
+            <p class="extension-tagline">Send URLs directly to your Stash Downloader queue from any webpage with one click.</p>
+
+            <div class="extension-features">
+              <div class="ext-feature">
+                <span class="ext-icon">&#128433;</span>
+                <div>
+                  <strong>Right-Click Menu</strong>
+                  <p>Send links, images, videos, or highlighted text directly to your queue</p>
+                </div>
+              </div>
+              <div class="ext-feature">
+                <span class="ext-icon">&#9889;</span>
+                <div>
+                  <strong>Real-Time Updates</strong>
+                  <p>URLs appear instantly in open Stash tabs - no page refresh needed</p>
+                </div>
+              </div>
+              <div class="ext-feature">
+                <span class="ext-icon">&#127916;</span>
+                <div>
+                  <strong>Content Type Detection</strong>
+                  <p>Choose Video, Image, or Gallery - auto-detects based on URL patterns</p>
+                </div>
+              </div>
+              <div class="ext-feature">
+                <span class="ext-icon">&#128274;</span>
+                <div>
+                  <strong>Secure Connection</strong>
+                  <p>Supports API key authentication for protected Stash instances</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="extension-cta">
+              <a href="#installation" class="btn btn-primary" onclick="document.querySelector('[data-tab=extension]').click()">
+                Install Extension
+              </a>
+              <span class="ext-badge">
+                <img src="https://www.mozilla.org/media/protocol/img/logos/firefox/browser/logo.svg" alt="Firefox" width="18" height="18" style="margin-right: 6px;">
+                Firefox
+              </span>
+            </div>
+          </div>
+          <div class="extension-preview">
+            <img src="extension-screenshot.png" alt="Browser Extension Screenshot" class="extension-img">
           </div>
         </div>
       </div>
