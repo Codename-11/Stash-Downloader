@@ -85,8 +85,21 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
 
   console.log('[Stash Downloader] Looking for tabs matching:', `${stashOrigin}/*`);
 
+  // Debug: List ALL tabs to see what's available
+  const allTabs = await browser.tabs.query({});
+  console.log('[Stash Downloader] All tabs:', allTabs.map(t => t.url));
+
   // Find tabs on the Stash domain
   const stashTabs = await browser.tabs.query({ url: `${stashOrigin}/*` });
+
+  // If URL pattern didn't work, try manual filtering
+  if (stashTabs.length === 0) {
+    const manualMatch = allTabs.filter(t => t.url && t.url.startsWith(stashOrigin));
+    console.log('[Stash Downloader] Manual filter found:', manualMatch.length, 'tabs');
+    if (manualMatch.length > 0) {
+      stashTabs.push(...manualMatch);
+    }
+  }
 
   console.log('[Stash Downloader] Found', stashTabs.length, 'Stash tab(s)');
 
