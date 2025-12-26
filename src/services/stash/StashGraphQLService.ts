@@ -1037,6 +1037,178 @@ export class StashGraphQLService {
     log.debug('Triggering scan for directory:', directory);
     return this.triggerScan([directory]);
   }
+
+  /**
+   * Wait for a job to complete
+   * Returns true if job finished successfully, false otherwise
+   */
+  async waitForJob(
+    jobId: string,
+    options?: {
+      pollIntervalMs?: number;
+      maxWaitMs?: number;
+      onProgress?: (progress: number) => void;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    const pollInterval = options?.pollIntervalMs || 500;
+    const maxWait = options?.maxWaitMs || 120000; // 2 minutes default
+
+    log.debug(`Waiting for job: ${jobId}`);
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      const job = await this.findJob(jobId);
+      if (!job) {
+        // Job not found - may have completed very quickly
+        log.debug(`Job ${jobId} not found, assuming completed`);
+        return { success: true };
+      }
+
+      log.debug(`Job ${jobId} status: ${job.status}, progress: ${job.progress || 0}`);
+
+      if (options?.onProgress && job.progress !== undefined) {
+        options.onProgress(job.progress);
+      }
+
+      switch (job.status) {
+        case 'FINISHED':
+          log.debug(`Job ${jobId} finished successfully`);
+          return { success: true };
+
+        case 'FAILED':
+          log.error(`Job ${jobId} failed: ${job.error || 'Unknown error'}`);
+          return { success: false, error: job.error || 'Job failed' };
+
+        case 'CANCELLED':
+        case 'STOPPING':
+          log.warn(`Job ${jobId} was cancelled`);
+          return { success: false, error: 'Job was cancelled' };
+
+        case 'READY':
+        case 'RUNNING':
+          // Continue polling
+          break;
+      }
+    }
+
+    // Timeout
+    log.warn(`Job ${jobId} timed out after ${maxWait}ms`);
+    return { success: false, error: 'Job timed out' };
+  }
+
+  /**
+   * Find a scene by file path
+   */
+  async findSceneByPath(filePath: string): Promise<IStashScene | null> {
+    const query = `
+      query FindSceneByPath($path: String!) {
+        findScenes(
+          scene_filter: { path: { value: $path, modifier: EQUALS } }
+          filter: { per_page: 1 }
+        ) {
+          scenes {
+            id
+            title
+            details
+            url
+            date
+            rating100
+            organized
+            created_at
+            updated_at
+            files {
+              path
+            }
+            performers {
+              id
+              name
+            }
+            tags {
+              id
+              name
+            }
+            studio {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ findScenes: { scenes: IStashScene[] } }>(
+        query,
+        { path: filePath }
+      );
+      const scenes = result.data?.findScenes?.scenes || [];
+      if (scenes.length > 0) {
+        log.debug(`Found scene by path: ${scenes[0]!.id}`);
+        return scenes[0]!;
+      }
+      log.debug(`No scene found for path: ${filePath}`);
+      return null;
+    } catch (error) {
+      log.error(`findSceneByPath failed: ${String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing scene with metadata
+   */
+  async updateScene(sceneId: string, input: {
+    title?: string;
+    details?: string;
+    url?: string;
+    date?: string;
+    rating100?: number;
+    organized?: boolean;
+    performer_ids?: string[];
+    tag_ids?: string[];
+    studio_id?: string | null;
+  }): Promise<IStashScene> {
+    const mutation = `
+      mutation SceneUpdate($input: SceneUpdateInput!) {
+        sceneUpdate(input: $input) {
+          id
+          title
+          details
+          url
+          date
+          rating100
+          organized
+          created_at
+          updated_at
+          performers {
+            id
+            name
+          }
+          tags {
+            id
+            name
+          }
+          studio {
+            id
+            name
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ sceneUpdate: IStashScene }>(mutation, {
+      input: { id: sceneId, ...input },
+    });
+
+    if (!result.data?.sceneUpdate) {
+      throw new Error('Failed to update scene');
+    }
+
+    log.info(`Updated scene ${sceneId} with metadata`);
+    return result.data.sceneUpdate;
+  }
 }
 
 // Singleton instance

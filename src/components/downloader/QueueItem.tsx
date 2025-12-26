@@ -22,14 +22,36 @@ interface QueueItemProps {
   showThumbnail?: boolean;
 }
 
+// Helper to format elapsed time
+function formatElapsedTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+}
+
 export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, onViewLogs, onRescrapeClick, onRetry, availableScrapers, showThumbnail = true }) => {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewType, setPreviewType] = React.useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = React.useState('');
   const [rescrapeDropdownOpen, setRescrapeDropdownOpen] = React.useState(false);
   const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, left: 0 });
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Track elapsed time during download
+  React.useEffect(() => {
+    if (item.status !== DownloadStatus.Downloading && item.status !== DownloadStatus.Processing) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [item.status]);
 
   // Close dropdown when clicking outside
   React.useEffect(() => {
@@ -127,6 +149,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
     // If we have progress data, show it
     if (item.progress) {
       const { percentage, bytesDownloaded, totalBytes, speed } = item.progress;
+      const hasRealProgress = totalBytes > 0 || bytesDownloaded > 0 || speed > 0;
 
       return (
         <div className="mt-2">
@@ -143,7 +166,11 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
           <small className="text-muted d-block mt-1">
             {totalBytes > 0
               ? `${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)`
-              : `Downloaded: ${formatBytes(bytesDownloaded)} (${formatBytes(speed)}/s)`
+              : hasRealProgress
+                ? `Downloaded: ${formatBytes(bytesDownloaded)} (${formatBytes(speed)}/s)`
+                : elapsedSeconds > 0
+                  ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
+                  : 'Starting download...'
             }
           </small>
         </div>
@@ -157,7 +184,9 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
           <div className="progress-bar progress-bar-striped progress-bar-animated w-100" role="progressbar"></div>
         </div>
         <small className="text-muted d-block mt-1">
-          {item.status === DownloadStatus.Downloading ? 'Downloading...' : 'Processing...'}
+          {elapsedSeconds > 0
+            ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
+            : item.status === DownloadStatus.Downloading ? 'Starting download...' : 'Processing...'}
         </small>
       </div>
     );

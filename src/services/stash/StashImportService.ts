@@ -145,27 +145,92 @@ export class StashImportService {
 
       if (onLog) onLog('success', `File saved: ${serverFilePath}`);
 
-      // Log scan status
+      // Wait for scan to complete if we have a job ID
       if (scanJobId) {
-        if (onLog) onLog('info', `Stash scan triggered (Job: ${scanJobId})`);
-        if (onLog) onLog('success', 'Scene will be indexed automatically');
-      } else if (libraryPath) {
-        if (onLog) onLog('warning', 'Scan not triggered - run manual scan in Stash');
+        if (onLog) onLog('info', `Waiting for Stash scan to complete (Job: ${scanJobId})...`);
+        if (onStatusChange) onStatusChange('Waiting for scan...');
+
+        const scanResult = await this.stashService.waitForJob(scanJobId, {
+          pollIntervalMs: 1000,
+          maxWaitMs: 60000, // 1 minute max for scan
+        });
+
+        if (!scanResult.success) {
+          log.warn('Scan job did not complete successfully:', scanResult.error);
+          if (onLog) onLog('warning', `Scan may not have completed: ${scanResult.error}`);
+        } else {
+          if (onLog) onLog('success', 'Scan completed');
+        }
       }
 
-      // For server-side downloads, return a placeholder result
-      // The file is on disk and Stash scan will index it
-      // Metadata can be applied after scan finds the scene
-      return {
-        id: `pending-scan-${Date.now()}`,
-        title: item.editedMetadata?.title || 'Pending scan',
-        path: serverFilePath,
-        organized: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        files: [],
-        paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
-      } as IStashScene;
+      // Find the scene by file path
+      if (onStatusChange) onStatusChange('Finding scene in Stash...');
+      if (onLog) onLog('info', 'Looking for scene in Stash...');
+
+      // Try a few times with delay (scan might take a moment to index)
+      let scene: IStashScene | null = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        scene = await this.stashService.findSceneByPath(serverFilePath);
+        if (scene) break;
+
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        log.debug(`Retry ${attempt + 1}/5 finding scene by path`);
+      }
+
+      if (!scene) {
+        log.warn('Could not find scene by path after scan');
+        if (onLog) onLog('warning', 'Scene not found in Stash - metadata will not be applied');
+        if (onLog) onLog('info', 'You may need to run a manual scan and apply metadata');
+
+        // Return placeholder since we couldn't find the scene
+        return {
+          id: `pending-scan-${Date.now()}`,
+          title: item.editedMetadata?.title || 'Pending scan',
+          path: serverFilePath,
+          organized: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          files: [],
+          paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
+        } as IStashScene;
+      }
+
+      if (onLog) onLog('success', `Found scene in Stash (ID: ${scene.id})`);
+      log.info('Found scene after scan:', scene.id);
+
+      // Resolve performers, tags, and studio
+      if (onStatusChange) onStatusChange('Applying metadata...');
+      if (onLog) onLog('info', 'Resolving performers, tags, and studio...');
+
+      const performerIds = await this.resolvePerformers(
+        item.editedMetadata.performers || []
+      );
+      const tagIds = await this.resolveTags(item.editedMetadata.tags || []);
+      const studioId = item.editedMetadata.studio
+        ? await this.resolveStudio(item.editedMetadata.studio)
+        : undefined;
+
+      if (onLog) onLog('info', `Resolved ${performerIds.length} performers, ${tagIds.length} tags, ${studioId ? '1 studio' : '0 studios'}`);
+
+      // Update the scene with metadata
+      if (onLog) onLog('info', 'Updating scene with metadata...');
+
+      const updatedScene = await this.stashService.updateScene(scene.id, {
+        title: item.editedMetadata.title,
+        details: item.editedMetadata.description,
+        url: item.url,
+        date: item.editedMetadata.date,
+        rating100: item.editedMetadata.rating,
+        performer_ids: performerIds,
+        tag_ids: tagIds,
+        studio_id: studioId,
+      });
+
+      if (onLog) onLog('success', 'Metadata applied successfully!');
+      log.info('Scene updated with metadata:', updatedScene.id);
+
+      return updatedScene;
     }
 
     log.info('Download complete, file size:', `${blob.size} bytes`);
