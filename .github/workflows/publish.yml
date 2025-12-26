@@ -372,39 +372,60 @@ jobs:
 
       - name: Generate release summary with Claude
         id: summary
-        uses: anthropics/claude-code-action@v1
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Generate release notes for Stash Downloader v${{ needs.deploy-stable.outputs.version }}.
-
-            Commits since last release:
-            $(cat /tmp/commits.txt)
-
-            Instructions:
-            - Write 3-6 bullet points summarizing the most important changes
-            - Group related commits into single bullet points
-            - Use simple language, focus on user-facing changes
-            - Start each bullet with an emoji: ✨ for features, 🐛 for fixes, ⚡ for improvements, 🔧 for maintenance
-            - Do NOT include commit hashes
-            - Do NOT mention 'chore' or 'refactor' unless user-visible
-            - Keep it brief - one line per bullet point
-
-            Write ONLY the bullet points to /tmp/summary.txt using Bash. No headers, no extra text.
-            After writing, output "SUMMARY_WRITTEN" to confirm.
-          claude_args: '--allowed-tools "Bash(cat:*),Bash(echo:*),Write" --max-turns 2'
-        continue-on-error: true
-
-      - name: Check if summary was generated
-        id: check_summary
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          if [ -f /tmp/summary.txt ] && [ -s /tmp/summary.txt ]; then
-            echo "has_summary=true" >> $GITHUB_OUTPUT
-            echo "Summary generated:"
-            cat /tmp/summary.txt
-          else
+          COMMITS=$(cat /tmp/commits.txt)
+          VERSION="${{ needs.deploy-stable.outputs.version }}"
+
+          # Skip if no API key configured
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY configured, skipping AI summary"
             echo "has_summary=false" >> $GITHUB_OUTPUT
-            echo "No summary generated (Claude action may have failed or no token configured)"
+            exit 0
+          fi
+
+          # Build prompt
+          PROMPT="Generate release notes for Stash Downloader v${VERSION}, a plugin for Stash (media organization software).
+
+          Commits since last release:
+          ${COMMITS}
+
+          Instructions:
+          - Write 3-6 bullet points summarizing the most important changes
+          - Group related commits into single bullet points
+          - Use simple language, focus on user-facing changes
+          - Start each bullet with an emoji: ✨ for features, 🐛 for fixes, ⚡ for improvements, 🔧 for maintenance
+          - Do NOT include commit hashes
+          - Do NOT mention 'chore' or 'refactor' unless user-visible
+          - Keep it brief - one line per bullet point
+          - Output ONLY the bullet points, no headers or extra text"
+
+          # Call Claude API
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(jq -n \
+              --arg prompt "$PROMPT" \
+              '{
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 500,
+                messages: [{role: "user", content: $prompt}]
+              }')")
+
+          # Extract text from response
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+
+          if [ -z "$SUMMARY" ]; then
+            echo "Claude API error or empty response:"
+            echo "$RESPONSE" | head -c 500
+            echo "has_summary=false" >> $GITHUB_OUTPUT
+          else
+            echo "$SUMMARY" > /tmp/summary.txt
+            echo "has_summary=true" >> $GITHUB_OUTPUT
+            echo "Generated summary:"
+            cat /tmp/summary.txt
           fi
 
       - name: Build release body
@@ -420,7 +441,7 @@ jobs:
           sed -i "s/v$/v${VERSION}/" /tmp/release_body.md
 
           # Add AI summary if available
-          if [ "${{ steps.check_summary.outputs.has_summary }}" = "true" ]; then
+          if [ "${{ steps.summary.outputs.has_summary }}" = "true" ]; then
             echo "" >> /tmp/release_body.md
             echo "### ✨ What's New" >> /tmp/release_body.md
             echo "" >> /tmp/release_body.md
@@ -458,9 +479,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ needs.deploy-stable.outputs.version }}
-          generate_release_notes: true
           body_path: /tmp/release_body.md
-          append_body: true
           files: stash-downloader.zip
           draft: false
           prerelease: false
