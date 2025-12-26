@@ -116,8 +116,12 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         status: DownloadStatus.Processing,
       };
 
-      // Initialize logs array
-      onUpdateItem(item.id, { logs: [] });
+      // Initialize logs array and set start time (for reconnection tracking)
+      onUpdateItem(item.id, {
+        logs: [],
+        startedAt: new Date(),
+        status: DownloadStatus.Processing,
+      });
 
       // Close modal immediately so import happens in background
       onClose();

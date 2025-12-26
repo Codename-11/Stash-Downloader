@@ -53,10 +53,30 @@ function loadQueue(): IDownloadItem[] {
 
     const items = deserializeQueue(stored);
 
-    // Reset any "downloading" items to "pending" (download was interrupted)
+    // For "downloading" items, check if they've been stuck for too long
+    // If started more than 15 minutes ago, assume interrupted and reset to pending
+    const MAX_DOWNLOAD_TIME_MS = 15 * 60 * 1000; // 15 minutes
+    const now = Date.now();
+
     return items.map(item => {
       if (item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing) {
-        return { ...item, status: DownloadStatus.Pending, progress: undefined };
+        const startTime = item.startedAt ? new Date(item.startedAt).getTime() : 0;
+        const elapsed = now - startTime;
+
+        if (elapsed > MAX_DOWNLOAD_TIME_MS || !item.startedAt) {
+          // Download was interrupted or took too long
+          log.info(`Resetting stale download: ${item.url} (elapsed: ${Math.round(elapsed / 1000)}s)`);
+          return {
+            ...item,
+            status: DownloadStatus.Pending,
+            progress: undefined,
+            error: 'Download was interrupted. Click retry to restart.',
+          };
+        }
+
+        // Still within timeout - keep status but clear progress (will need to reconnect)
+        log.info(`Keeping active download: ${item.url} (elapsed: ${Math.round(elapsed / 1000)}s)`);
+        return { ...item, progress: undefined };
       }
       return item;
     });

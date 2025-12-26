@@ -165,9 +165,9 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
           </div>
           <small className="text-muted d-block mt-1">
             {totalBytes > 0
-              ? `${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)`
+              ? `${percentage.toFixed(1)}% • ${formatBytes(bytesDownloaded)} / ${formatBytes(totalBytes)} (${formatBytes(speed)}/s)`
               : hasRealProgress
-                ? `Downloaded: ${formatBytes(bytesDownloaded)} (${formatBytes(speed)}/s)`
+                ? `Downloaded: ${formatBytes(bytesDownloaded)}${speed > 0 ? ` (${formatBytes(speed)}/s)` : ''}`
                 : elapsedSeconds > 0
                   ? `⏱ ${formatElapsedTime(elapsedSeconds)} elapsed${elapsedSeconds >= 5 ? ' • Working...' : ''}`
                   : 'Starting download...'

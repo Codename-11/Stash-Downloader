@@ -146,6 +146,10 @@ export interface IDownloadItem {
   existsInStash?: { id: string; title?: string }; // If scene already exists in Stash before import
   postImportAction?: PostImportAction; // Action to take after import (none, identify, scrape_url)
 
+  // Download tracking (for reconnecting after navigation)
+  downloadProgressId?: string; // Progress file ID for polling
+  downloadResultId?: string; // Result file ID for completion check
+
   // Logs for this specific item
   logs?: IItemLogEntry[];
 
