@@ -110,31 +110,44 @@ export class DownloadService {
 
       // Start progress polling in background
       let progressPollInterval: ReturnType<typeof setInterval> | null = null;
+      let pollCount = 0;
       if (options.onProgress) {
+        log.debug(`Starting progress polling with progressId: ${progressId}`);
         progressPollInterval = setInterval(async () => {
+          pollCount++;
           try {
             const progressResult = await stashService.runPluginOperation(PLUGIN_ID, {
               mode: 'read_result',
               result_id: `progress-${progressId}`,
             }) as any;
 
+            // Log every 5th poll to avoid spam
+            if (pollCount % 5 === 1 || progressResult?.retrieved) {
+              log.debug(`Progress poll #${pollCount}: retrieved=${progressResult?.retrieved}, status=${progressResult?.status}, pct=${progressResult?.percentage}`);
+            }
+
             // Check if we got progress data (retrieved=true means file was found)
             if (progressResult?.retrieved) {
               const status = progressResult.status;
               // Update progress for downloading or starting status
               if (status === 'downloading' || status === 'starting') {
-                options.onProgress!({
+                const progress = {
                   bytesDownloaded: progressResult.downloaded_bytes || 0,
                   totalBytes: progressResult.total_bytes || 0,
                   percentage: progressResult.percentage || 0,
                   speed: progressResult.speed || 0,
                   timeRemaining: progressResult.eta,
-                });
+                };
+                log.debug(`Progress update: ${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`);
+                options.onProgress!(progress);
               }
             }
             // not_found is expected early in download - silently ignore
-          } catch {
-            // Ignore progress polling errors - file might not exist yet
+          } catch (err) {
+            // Log error occasionally for debugging
+            if (pollCount === 1) {
+              log.debug(`Progress poll error (first attempt): ${err}`);
+            }
           }
         }, 1000); // Poll every second
       }

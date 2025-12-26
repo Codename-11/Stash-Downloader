@@ -359,7 +359,8 @@ def is_direct_file_url(url: str) -> bool:
 
 
 def download_direct_file(
-    url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None
+    url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None,
+    progress_id: Optional[str] = None
 ) -> Optional[str]:
     """
     Download a direct file URL using requests (no yt-dlp).
@@ -369,10 +370,12 @@ def download_direct_file(
         output_dir: Directory to save the file
         filename: Optional custom filename (will extract from URL if not provided)
         proxy: Optional HTTP/HTTPS/SOCKS proxy
+        progress_id: Optional ID for progress file updates (for frontend polling)
 
     Returns:
         Path to downloaded file, or None if failed
     """
+    import time
     import requests
     from urllib.parse import urlparse, unquote, parse_qs
 
@@ -447,16 +450,39 @@ def download_direct_file(
         # Get content length for progress
         total_size = int(response.headers.get("content-length", 0))
         downloaded = 0
+        last_progress_update = 0
+        progress_update_interval = 0.5  # Update every 0.5 seconds
+
+        # Create initial progress file
+        if progress_id:
+            log.info(f"Creating progress file for direct download: progress-{progress_id}")
+            save_result(f"progress-{progress_id}", {
+                "status": "starting",
+                "percentage": 0,
+                "downloaded_bytes": 0,
+                "total_bytes": total_size,
+            })
 
         with open(output_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
-                    if total_size > 0:
-                        progress = (downloaded / total_size) * 100
-                        if downloaded % (1024 * 1024) < 8192:  # Log every ~1MB
-                            log.debug(f"Download progress: {progress:.1f}% ({downloaded}/{total_size} bytes)")
+
+                    # Update progress file periodically
+                    current_time = time.time()
+                    if progress_id and total_size > 0 and (current_time - last_progress_update) >= progress_update_interval:
+                        pct = (downloaded / total_size) * 100
+                        save_result(f"progress-{progress_id}", {
+                            "status": "downloading",
+                            "percentage": pct,
+                            "downloaded_bytes": downloaded,
+                            "total_bytes": total_size,
+                        })
+                        last_progress_update = current_time
+                        log.info(f"Direct download progress: {pct:.1f}% ({downloaded}/{total_size} bytes)")
+                    elif total_size > 0 and downloaded % (1024 * 1024) < 8192:  # Log every ~1MB
+                        log.debug(f"Download progress: {(downloaded / total_size) * 100:.1f}% ({downloaded}/{total_size} bytes)")
 
         log.debug(f"Direct download complete: {output_path} ({downloaded} bytes)")
         return output_path
@@ -593,12 +619,21 @@ def download_video(
 
     # Create initial progress file so frontend knows download has started
     if progress_id:
-        save_result(f"progress-{progress_id}", {
+        progress_file_id = f"progress-{progress_id}"
+        log.info(f"Creating progress file: {progress_file_id}")
+        initial_progress = {
             "status": "starting",
             "percentage": 0,
             "downloaded_bytes": 0,
             "total_bytes": 0,
-        })
+        }
+        save_success = save_result(progress_file_id, initial_progress)
+        log.info(f"Progress file created: {save_success}")
+        # Verify file was created
+        result_path = get_result_path(progress_file_id)
+        log.info(f"Progress file path: {result_path}, exists: {os.path.exists(result_path)}")
+    else:
+        log.warning("No progress_id provided - progress tracking disabled")
 
     try:
         # Use Popen for streaming output to get real-time progress
@@ -630,22 +665,27 @@ def download_video(
         stdout_thread.start()
 
         # Read stderr for progress updates
+        lines_read = 0
+        progress_updates = 0
         if process.stderr:
+            log.info("Reading yt-dlp stderr for progress updates...")
             for line in process.stderr:
                 line = line.strip()
                 if not line:
                     continue
+                lines_read += 1
 
                 # Parse progress from yt-dlp output
                 progress = parse_ytdlp_progress(line)
                 if progress:
+                    progress_updates += 1
                     current_time = time.time()
                     # Update progress file periodically (not on every line)
                     if progress_id and (current_time - last_progress_update) >= progress_update_interval:
                         progress["status"] = "downloading"
                         save_result(f"progress-{progress_id}", progress)
                         last_progress_update = current_time
-                        log.debug(f"Progress: {progress['percentage']:.1f}% ({progress.get('speed', 0) / 1024 / 1024:.1f} MB/s)")
+                        log.info(f"Progress: {progress['percentage']:.1f}% ({progress.get('downloaded_bytes', 0)}/{progress.get('total_bytes', 0)} bytes)")
 
                     if progress_callback:
                         progress_callback(progress)
@@ -655,6 +695,7 @@ def download_video(
                         log.debug(f"yt-dlp: {line}")
                     elif "ERROR" in line or "error" in line.lower():
                         log.error(f"yt-dlp: {line}")
+            log.info(f"Finished reading stderr: {lines_read} lines, {progress_updates} progress updates")
 
         # Wait for process to complete
         process.wait()
@@ -749,7 +790,9 @@ def task_download(args: dict) -> dict:
     result_id = args.get("result_id")
     progress_id = args.get("progress_id")  # For real-time progress updates
 
-    # Log configuration for troubleshooting
+    # Log all received args for debugging
+    log.info(f"Download task received args: {list(args.keys())}")
+    log.info(f"Download task started: progress_id={progress_id}, result_id={result_id}")
     log.debug(f"[task_download] URL: {url}")
     if fallback_url:
         log.debug(f"[task_download] Fallback URL for yt-dlp: {fallback_url}")
@@ -769,8 +812,8 @@ def task_download(args: dict) -> dict:
 
     # Check if this is a direct file URL (try direct download first, fallback to yt-dlp)
     if is_direct_file_url(url):
-        log.debug(f"[task_download] Detected direct file URL, trying direct download first")
-        file_path = download_direct_file(url, output_dir, filename, proxy=proxy)
+        log.info(f"Detected direct file URL, trying direct download first")
+        file_path = download_direct_file(url, output_dir, filename, proxy=proxy, progress_id=progress_id)
 
         if file_path:
             file_size = os.path.getsize(file_path)
@@ -965,7 +1008,12 @@ def task_read_result(args: dict) -> dict:
     """
     result_id = args.get("result_id")
 
-    log.debug(f"Reading result for result_id: {result_id}")
+    # Only log progress file reads at debug level (they're frequent during download)
+    is_progress_read = result_id and result_id.startswith("progress-")
+    if is_progress_read:
+        log.debug(f"Reading progress file: {result_id}")
+    else:
+        log.debug(f"Reading result for result_id: {result_id}")
 
     if not result_id:
         log.error("No result_id provided to read_result")
