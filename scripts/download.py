@@ -382,10 +382,11 @@ def download_direct_file(
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
 
+        # Parse URL (needed for filename extraction and Referer header)
+        parsed = urlparse(url)
+
         # Determine filename
         if not filename:
-            parsed = urlparse(url)
-
             # Try to get filename from query params (e.g., download_filename=...)
             query_params = parse_qs(parsed.query)
             if "download_filename" in query_params:
