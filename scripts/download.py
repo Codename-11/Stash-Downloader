@@ -274,14 +274,14 @@ def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
 
     cmd.append(url)
 
-    log.info(f"Starting yt-dlp metadata extraction: {url[:80]}...")
+    log.debug(f"Starting yt-dlp metadata extraction: {url[:80]}...")
     log.debug(f"yt-dlp command: {' '.join(cmd)}")  # Log full command for debugging
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         if result.returncode == 0 and result.stdout:
-            log.info("✓ Metadata extraction successful")
+            log.debug("✓ Metadata extraction successful")
             return json.loads(result.stdout)
         else:
             # Enhanced error logging with proxy context
