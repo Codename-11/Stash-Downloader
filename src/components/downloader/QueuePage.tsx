@@ -80,24 +80,24 @@ export const QueuePage: React.FC = () => {
           // Merge Stash settings into local settings (Stash settings take priority)
           updateSettings(graphqlSettings as Partial<IPluginSettings>);
 
-          // Log proxy status
+          // Log proxy status (debug only - visible in Server Settings dropdown)
           if (graphqlSettings.httpProxy) {
             const masked = String(graphqlSettings.httpProxy).replace(/:[^:@]*@/, ':****@');
-            debugLog.info(`✓ HTTP/SOCKS proxy: ${masked}`);
+            debugLog.debug(`✓ HTTP/SOCKS proxy: ${masked}`);
           }
 
-          // Log download path - plugin setting takes priority over Stash library
+          // Log download path (debug only - visible in Server Settings dropdown)
           try {
             if (graphqlSettings.serverDownloadPath) {
               // User explicitly set a download path - use it
-              debugLog.info(`✓ Download path (plugin setting): ${graphqlSettings.serverDownloadPath}`);
+              debugLog.debug(`✓ Download path (plugin setting): ${graphqlSettings.serverDownloadPath}`);
             } else {
               // No plugin setting - fall back to Stash library
               const libraryPath = await stashService.getVideoLibraryPath();
               if (libraryPath) {
-                debugLog.info(`✓ Download path (Stash library): ${libraryPath}`);
+                debugLog.debug(`✓ Download path (Stash library): ${libraryPath}`);
               } else {
-                debugLog.info(`✓ Download path (default): ${DEFAULT_SETTINGS.serverDownloadPath}`);
+                debugLog.debug(`✓ Download path (default): ${DEFAULT_SETTINGS.serverDownloadPath}`);
               }
             }
           } catch (pathError) {

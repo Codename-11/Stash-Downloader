@@ -83,17 +83,17 @@ export class DownloadService {
       const serverDownloadPath = settings.serverDownloadPath || options.outputDir || DEFAULT_SETTINGS.serverDownloadPath;
       const httpProxy = settings.httpProxy;
 
-      // Log which path was determined and why
+      // Log which path was determined and why (debug only - visible in UI)
       if (settings.serverDownloadPath) {
-        log.info('Download path (from plugin settings):', serverDownloadPath);
+        log.debug('Download path (from plugin settings):', serverDownloadPath);
       } else if (options.outputDir) {
-        log.info('Download path (from Stash library):', serverDownloadPath);
+        log.debug('Download path (from Stash library):', serverDownloadPath);
       } else {
-        log.info('Download path (default fallback):', serverDownloadPath);
+        log.debug('Download path (default fallback):', serverDownloadPath);
       }
 
       if (httpProxy) {
-        log.info(`Using HTTP proxy: ${httpProxy}`);
+        log.debug(`Using HTTP proxy: ${httpProxy}`);
       }
 
       // Run the download task and wait for completion

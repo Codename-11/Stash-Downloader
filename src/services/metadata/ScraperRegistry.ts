@@ -60,7 +60,7 @@ export class ScraperRegistry {
       }) as { available?: boolean; version?: string; status_message?: string } | null;
 
       if (result?.available && result?.version) {
-        log.info(`yt-dlp installed: v${result.version}`);
+        log.debug(`yt-dlp installed: v${result.version}`);
       } else if (result?.available === false) {
         log.warn(`yt-dlp not available: ${result.status_message || 'not installed'}`);
       } else {
