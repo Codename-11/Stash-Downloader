@@ -249,7 +249,8 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Building DEV version: ${VERSION}"
+          echo "base_version=${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Building DEV version: ${VERSION} (base: ${BASE_VERSION})"
 
           # Update package.json version so __APP_VERSION__ is correct at build time
           npm version ${VERSION} --no-git-tag-version --allow-same-version
@@ -304,7 +305,7 @@ jobs:
         run: |
           CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %H:%M:%S')
           VERSION=${{ steps.version.outputs.version }}
-          BASE_VERSION=$(node -p "require('./package.json').version")
+          BASE_VERSION=${{ steps.version.outputs.base_version }}
           DEV_SHA256=$(sha256sum _site/stash-downloader-dev.zip | awk '{print $1}')
 
           # Start with dev entry
