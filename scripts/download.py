@@ -78,15 +78,21 @@ def save_result(result_id: str, data: dict) -> bool:
         return False
 
 
-def load_result(result_id: str) -> Optional[dict]:
-    """Load a result from file."""
+def load_result(result_id: str, silent: bool = False) -> Optional[dict]:
+    """Load a result from file.
+
+    Args:
+        result_id: ID of the result to load
+        silent: If True, don't log warnings for missing files (used for progress polling)
+    """
     try:
         result_path = get_result_path(result_id)
         if os.path.exists(result_path):
             with open(result_path, "r") as f:
                 return json.load(f)
         else:
-            log.warning(f"Result file not found: {result_path}")
+            if not silent:
+                log.debug(f"Result file not found: {result_path}")
             return None
     except Exception as e:
         log.error(f"Failed to load result: {e}")
@@ -584,6 +590,15 @@ def download_video(
     log.debug(f"Quality: {quality}")
     log.debug(f"yt-dlp command: {' '.join(cmd)}")
 
+    # Create initial progress file so frontend knows download has started
+    if progress_id:
+        save_result(f"progress-{progress_id}", {
+            "status": "starting",
+            "percentage": 0,
+            "downloaded_bytes": 0,
+            "total_bytes": 0,
+        })
+
     try:
         # Use Popen for streaming output to get real-time progress
         process = subprocess.Popen(
@@ -950,30 +965,25 @@ def task_read_result(args: dict) -> dict:
     result_id = args.get("result_id")
 
     log.debug(f"Reading result for result_id: {result_id}")
-    log.debug(f"Result directory: {RESULT_DIR}")
 
     if not result_id:
         log.error("No result_id provided to read_result")
         # Don't use 'error' field - Stash treats it as GraphQL error
         return {"success": False, "result_error": "No result_id provided", "retrieved": False}
 
+    # For progress files, missing file is expected (download may not have started yet)
+    # Don't log errors for these - just return not found quietly
+    is_progress_file = result_id.startswith("progress-")
+
     # Check if result directory exists
     if not os.path.exists(RESULT_DIR):
-        log.error(f"Result directory does not exist: {RESULT_DIR}")
-        return {"success": False, "result_error": f"Result directory not found: {RESULT_DIR}", "retrieved": False}
+        if not is_progress_file:
+            log.error(f"Result directory does not exist: {RESULT_DIR}")
+        return {"success": True, "retrieved": False, "not_found": True}
 
-    # List all files in result directory for debugging
-    try:
-        files = os.listdir(RESULT_DIR)
-        log.debug(f"Files in result directory: {files}")
-    except Exception as e:
-        log.warning(f"Could not list result directory: {e}")
-
-    data = load_result(result_id)
+    data = load_result(result_id, silent=is_progress_file)
     if data:
         log.debug(f"Successfully loaded result for {result_id}")
-        log.debug(f"Loaded data keys: {list(data.keys())}")
-        log.debug(f"Loaded data (first 500 chars): {json.dumps(data, default=str)[:500]}")
 
         # Return the data as-is, but ensure we don't have any field that would
         # cause write_output to set the 'error' field in PluginOutput
@@ -985,28 +995,23 @@ def task_read_result(args: dict) -> dict:
         # The caller should check 'task_error' field instead
         if "result_error" in result:
             result["task_error"] = result.pop("result_error")
-            log.debug(f"Renamed 'result_error' to 'task_error' to avoid GraphQL error interpretation")
 
         # Also rename 'error' field if present
         if "error" in result:
             result["task_error"] = result.pop("error")
-            log.debug(f"Renamed 'error' to 'task_error' to avoid GraphQL error interpretation")
 
         # Ensure we always have a 'success' field for consistency
         if "success" not in result:
             # If there's a task_error, success should be False, otherwise True
             result["success"] = "task_error" not in result
 
-        log.debug(f"Final result keys: {list(result.keys())}")
-        log.debug(f"Final result (first 500 chars): {json.dumps(result, default=str)[:500]}")
-
         return result
     else:
-        log.error(f"Result not found for result_id: {result_id}")
-        result_path = get_result_path(result_id)
-        log.error(f"Expected result file path: {result_path}")
-        log.error(f"File exists: {os.path.exists(result_path)}")
-        return {"success": False, "result_error": f"Result not found for result_id: {result_id}", "retrieved": False}
+        # File not found - for progress files this is expected, don't log error
+        if not is_progress_file:
+            log.debug(f"Result not found for result_id: {result_id}")
+        # Return success:true but retrieved:false - this is not an error condition
+        return {"success": True, "retrieved": False, "not_found": True}
 
 
 def task_cleanup_result(args: dict) -> dict:

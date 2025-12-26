@@ -118,15 +118,21 @@ export class DownloadService {
               result_id: `progress-${progressId}`,
             }) as any;
 
-            if (progressResult?.retrieved && progressResult.status === 'downloading') {
-              options.onProgress!({
-                bytesDownloaded: progressResult.downloaded_bytes || 0,
-                totalBytes: progressResult.total_bytes || 0,
-                percentage: progressResult.percentage || 0,
-                speed: progressResult.speed || 0,
-                timeRemaining: progressResult.eta,
-              });
+            // Check if we got progress data (retrieved=true means file was found)
+            if (progressResult?.retrieved) {
+              const status = progressResult.status;
+              // Update progress for downloading or starting status
+              if (status === 'downloading' || status === 'starting') {
+                options.onProgress!({
+                  bytesDownloaded: progressResult.downloaded_bytes || 0,
+                  totalBytes: progressResult.total_bytes || 0,
+                  percentage: progressResult.percentage || 0,
+                  speed: progressResult.speed || 0,
+                  timeRemaining: progressResult.eta,
+                });
+              }
             }
+            // not_found is expected early in download - silently ignore
           } catch {
             // Ignore progress polling errors - file might not exist yet
           }
