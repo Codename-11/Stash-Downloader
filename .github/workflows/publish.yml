@@ -408,18 +408,21 @@ jobs:
               --arg prompt "$PROMPT" \
               '{
                 contents: [{parts: [{text: $prompt}]}],
-                generationConfig: {maxOutputTokens: 500}
+                generationConfig: {maxOutputTokens: 1024}
               }')")
 
-          # Extract text from Gemini response
-          SUMMARY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+          # Debug: show finish reason
+          FINISH_REASON=$(echo "$RESPONSE" | jq -r '.candidates[0].finishReason // "unknown"')
+          echo "Gemini finish reason: $FINISH_REASON"
 
-          if [ -z "$SUMMARY" ]; then
+          # Extract text from Gemini response (write directly to file to preserve formatting)
+          echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty' > /tmp/summary.txt
+
+          if [ ! -s /tmp/summary.txt ]; then
             echo "Gemini API error or empty response:"
-            echo "$RESPONSE" | head -c 500
+            echo "$RESPONSE" | head -c 1000
             echo "has_summary=false" >> $GITHUB_OUTPUT
           else
-            echo "$SUMMARY" > /tmp/summary.txt
             echo "has_summary=true" >> $GITHUB_OUTPUT
             echo "Generated summary:"
             cat /tmp/summary.txt
