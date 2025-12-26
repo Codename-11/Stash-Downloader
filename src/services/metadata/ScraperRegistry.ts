@@ -162,75 +162,76 @@ export class ScraperRegistry {
       }
 
       // Last resort: fallback scraper
-      log.info('All scrapers failed, using generic fallback');
-      return await this.fallbackScraper.scrape(url);
+      log.warn('All scrapers failed - using generic fallback (minimal metadata only)');
+      const fallbackResult = await this.fallbackScraper.scrape(url);
+      this.logExtractedMetadata('Generic (fallback)', fallbackResult, url);
+      return fallbackResult;
     }
   }
 
   /**
    * Log extracted metadata details with actual values for troubleshooting
+   * Always shows all fields so users can see what's missing
    */
   private logExtractedMetadata(scraperName: string, metadata: IScrapedMetadata, url?: string): void {
     const details: string[] = [];
 
     // Source URL
-    if (url) {
-      details.push(`Source: ${url}`);
-    }
+    details.push(`Source: ${url || 'N/A'}`);
 
     // Title
-    details.push(`Title: ${metadata.title || 'N/A'}`);
+    details.push(`Title: ${metadata.title || '—'}`);
 
-    // Video/Image URL (truncated for readability)
-    if (metadata.videoUrl) {
-      const truncated = metadata.videoUrl.length > 100
-        ? metadata.videoUrl.substring(0, 100) + '...'
-        : metadata.videoUrl;
-      details.push(`Video URL: ${truncated}`);
-    }
-    if (metadata.imageUrl) {
-      const truncated = metadata.imageUrl.length > 100
-        ? metadata.imageUrl.substring(0, 100) + '...'
-        : metadata.imageUrl;
-      details.push(`Image URL: ${truncated}`);
-    }
+    // Video/Image URL (truncated for readability) - always show both
+    const videoUrl = metadata.videoUrl
+      ? (metadata.videoUrl.length > 100 ? metadata.videoUrl.substring(0, 100) + '...' : metadata.videoUrl)
+      : '—';
+    details.push(`Video URL: ${videoUrl}`);
 
-    // Quality info
-    if (metadata.quality) {
-      details.push(`Quality: ${metadata.quality}`);
-    }
-    if (metadata.availableQualities?.length) {
-      details.push(`Available: ${metadata.availableQualities.join(', ')}`);
-    }
+    const imageUrl = metadata.imageUrl
+      ? (metadata.imageUrl.length > 100 ? metadata.imageUrl.substring(0, 100) + '...' : metadata.imageUrl)
+      : '—';
+    details.push(`Image URL: ${imageUrl}`);
 
-    // Duration
+    // Quality info - always show
+    details.push(`Quality: ${metadata.quality || '—'}`);
+    details.push(`Available Qualities: ${metadata.availableQualities?.length ? metadata.availableQualities.join(', ') : '—'}`);
+
+    // Duration - always show
     if (metadata.duration) {
       const mins = Math.floor(metadata.duration / 60);
       const secs = Math.round(metadata.duration % 60);
       details.push(`Duration: ${mins}m ${secs}s`);
+    } else {
+      details.push(`Duration: —`);
     }
 
-    // Performers
+    // Thumbnail
+    details.push(`Thumbnail: ${metadata.thumbnailUrl ? '✓' : '—'}`);
+
+    // Performers - always show
     if (metadata.performers?.length) {
       const performerList = metadata.performers.slice(0, 5).join(', ');
       const suffix = metadata.performers.length > 5 ? ` (+${metadata.performers.length - 5} more)` : '';
       details.push(`Performers: ${performerList}${suffix}`);
+    } else {
+      details.push(`Performers: —`);
     }
 
-    // Tags (just count, too many to list)
-    if (metadata.tags?.length) {
-      details.push(`Tags: ${metadata.tags.length}`);
-    }
+    // Tags - always show
+    details.push(`Tags: ${metadata.tags?.length || '—'}`);
 
-    // Studio
-    if (metadata.studio) {
-      details.push(`Studio: ${metadata.studio}`);
-    }
+    // Studio - always show
+    details.push(`Studio: ${metadata.studio || '—'}`);
 
-    // Date
-    if (metadata.date) {
-      details.push(`Date: ${metadata.date}`);
-    }
+    // Date - always show
+    details.push(`Date: ${metadata.date || '—'}`);
+
+    // Description (truncated)
+    const desc = metadata.description
+      ? (metadata.description.length > 50 ? metadata.description.substring(0, 50) + '...' : metadata.description)
+      : '—';
+    details.push(`Description: ${desc}`);
 
     const title = metadata.title || 'Untitled';
     log.success(`${scraperName} extracted: ${title}`, details.join('\n'));
