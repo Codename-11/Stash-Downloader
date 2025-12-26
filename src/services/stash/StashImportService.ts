@@ -11,6 +11,7 @@ import type {
   IStashStudio,
   IDownloadProgress,
   IItemLogEntry,
+  PostImportAction,
 } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from './StashGraphQLService';
@@ -199,36 +200,64 @@ export class StashImportService {
       if (onLog) onLog('success', `Found scene in Stash (ID: ${scene.id})`);
       log.info('Found scene after scan:', scene.id);
 
-      // Resolve performers, tags, and studio
-      if (onStatusChange) onStatusChange('Applying metadata...');
-      if (onLog) onLog('info', 'Resolving performers, tags, and studio...');
+      // Apply basic metadata (title, description, url, date)
+      if (onStatusChange) onStatusChange('Applying basic metadata...');
+      if (onLog) onLog('info', 'Applying title, description, and URL...');
 
-      const performerIds = await this.resolvePerformers(
-        item.editedMetadata.performers || []
-      );
-      const tagIds = await this.resolveTags(item.editedMetadata.tags || []);
-      const studioId = item.editedMetadata.studio
-        ? await this.resolveStudio(item.editedMetadata.studio)
-        : undefined;
-
-      if (onLog) onLog('info', `Resolved ${performerIds.length} performers, ${tagIds.length} tags, ${studioId ? '1 studio' : '0 studios'}`);
-
-      // Update the scene with metadata
-      if (onLog) onLog('info', 'Updating scene with metadata...');
-
-      const updatedScene = await this.stashService.updateScene(scene.id, {
-        title: item.editedMetadata.title,
-        details: item.editedMetadata.description,
+      let updatedScene = await this.stashService.updateScene(scene.id, {
+        title: item.editedMetadata?.title || item.metadata?.title,
+        details: item.editedMetadata?.description || item.metadata?.description,
         url: item.url,
-        date: item.editedMetadata.date,
-        rating100: item.editedMetadata.rating,
-        performer_ids: performerIds,
-        tag_ids: tagIds,
-        studio_id: studioId,
+        date: item.editedMetadata?.date || item.metadata?.date,
       });
 
-      if (onLog) onLog('success', 'Metadata applied successfully!');
-      log.info('Scene updated with metadata:', updatedScene.id);
+      if (onLog) onLog('success', 'Basic metadata applied');
+
+      // Execute post-import action
+      const postImportAction: PostImportAction = item.postImportAction || 'none';
+
+      if (postImportAction === 'identify') {
+        // Trigger Stash's Identify (StashDB + scrapers)
+        if (onStatusChange) onStatusChange('Running Identify...');
+        if (onLog) onLog('info', 'Triggering Stash Identify (StashDB + scrapers)...');
+
+        const identifyJobId = await this.stashService.identifyScenes([scene.id]);
+        if (identifyJobId) {
+          if (onLog) onLog('info', `Identify job started (ID: ${identifyJobId})`);
+
+          // Wait for identify to complete
+          const identifyResult = await this.stashService.waitForJob(identifyJobId, {
+            pollIntervalMs: 1000,
+            maxWaitMs: 120000, // 2 minutes for identify
+          });
+
+          if (identifyResult.success) {
+            if (onLog) onLog('success', 'Identify completed - metadata matched from StashDB/scrapers');
+          } else {
+            if (onLog) onLog('warning', `Identify may not have found matches: ${identifyResult.error}`);
+          }
+        } else {
+          if (onLog) onLog('warning', 'Could not start Identify job');
+        }
+      } else if (postImportAction === 'scrape_url') {
+        // Scrape using the source URL
+        if (onStatusChange) onStatusChange('Scraping URL...');
+        if (onLog) onLog('info', `Scraping metadata from URL: ${item.url}`);
+
+        const scraped = await this.stashService.scrapeSingleSceneByURL(scene.id, item.url);
+        if (scraped) {
+          if (onLog) onLog('info', 'Applying scraped metadata (performers, tags, studio)...');
+          updatedScene = await this.stashService.applyScrapedMetadata(scene.id, scraped);
+          if (onLog) onLog('success', 'Scraped metadata applied successfully');
+        } else {
+          if (onLog) onLog('warning', 'No scraper found for this URL - metadata not applied');
+        }
+      } else {
+        if (onLog) onLog('info', 'Post-import action: None - edit metadata in Stash if needed');
+      }
+
+      if (onLog) onLog('success', 'Import completed successfully!');
+      log.info('Scene import complete:', updatedScene.id);
 
       return updatedScene;
     }

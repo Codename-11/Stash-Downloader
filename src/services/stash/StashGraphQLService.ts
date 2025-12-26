@@ -1209,6 +1209,122 @@ export class StashGraphQLService {
     log.info(`Updated scene ${sceneId} with metadata`);
     return result.data.sceneUpdate;
   }
+
+  /**
+   * Trigger Stash's Identify on specific scenes
+   * Uses StashDB fingerprints and installed scrapers to match metadata
+   * Returns job ID for tracking
+   */
+  async identifyScenes(sceneIds: string[], options?: {
+    includeMalePerformers?: boolean;
+    setCoverImage?: boolean;
+    setOrganized?: boolean;
+  }): Promise<string | null> {
+    const mutation = `
+      mutation MetadataIdentify($input: IdentifyMetadataInput!) {
+        metadataIdentify(input: $input)
+      }
+    `;
+
+    try {
+      const input: Record<string, unknown> = {
+        sceneIDs: sceneIds,
+      };
+
+      // Add options if provided
+      if (options) {
+        input.options = {
+          includeMalePerformers: options.includeMalePerformers ?? true,
+          setCoverImage: options.setCoverImage ?? true,
+          setOrganized: options.setOrganized ?? false,
+        };
+      }
+
+      const result = await this.gqlRequest<{ metadataIdentify: string }>(mutation, { input });
+      const jobId = result.data?.metadataIdentify;
+
+      if (jobId) {
+        log.info(`Identify triggered for ${sceneIds.length} scene(s), job ID: ${jobId}`);
+      }
+
+      return jobId || null;
+    } catch (error) {
+      log.error(`identifyScenes failed: ${String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape a single existing scene using a scraper
+   * Can scrape by scene ID (uses fingerprints) or by URL
+   */
+  async scrapeSingleSceneByURL(sceneId: string, url: string): Promise<IStashScrapedScene | null> {
+    // First, try to scrape the URL directly
+    const scraped = await this.scrapeSceneURL(url);
+
+    if (!scraped) {
+      log.warn(`No scraper found for URL: ${url}`);
+      return null;
+    }
+
+    // Apply the scraped data to the scene
+    log.info(`Scraped metadata for scene ${sceneId} from URL: ${url}`);
+    return scraped;
+  }
+
+  /**
+   * Apply scraped metadata to an existing scene
+   * Resolves performers/tags/studios and updates the scene
+   */
+  async applyScrapedMetadata(sceneId: string, scraped: IStashScrapedScene): Promise<IStashScene> {
+    const updateInput: Record<string, unknown> = {
+      title: scraped.title,
+      details: scraped.details,
+      url: scraped.url,
+      date: scraped.date,
+    };
+
+    // Resolve performers - use stored_id if available, otherwise create
+    if (scraped.performers && scraped.performers.length > 0) {
+      const performerIds: string[] = [];
+      for (const p of scraped.performers) {
+        if (p.stored_id) {
+          performerIds.push(p.stored_id);
+        } else if (p.name) {
+          // Try to find or create performer
+          const performer = await this.getOrCreatePerformer(p.name);
+          performerIds.push(performer.id);
+        }
+      }
+      updateInput.performer_ids = performerIds;
+    }
+
+    // Resolve tags - use stored_id if available, otherwise create
+    if (scraped.tags && scraped.tags.length > 0) {
+      const tagIds: string[] = [];
+      for (const t of scraped.tags) {
+        if (t.stored_id) {
+          tagIds.push(t.stored_id);
+        } else if (t.name) {
+          const tag = await this.getOrCreateTag(t.name);
+          tagIds.push(tag.id);
+        }
+      }
+      updateInput.tag_ids = tagIds;
+    }
+
+    // Resolve studio - use stored_id if available, otherwise create
+    if (scraped.studio) {
+      if (scraped.studio.stored_id) {
+        updateInput.studio_id = scraped.studio.stored_id;
+      } else if (scraped.studio.name) {
+        const studio = await this.getOrCreateStudio(scraped.studio.name);
+        updateInput.studio_id = studio.id;
+      }
+    }
+
+    return this.updateScene(sceneId, updateInput as any);
+  }
 }
 
 // Singleton instance

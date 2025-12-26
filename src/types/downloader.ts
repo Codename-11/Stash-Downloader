@@ -19,6 +19,11 @@ export enum ContentType {
   Gallery = 'gallery',
 }
 
+/**
+ * Post-import action to apply metadata via Stash's systems
+ */
+export type PostImportAction = 'none' | 'identify' | 'scrape_url';
+
 export interface IDownloadProgress {
   bytesDownloaded: number;
   totalBytes: number;
@@ -134,6 +139,7 @@ export interface IDownloadItem {
   // Stash integration
   stashId?: string; // Scene/Image/Gallery ID after creation
   existsInStash?: { id: string; title?: string }; // If scene already exists in Stash before import
+  postImportAction?: PostImportAction; // Action to take after import (none, identify, scrape_url)
 
   // Logs for this specific item
   logs?: IItemLogEntry[];
