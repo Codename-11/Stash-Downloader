@@ -14,10 +14,13 @@
 ## Features
 
 - **URL-based Downloads** - Paste URLs to download videos and images
-- **Automatic Metadata** - Extracts titles, performers, tags via yt-dlp
+- **Automatic Metadata** - Extracts titles, thumbnails, duration via yt-dlp
 - **Browser Extension** - Right-click any link to send directly to your queue
 - **Batch Import** - Import multiple URLs from clipboard
-- **Smart Matching** - Autocomplete for performers, tags, studios
+- **Post-Import Actions** - Choose how Stash handles metadata after import:
+  - **Identify** - Match via StashDB fingerprints + installed scrapers
+  - **Scrape URL** - Use Stash's scrapers for the source URL
+  - **None** - Just import, edit metadata in Stash later
 - **Queue Management** - Track downloads with progress indicators
 - **Persistent Queue** - Queue survives page refresh and navigation
 

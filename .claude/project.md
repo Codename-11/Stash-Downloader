@@ -6,8 +6,8 @@ A React-based web-UI plugin for Stash that enables downloading images and videos
 ## Purpose
 Streamline the process of importing content into Stash by:
 - Downloading content from URLs
-- Extracting and mapping metadata automatically
-- Managing performers, tags, and studios
+- Extracting and previewing metadata automatically
+- Triggering Stash's metadata system (Identify/Scrape) after import
 - Creating properly organized Stash entries via GraphQL API
 
 ## Technology Stack
@@ -31,13 +31,12 @@ JavaScript Extension / Web-UI Plugin for Stash
    - Server-side downloads via yt-dlp (bypasses CORS)
    - **Queue persistence**: Download queue survives navigation and page refresh via localStorage
 
-2. **Metadata Intelligence**
+2. **Metadata Preview**
    - Automatic metadata extraction from sources
    - Server-side scraping via yt-dlp Python backend (no CORS issues)
    - Extracts video URLs, thumbnails, descriptions, etc.
-   - Smart matching against existing Stash data
-   - Manual override and editing capabilities
-   - **Re-scrape**: Manually try different scrapers via dropdown menu
+   - Preview scraped metadata before import (title, thumbnail, duration, quality)
+   - Editable title field for customization
 
 3. **Content Type Support**
    - **Video**: Via YtDlpScraper (primary), supports most video sites
@@ -49,15 +48,17 @@ JavaScript Extension / Web-UI Plugin for Stash
    - GraphQL mutations for scene/image/gallery creation
    - Server-side scraping: `scrapeSceneURL`, `scrapeGalleryURL`
    - Plugin task execution: `runPluginTask`, `runPluginOperation`
-   - Performer, tag, and studio association
+   - **Post-Import Actions** - Choose how Stash handles metadata after import:
+     - **None**: Just import the file, edit metadata in Stash later
+     - **Identify**: Match via StashDB fingerprints + installed scrapers
+     - **Scrape URL**: Use Stash's scrapers to populate performers/tags/studio
    - File organization according to Stash library structure
 
 5. **User Experience**
    - Dark-themed interface matching Stash's UI
    - Real-time progress indicators
    - Error handling with actionable messages
-   - Preview before finalizing
-   - Visual distinction for new vs existing entities (green = new, blue = existing)
+   - Preview before finalizing (thumbnail, title, duration, quality)
    - **Retry button**: Failed items can be retried without re-adding to queue
    - **Navbar icon**: Download icon in Stash navbar for quick access
 

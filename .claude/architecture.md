@@ -52,7 +52,9 @@ All external interactions go through dedicated services:
 - Plugin settings: `getPluginSettings()` - queries `configuration { plugins }` (PluginConfigMap scalar)
 - Server-side scraping: `scrapeSceneURL()`, `scrapeGalleryURL()`, `scrapeImageURL()`
 - Plugin task execution: `runPluginTask()`, `runPluginOperation()`
-- Job management: `stopJob()`
+- Job management: `stopJob()`, `waitForJob()`
+- Post-import actions: `identifyScenes()`, `scrapeSingleSceneByURL()`, `applyScrapedMetadata()`
+- Scene operations: `findSceneByPath()`, `updateScene()`
 - Environment detection: `isStashEnvironment()`
 - Handles authentication via localStorage API key
 
@@ -294,16 +296,14 @@ DownloaderPlugin (Route Container)
 │   └── QueueItem (repeat)
 │       ├── Edit button
 │       ├── Logs button (per-item logs)
-│       ├── Retry button (for failed items)
-│       └── Re-scrape dropdown (for pending items)
+│       └── Retry button (for failed items)
 ├── LogViewer (Activity Log with filters)
 ├── EditMetadataModal (when editing)
-│   ├── MetadataEditorForm
-│   │   ├── PerformerSelector
-│   │   ├── TagSelector
-│   │   └── StudioSelector
-│   └── ActionButtons
-└── Modals (InfoModal, ItemLogModal, RescrapeModal)
+│   └── MetadataEditorForm
+│       ├── Thumbnail preview
+│       ├── Title editor
+│       └── Post-import action selector
+└── Modals (InfoModal, ItemLogModal, AboutModal)
 ```
 
 ### Component Types
@@ -321,7 +321,7 @@ DownloaderPlugin (Route Container)
 
 **Hook Components**
 - Custom hooks for shared logic
-- Example: `useDownloadQueue`, `useStashData`, `useMetadataMapping`
+- Example: `useDownloadQueue`, `useStashData`, `useSettings`
 
 ## API Design
 
@@ -400,7 +400,7 @@ If a scraper throws an error, the registry tries the next one.
 
 ### Settings-Driven Configuration
 - Scrapers can be enabled/disabled via settings
-- Metadata mapping rules configurable by user
+- Post-import action configurable per item (None, Identify, Scrape URL)
 - No code changes needed for common customizations
 
 ## Error Handling Strategy

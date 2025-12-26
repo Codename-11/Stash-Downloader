@@ -33,7 +33,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
 }) => {
   const { settings } = useSettings();
   const [title, setTitle] = useState(item.editedMetadata?.title || item.metadata?.title || '');
-  const [postImportAction, setPostImportAction] = useState<PostImportAction>(item.postImportAction || 'scrape_url');
+  const [postImportAction, setPostImportAction] = useState<PostImportAction>(item.postImportAction || 'none');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = useState('');
@@ -214,7 +214,7 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             {/* Post-Import Action */}
             <div>
               <label className="form-label" style={{ color: '#8b9fad' }}>
-                After Import
+                Additional Processing
               </label>
               <select
                 className="form-select text-light"
@@ -222,26 +222,28 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                 value={postImportAction}
                 onChange={(e) => setPostImportAction(e.target.value as PostImportAction)}
               >
-                <option value="none">None - Just import file</option>
-                <option value="scrape_url">Scrape URL - Use Stash scrapers for metadata</option>
-                <option value="identify">Identify - Match via StashDB fingerprints</option>
+                <option value="none">None - Keep scraped metadata only</option>
+                <option value="identify">Identify - Also match via StashDB fingerprints</option>
+                <option value="scrape_url">Scrape URL - Also try Stash scrapers</option>
               </select>
               <small className="text-muted d-block mt-1">
-                {postImportAction === 'none' && 'File will be imported without metadata. Edit in Stash later.'}
-                {postImportAction === 'scrape_url' && 'Stash will scrape the source URL for performers, tags, and studio.'}
-                {postImportAction === 'identify' && 'Stash will match the video fingerprint against StashDB database.'}
+                {postImportAction === 'none' && 'Scraped metadata (performers, tags, studio) will be applied. No additional processing.'}
+                {postImportAction === 'identify' && 'After applying scraped metadata, Stash will also match fingerprints against StashDB.'}
+                {postImportAction === 'scrape_url' && 'After applying scraped metadata, Stash will also try its scrapers (may find additional info).'}
               </small>
             </div>
 
             {/* Scraped Metadata Preview */}
             {item.metadata && (
               (item.metadata.performers?.length || item.metadata.tags?.length || item.metadata.studio) && (
-                <div className="p-3 rounded" style={{ backgroundColor: '#243340', border: '1px solid #394b59' }}>
-                  <small className="text-muted d-block mb-2">Scraped metadata (will be matched by Stash):</small>
+                <div className="p-3 rounded" style={{ backgroundColor: '#1a3020', border: '1px solid #2d5a3d' }}>
+                  <small className="d-block mb-2" style={{ color: '#7dcea0' }}>
+                    ✓ Scraped metadata (will be applied):
+                  </small>
                   <div className="d-flex gap-2 flex-wrap">
                     {item.metadata.performers?.length ? (
-                      <span className="badge bg-primary">
-                        👤 {item.metadata.performers.length} performer{item.metadata.performers.length > 1 ? 's' : ''}
+                      <span className="badge bg-success">
+                        👤 {item.metadata.performers.length} performer{item.metadata.performers.length > 1 ? 's' : ''}: {item.metadata.performers.slice(0, 3).join(', ')}{item.metadata.performers.length > 3 ? '...' : ''}
                       </span>
                     ) : null}
                     {item.metadata.tags?.length ? (

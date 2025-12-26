@@ -200,20 +200,74 @@ export class StashImportService {
       if (onLog) onLog('success', `Found scene in Stash (ID: ${scene.id})`);
       log.info('Found scene after scan:', scene.id);
 
-      // Apply basic metadata (title, description, url, date)
-      if (onStatusChange) onStatusChange('Applying basic metadata...');
-      if (onLog) onLog('info', 'Applying title, description, and URL...');
+      // Apply yt-dlp scraped metadata (performers, tags, studio)
+      if (onStatusChange) onStatusChange('Applying scraped metadata...');
+      if (onLog) onLog('info', 'Applying scraped metadata (performers, tags, studio)...');
 
-      let updatedScene = await this.stashService.updateScene(scene.id, {
-        title: item.editedMetadata?.title || item.metadata?.title,
-        details: item.editedMetadata?.description || item.metadata?.description,
+      const scrapedMeta = item.metadata;
+      const updateInput: Record<string, unknown> = {
+        title: item.editedMetadata?.title || scrapedMeta?.title,
+        details: item.editedMetadata?.description || scrapedMeta?.description,
         url: item.url,
-        date: item.editedMetadata?.date || item.metadata?.date,
-      });
+        date: item.editedMetadata?.date || scrapedMeta?.date,
+      };
 
-      if (onLog) onLog('success', 'Basic metadata applied');
+      // Resolve performers from scraped names
+      if (scrapedMeta?.performers && scrapedMeta.performers.length > 0) {
+        if (onLog) onLog('info', `Resolving ${scrapedMeta.performers.length} performer(s)...`);
+        const performerIds: string[] = [];
+        for (const name of scrapedMeta.performers) {
+          try {
+            const performer = await this.stashService.getOrCreatePerformer(name);
+            performerIds.push(performer.id);
+            log.debug(`Resolved performer: ${name} -> ${performer.id}`);
+          } catch (err) {
+            log.warn(`Failed to resolve performer "${name}": ${String(err)}`);
+          }
+        }
+        if (performerIds.length > 0) {
+          updateInput.performer_ids = performerIds;
+          if (onLog) onLog('success', `Linked ${performerIds.length} performer(s)`);
+        }
+      }
 
-      // Execute post-import action
+      // Resolve tags from scraped names
+      if (scrapedMeta?.tags && scrapedMeta.tags.length > 0) {
+        if (onLog) onLog('info', `Resolving ${scrapedMeta.tags.length} tag(s)...`);
+        const tagIds: string[] = [];
+        for (const name of scrapedMeta.tags) {
+          try {
+            const tag = await this.stashService.getOrCreateTag(name);
+            tagIds.push(tag.id);
+            log.debug(`Resolved tag: ${name} -> ${tag.id}`);
+          } catch (err) {
+            log.warn(`Failed to resolve tag "${name}": ${String(err)}`);
+          }
+        }
+        if (tagIds.length > 0) {
+          updateInput.tag_ids = tagIds;
+          if (onLog) onLog('success', `Linked ${tagIds.length} tag(s)`);
+        }
+      }
+
+      // Resolve studio from scraped name
+      if (scrapedMeta?.studio) {
+        if (onLog) onLog('info', `Resolving studio: ${scrapedMeta.studio}...`);
+        try {
+          const studio = await this.stashService.getOrCreateStudio(scrapedMeta.studio);
+          updateInput.studio_id = studio.id;
+          log.debug(`Resolved studio: ${scrapedMeta.studio} -> ${studio.id}`);
+          if (onLog) onLog('success', `Linked studio: ${studio.name}`);
+        } catch (err) {
+          log.warn(`Failed to resolve studio "${scrapedMeta.studio}": ${String(err)}`);
+        }
+      }
+
+      let updatedScene = await this.stashService.updateScene(scene.id, updateInput as any);
+
+      if (onLog) onLog('success', 'Scraped metadata applied');
+
+      // Execute post-import action (optional additional processing)
       const postImportAction: PostImportAction = item.postImportAction || 'none';
 
       if (postImportAction === 'identify') {
