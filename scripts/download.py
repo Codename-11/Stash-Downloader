@@ -599,10 +599,14 @@ def download_video(
         "--no-playlist",
         "--newline",  # Output progress on new lines for parsing
         "--progress",  # Show progress bar
-        "--force-progress",  # Force progress output even when not in TTY (critical for non-terminal execution)
         "--print",
         "after_move:filepath",  # Print final path
     ]
+
+    # Set TERM environment variable to trick yt-dlp into outputting progress
+    # (yt-dlp suppresses progress when not in a TTY; this makes it think it is)
+    env = os.environ.copy()
+    env["TERM"] = "xterm"
 
     # Add proxy if provided (yt-dlp supports http://, https://, socks4://, socks5://)
     if proxy:
@@ -644,6 +648,7 @@ def download_video(
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # Line buffered
+            env=env,  # Pass environment with TERM=xterm to enable progress output
         )
 
         stdout_lines = []
