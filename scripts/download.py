@@ -1220,34 +1220,54 @@ def task_fetch_image(args: dict) -> dict:
 
     log.info(f"Fetching image: {url[:100]}...")
 
-    try:
-        # Build headers
-        parsed = urlparse(url)
-        referer = f"{parsed.scheme}://{parsed.netloc}/"
+    # Build headers
+    parsed = urlparse(url)
+    referer = f"{parsed.scheme}://{parsed.netloc}/"
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "image/*,*/*",
-            "Accept-Encoding": "gzip, deflate",
-            "Referer": referer,
-        }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "image/*,*/*",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": referer,
+    }
 
-        # Configure proxy
+    def do_fetch(use_proxy: bool) -> requests.Response:
+        """Helper to fetch with or without proxy."""
         proxies = None
-        if proxy:
+        if use_proxy and proxy:
             log.debug(f"Using proxy for image fetch: {proxy}")
             proxies = {"http": proxy, "https": proxy}
-
-        # Fetch the image
-        response = requests.get(
+        return requests.get(
             url,
             headers=headers,
             proxies=proxies,
             timeout=30,
             allow_redirects=True,
         )
+
+    try:
+        # Try with proxy first (if provided)
+        response = do_fetch(use_proxy=bool(proxy))
         response.raise_for_status()
 
+    except Exception as e:
+        error_msg = str(e).lower()
+        # If SOCKS proxy failed (missing PySocks), retry without proxy
+        # Image CDNs usually don't need proxies anyway
+        if proxy and ("socks" in error_msg or "missing dependencies" in error_msg):
+            log.warning(f"Proxy failed for image fetch (SOCKS issue), retrying without proxy...")
+            try:
+                response = do_fetch(use_proxy=False)
+                response.raise_for_status()
+                log.info("✓ Image fetched successfully without proxy")
+            except Exception as retry_e:
+                log.error(f"Failed to fetch image (retry without proxy): {retry_e}")
+                return {"result_error": f"Failed to fetch image: {str(retry_e)}", "success": False}
+        else:
+            log.error(f"Failed to fetch image: {e}")
+            return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
+
+    try:
         # Get content type
         content_type = response.headers.get("Content-Type", "image/jpeg")
         if ";" in content_type:
@@ -1260,12 +1280,9 @@ def task_fetch_image(args: dict) -> dict:
         log.info(f"✓ Image fetched successfully ({len(response.content)} bytes)")
         return {"success": True, "image_base64": data_url}
 
-    except requests.exceptions.RequestException as e:
-        log.error(f"Failed to fetch image (network error): {e}")
-        return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
     except Exception as e:
-        log.error(f"Failed to fetch image: {e}")
-        return {"result_error": f"Failed to fetch image: {str(e)}", "success": False}
+        log.error(f"Failed to process image: {e}")
+        return {"result_error": f"Failed to process image: {str(e)}", "success": False}
 
 
 def main():
