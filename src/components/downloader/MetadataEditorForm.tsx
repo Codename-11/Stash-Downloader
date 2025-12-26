@@ -229,15 +229,6 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                 <small className="text-muted d-block">
                   Source: {getHostname(item.url)}
                 </small>
-                {item.metadata?.videoUrl && item.metadata?.contentType === ContentType.Video && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-primary mt-2"
-                    onClick={() => item.metadata?.videoUrl && handlePreview(item.metadata.videoUrl, 'video')}
-                  >
-                    ▶ Preview Video
-                  </button>
-                )}
               </div>
             </div>
 
