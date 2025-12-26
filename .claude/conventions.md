@@ -252,63 +252,66 @@ BREAKING CHANGE: Response now returns array instead of object
 ```
 
 ### Branch Naming
-- `feature/description` - New features
-- `fix/description` - Bug fixes
+- `feature/description` - New features (branch from dev)
+- `fix/description` - Bug fixes (branch from dev)
 - `docs/description` - Documentation
-- `refactor/description` - Code refactoring
-- `release/vX.Y.Z` - Release preparation
-- `dev` - Development channel (auto-deploys dev builds)
+- `dev` - Active development (auto-deploys dev builds)
+- `main` - Stable releases only (merged from dev)
 
-### Development Workflow (PR-Based)
+### Branch Strategy
 
-All changes should go through pull requests for Claude review:
+**ALWAYS develop on `dev` branch.** Never commit directly to `main`.
 
 ```
-1. Create branch    → git checkout -b feature/my-feature
+dev (active development) → main (stable) → tag (release)
+```
+
+### Development Workflow
+
+```
+1. Work on dev      → git checkout dev
+2. Make changes     → edit files, commit, push
+3. Test dev build   → Auto-deploys as "Downloader-Dev"
+4. Ready to release → Merge dev to main, then tag
+```
+
+For larger features, use feature branches merged to dev:
+```
+1. Create branch    → git checkout -b feature/my-feature dev
 2. Make changes     → edit files, commit
-3. Push branch      → git push -u origin feature/my-feature
-4. Create PR        → gh pr create
-5. Claude reviews   → Automatic via claude.yml workflow
-6. Merge PR         → After approval
+3. Merge to dev     → git checkout dev && git merge feature/my-feature
+4. Push dev         → git push origin dev
 ```
 
-**Benefits:**
-- Claude reviews all changes before merge
-- CI runs on every PR
-- Clean commit history on main
-
-### Pull Requests
-Include:
+### Pull Requests (Optional)
+For significant changes, PRs enable Claude review:
 - Clear description of changes
 - Testing notes (how to verify)
 - Breaking changes (if any)
 - Related issues (closes #123)
 
-### Releasing (PR + Tag-Based)
+### Releasing (Tag-Based)
 
-This project uses **PR-based releases** with tag triggers:
+This project uses **tag-based releases**:
 
-**Step 1: Create Release PR**
 ```bash
-# Create release branch
-git checkout -b release/vX.Y.Z
+# On dev branch, ready to release:
+git checkout main
+git merge dev
 
-# Update package.json version, then commit
+# Bump version in package.json
 git add package.json
 git commit -m "🔖 chore: release vX.Y.Z"
 
-# Push and create PR
-git push -u origin release/vX.Y.Z
-gh pr create --title "🔖 Release vX.Y.Z" --body "Release vX.Y.Z"
+# Create and push tag
+git tag vX.Y.Z
+git push origin main --tags
+
+# Return to dev
+git checkout dev
 ```
 
-**Step 2: After PR Merge - Create Tag**
-```bash
-git checkout main
-git pull origin main
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
+Or use `/release` skill for guided release.
 
 **Version Bump Rules:**
 | Changes | Bump | Example |
@@ -328,28 +331,13 @@ git push origin vX.Y.Z
 **Important:**
 - Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
 - Version in `package.json` should match tag (without `v` prefix)
-- PR workflow allows Claude to review release before publishing
 
-### Development Builds (Dev Channel)
+### Dev Builds (Automatic)
 
-For testing changes before release, use the `dev` branch:
-
-```bash
-# Merge changes to dev branch
-git checkout dev
-git merge feature/my-feature
-git push origin dev
-```
-
-**What happens:**
-- Deploys `stash-downloader-dev.zip` to GitHub Pages
-- Version: `X.Y.Z-dev.{commit-sha}`
-- Shows as "Stash Downloader (Dev)" in Stash plugin manager
-
-**Manual dev deploy** (from any branch):
-- Go to Actions → CI/CD → Run workflow
-- Check "Deploy as dev build"
-- Click "Run workflow"
+Every push to `dev` branch auto-deploys a dev build:
+- Plugin ID: `stash-downloader-dev`
+- Navbar: "Downloader-Dev"
+- Can run alongside stable version
 
 **In Stash**, both stable and dev appear in the same source:
 ```

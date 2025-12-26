@@ -19,50 +19,55 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 | `npm run type-check` | TypeScript check |
 | `npm run lint` | ESLint check |
 
-## Versioning & Release Workflow
+## Branch & Release Workflow
 
-### Two Independent Version Numbers
+### Branch Strategy
+| Branch | Purpose |
+|--------|---------|
+| **dev** | Active development - all work happens here |
+| **main** | Stable releases only - merged from dev |
+
+**ALWAYS develop on `dev` branch.** Never commit directly to `main`.
+
+### Development Flow
+```
+1. Work on dev branch
+2. Push to dev → triggers dev build (Downloader-Dev)
+3. When ready for release: PR or merge dev → main
+4. Tag on main → triggers stable release
+```
+
+### Two Independent Versions
 | Component | Version Location | Release Trigger |
 |-----------|-----------------|-----------------|
-| **Stash Plugin** | `package.json` | Git tags (`vX.Y.Z`) |
+| **Stash Plugin** | `package.json` | Git tags (`vX.Y.Z`) on main |
 | **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO |
 
-**Important**: These versions are INDEPENDENT. Only bump what changed.
-
 ### Stable vs Dev Builds
-| Build | Branch/Trigger | Plugin ID | Navbar Label |
-|-------|---------------|-----------|--------------|
+| Build | Trigger | Plugin ID | Navbar Label |
+|-------|---------|-----------|--------------|
 | **Stable** | Git tag `vX.Y.Z` | `stash-downloader` | "Downloader" |
-| **Dev** | Push to `dev` branch | `stash-downloader-dev` | "Downloader-Dev" |
+| **Dev** | Push to `dev` | `stash-downloader-dev` | "Downloader-Dev" |
 
-Both can be installed simultaneously in Stash from the same source URL.
+Both can be installed simultaneously in Stash.
 
-### When to Release What
-
-| Scenario | Action |
-|----------|--------|
-| Plugin code changed | Bump `package.json` → tag → push (use `/release` skill) |
-| Extension code changed | Bump `browser-extension/manifest.json` → manually upload ZIP to AMO |
-| Both changed | Bump both versions |
-| Testing changes | Push to `dev` branch (no version bump needed) |
-
-### Release Commands
+### Release Process
 ```bash
-# Quick stable release (on main)
-npm version patch|minor|major  # or edit package.json manually
+# On dev branch, ready to release:
+git checkout main
+git merge dev
+# Bump version in package.json
 git add package.json && git commit -m "🔖 chore: release vX.Y.Z"
 git tag vX.Y.Z && git push origin main --tags
-
-# Dev build (for testing)
-git checkout dev && git merge main && git push origin dev
+git checkout dev
 ```
+
+Or use `/release` skill for guided release.
 
 ### After Releasing
 - **Stable**: GitHub Actions builds + deploys to GitHub Pages + creates GitHub Release
-- **Dev**: GitHub Actions builds with `-dev` suffix, deploys alongside stable
+- **Dev**: Automatically stays ahead of main (no action needed)
 - **Extension**: Manually run `python package_extension.py` and upload ZIP to AMO
-
-See `.claude/conventions.md` for full details.
 
 ## Tech Stack
 
