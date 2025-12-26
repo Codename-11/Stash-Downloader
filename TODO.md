@@ -23,11 +23,6 @@
 - [ ] Download history view
 - [ ] Export/import queue
 
-### Scrapers
-- [ ] Add more site-specific scrapers
-- [ ] Verify scrapers are properly retrieving metadata
-- [ ] Scraper enable/disable settings UI
-
 ### UI/UX
 - [ ] Keyboard shortcuts (using Mousetrap from PluginApi)
 - [ ] Drag-and-drop queue reordering

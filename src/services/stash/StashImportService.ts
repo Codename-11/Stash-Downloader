@@ -200,23 +200,26 @@ export class StashImportService {
       if (onLog) onLog('success', `Found scene in Stash (ID: ${scene.id})`);
       log.info('Found scene after scan:', scene.id);
 
-      // Apply yt-dlp scraped metadata (performers, tags, studio)
-      if (onStatusChange) onStatusChange('Applying scraped metadata...');
-      if (onLog) onLog('info', 'Applying scraped metadata (performers, tags, studio)...');
+      // Apply edited metadata (performers, tags, studio)
+      // Use edited values if available, otherwise fall back to scraped metadata
+      if (onStatusChange) onStatusChange('Applying metadata...');
+      if (onLog) onLog('info', 'Applying metadata (performers, tags, studio)...');
 
+      const editedMeta = item.editedMetadata;
       const scrapedMeta = item.metadata;
       const updateInput: Record<string, unknown> = {
-        title: item.editedMetadata?.title || scrapedMeta?.title,
-        details: item.editedMetadata?.description || scrapedMeta?.description,
+        title: editedMeta?.title || scrapedMeta?.title,
+        details: editedMeta?.description || scrapedMeta?.description,
         url: item.url,
-        date: item.editedMetadata?.date || scrapedMeta?.date,
+        date: editedMeta?.date || scrapedMeta?.date,
       };
 
-      // Resolve performers from scraped names
-      if (scrapedMeta?.performers && scrapedMeta.performers.length > 0) {
-        if (onLog) onLog('info', `Resolving ${scrapedMeta.performers.length} performer(s)...`);
+      // Use edited performer names if available, otherwise use scraped
+      const performerNames = editedMeta?.performerNames || scrapedMeta?.performers || [];
+      if (performerNames.length > 0) {
+        if (onLog) onLog('info', `Resolving ${performerNames.length} performer(s)...`);
         const performerIds: string[] = [];
-        for (const name of scrapedMeta.performers) {
+        for (const name of performerNames) {
           try {
             const performer = await this.stashService.getOrCreatePerformer(name);
             performerIds.push(performer.id);
@@ -231,11 +234,12 @@ export class StashImportService {
         }
       }
 
-      // Resolve tags from scraped names
-      if (scrapedMeta?.tags && scrapedMeta.tags.length > 0) {
-        if (onLog) onLog('info', `Resolving ${scrapedMeta.tags.length} tag(s)...`);
+      // Use edited tag names if available, otherwise use scraped
+      const tagNames = editedMeta?.tagNames || scrapedMeta?.tags || [];
+      if (tagNames.length > 0) {
+        if (onLog) onLog('info', `Resolving ${tagNames.length} tag(s)...`);
         const tagIds: string[] = [];
-        for (const name of scrapedMeta.tags) {
+        for (const name of tagNames) {
           try {
             const tag = await this.stashService.getOrCreateTag(name);
             tagIds.push(tag.id);
@@ -250,22 +254,39 @@ export class StashImportService {
         }
       }
 
-      // Resolve studio from scraped name
-      if (scrapedMeta?.studio) {
-        if (onLog) onLog('info', `Resolving studio: ${scrapedMeta.studio}...`);
+      // Use edited studio name if available, otherwise use scraped
+      const studioName = editedMeta?.studioName || scrapedMeta?.studio;
+      if (studioName) {
+        if (onLog) onLog('info', `Resolving studio: ${studioName}...`);
         try {
-          const studio = await this.stashService.getOrCreateStudio(scrapedMeta.studio);
+          const studio = await this.stashService.getOrCreateStudio(studioName);
           updateInput.studio_id = studio.id;
-          log.debug(`Resolved studio: ${scrapedMeta.studio} -> ${studio.id}`);
+          log.debug(`Resolved studio: ${studioName} -> ${studio.id}`);
           if (onLog) onLog('success', `Linked studio: ${studio.name}`);
         } catch (err) {
-          log.warn(`Failed to resolve studio "${scrapedMeta.studio}": ${String(err)}`);
+          log.warn(`Failed to resolve studio "${studioName}": ${String(err)}`);
+        }
+      }
+
+      // Set cover image from thumbnail if available
+      if (scrapedMeta?.thumbnailUrl) {
+        if (onLog) onLog('info', 'Fetching cover image...');
+        try {
+          const coverBase64 = await this.fetchImageAsBase64(scrapedMeta.thumbnailUrl);
+          if (coverBase64) {
+            updateInput.cover_image = coverBase64;
+            log.debug('Cover image fetched successfully');
+            if (onLog) onLog('success', 'Cover image set');
+          }
+        } catch (err) {
+          log.warn(`Failed to fetch cover image: ${String(err)}`);
+          if (onLog) onLog('warning', 'Could not set cover image');
         }
       }
 
       let updatedScene = await this.stashService.updateScene(scene.id, updateInput as any);
 
-      if (onLog) onLog('success', 'Scraped metadata applied');
+      if (onLog) onLog('success', 'Metadata applied');
 
       // Execute post-import action (optional additional processing)
       const postImportAction: PostImportAction = item.postImportAction || 'none';
@@ -506,6 +527,31 @@ export class StashImportService {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+
+  /**
+   * Fetch an image URL and convert to base64
+   * Used for setting cover images from thumbnails
+   */
+  private async fetchImageAsBase64(imageUrl: string): Promise<string | null> {
+    try {
+      // Use the download service to fetch the image (handles CORS via server-side)
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        log.warn(`Failed to fetch image: ${response.status}`);
+        return null;
+      }
+
+      const blob = await response.blob();
+      const base64 = await this.blobToBase64(blob);
+
+      // Return with data URL prefix that Stash expects
+      const mimeType = blob.type || 'image/jpeg';
+      return `data:${mimeType};base64,${base64}`;
+    } catch (err) {
+      log.warn(`Error fetching image: ${String(err)}`);
+      return null;
+    }
   }
 
 }

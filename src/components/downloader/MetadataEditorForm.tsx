@@ -1,12 +1,10 @@
 /**
- * MetadataEditorForm - Simplified preview and import options
+ * MetadataEditorForm - Preview and edit metadata before import
  *
- * Focuses on:
+ * Features:
  * - Preview (thumbnail, title, duration, quality)
+ * - Editable performers, tags, studio
  * - Post-import action selector (None, Identify, Scrape URL)
- * - URL display
- *
- * Metadata editing (performers, tags, studio) is handled by Stash after import.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -38,6 +36,21 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [previewType, setPreviewType] = useState<'image' | 'video'>('image');
   const [previewUrl, setPreviewUrl] = useState('');
 
+  // Editable metadata state
+  const [performers, setPerformers] = useState<string[]>(item.metadata?.performers || []);
+  const [tags, setTags] = useState<string[]>(item.metadata?.tags || []);
+  const [studio, setStudio] = useState<string>(item.metadata?.studio || '');
+
+  // Input state for adding new items
+  const [newPerformer, setNewPerformer] = useState('');
+  const [newTag, setNewTag] = useState('');
+
+  // Expanded sections state
+  const [expandedSections, setExpandedSections] = useState({
+    performers: false,
+    tags: false,
+  });
+
   const handlePreview = (url: string, type: 'image' | 'video') => {
     setPreviewUrl(url);
     setPreviewType(type);
@@ -54,6 +67,10 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
     if (item.postImportAction) {
       setPostImportAction(item.postImportAction);
     }
+    // Initialize editable metadata from scraped data
+    setPerformers(item.metadata?.performers || []);
+    setTags(item.metadata?.tags || []);
+    setStudio(item.metadata?.studio || '');
   }, [item]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -63,10 +80,49 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
       title: title.trim() || undefined,
       description: item.metadata?.description,
       date: item.metadata?.date,
+      // Include edited performers, tags, studio as string arrays
+      // These will be resolved to IDs during import
+      performerNames: performers,
+      tagNames: tags,
+      studioName: studio || undefined,
     };
 
     debugLog.info('Submitting import with post-action:', postImportAction);
+    debugLog.info('Edited metadata:', JSON.stringify({
+      performers: performers.length,
+      tags: tags.length,
+      studio: studio || '(none)',
+    }));
     onSave(editedMetadata, postImportAction);
+  };
+
+  // Helper functions for editing
+  const addPerformer = () => {
+    const trimmed = newPerformer.trim();
+    if (trimmed && !performers.includes(trimmed)) {
+      setPerformers([...performers, trimmed]);
+      setNewPerformer('');
+    }
+  };
+
+  const removePerformer = (name: string) => {
+    setPerformers(performers.filter(p => p !== name));
+  };
+
+  const addTag = () => {
+    const trimmed = newTag.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+      setNewTag('');
+    }
+  };
+
+  const removeTag = (name: string) => {
+    setTags(tags.filter(t => t !== name));
+  };
+
+  const toggleSection = (section: 'performers' | 'tags') => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
   // Format duration
@@ -233,33 +289,160 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
               </small>
             </div>
 
-            {/* Scraped Metadata Preview */}
-            {item.metadata && (
-              (item.metadata.performers?.length || item.metadata.tags?.length || item.metadata.studio) && (
-                <div className="p-3 rounded" style={{ backgroundColor: '#1a3020', border: '1px solid #2d5a3d' }}>
-                  <small className="d-block mb-2" style={{ color: '#7dcea0' }}>
-                    ✓ Scraped metadata (will be applied):
-                  </small>
-                  <div className="d-flex gap-2 flex-wrap">
-                    {item.metadata.performers?.length ? (
-                      <span className="badge bg-success">
-                        👤 {item.metadata.performers.length} performer{item.metadata.performers.length > 1 ? 's' : ''}: {item.metadata.performers.slice(0, 3).join(', ')}{item.metadata.performers.length > 3 ? '...' : ''}
+            {/* Performers Section */}
+            <div className="p-3 rounded" style={{ backgroundColor: '#243340', border: '1px solid #394b59' }}>
+              <div
+                className="d-flex justify-content-between align-items-center"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleSection('performers')}
+              >
+                <label className="form-label mb-0" style={{ color: '#8b9fad', cursor: 'pointer' }}>
+                  👤 Performers ({performers.length})
+                </label>
+                <span style={{ color: '#8b9fad' }}>
+                  {expandedSections.performers ? '▼' : '▶'}
+                </span>
+              </div>
+
+              {expandedSections.performers && (
+                <div className="mt-2">
+                  {/* List of performers */}
+                  <div className="d-flex flex-wrap gap-1 mb-2">
+                    {performers.map((name) => (
+                      <span
+                        key={name}
+                        className="badge bg-primary d-flex align-items-center gap-1"
+                        style={{ fontSize: '0.85rem' }}
+                      >
+                        {name}
+                        <button
+                          type="button"
+                          className="btn-close btn-close-white"
+                          style={{ fontSize: '0.5rem', padding: '0.25rem' }}
+                          onClick={() => removePerformer(name)}
+                          title="Remove"
+                        />
                       </span>
-                    ) : null}
-                    {item.metadata.tags?.length ? (
-                      <span className="badge bg-secondary">
-                        🏷️ {item.metadata.tags.length} tag{item.metadata.tags.length > 1 ? 's' : ''}
-                      </span>
-                    ) : null}
-                    {item.metadata.studio && (
-                      <span className="badge bg-info">
-                        🏢 {item.metadata.studio}
-                      </span>
+                    ))}
+                    {performers.length === 0 && (
+                      <small className="text-muted">No performers</small>
                     )}
                   </div>
+
+                  {/* Add performer input */}
+                  <div className="input-group input-group-sm">
+                    <input
+                      type="text"
+                      className="form-control text-light"
+                      style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
+                      placeholder="Add performer..."
+                      value={newPerformer}
+                      onChange={(e) => setNewPerformer(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPerformer())}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-success"
+                      onClick={addPerformer}
+                      disabled={!newPerformer.trim()}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              )
-            )}
+              )}
+            </div>
+
+            {/* Tags Section */}
+            <div className="p-3 rounded" style={{ backgroundColor: '#243340', border: '1px solid #394b59' }}>
+              <div
+                className="d-flex justify-content-between align-items-center"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleSection('tags')}
+              >
+                <label className="form-label mb-0" style={{ color: '#8b9fad', cursor: 'pointer' }}>
+                  🏷️ Tags ({tags.length})
+                </label>
+                <span style={{ color: '#8b9fad' }}>
+                  {expandedSections.tags ? '▼' : '▶'}
+                </span>
+              </div>
+
+              {expandedSections.tags && (
+                <div className="mt-2">
+                  {/* List of tags */}
+                  <div className="d-flex flex-wrap gap-1 mb-2" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                    {tags.map((name) => (
+                      <span
+                        key={name}
+                        className="badge bg-secondary d-flex align-items-center gap-1"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        {name}
+                        <button
+                          type="button"
+                          className="btn-close btn-close-white"
+                          style={{ fontSize: '0.45rem', padding: '0.2rem' }}
+                          onClick={() => removeTag(name)}
+                          title="Remove"
+                        />
+                      </span>
+                    ))}
+                    {tags.length === 0 && (
+                      <small className="text-muted">No tags</small>
+                    )}
+                  </div>
+
+                  {/* Add tag input */}
+                  <div className="input-group input-group-sm">
+                    <input
+                      type="text"
+                      className="form-control text-light"
+                      style={{ backgroundColor: '#1a2530', borderColor: '#394b59' }}
+                      placeholder="Add tag..."
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-success"
+                      onClick={addTag}
+                      disabled={!newTag.trim()}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Studio Section */}
+            <div>
+              <label className="form-label" style={{ color: '#8b9fad' }}>
+                🏢 Studio
+              </label>
+              <div className="input-group">
+                <input
+                  type="text"
+                  className="form-control text-light"
+                  style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
+                  placeholder="Studio name..."
+                  value={studio}
+                  onChange={(e) => setStudio(e.target.value)}
+                />
+                {studio && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger"
+                    onClick={() => setStudio('')}
+                    title="Clear studio"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Actions */}
             <div className="d-flex gap-2">

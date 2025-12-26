@@ -317,7 +317,7 @@ export class StashGraphQLService {
           id
           name
           disambiguation
-          aliases
+          alias_list
           image_path
         }
       }
@@ -1169,6 +1169,7 @@ export class StashGraphQLService {
     performer_ids?: string[];
     tag_ids?: string[];
     studio_id?: string | null;
+    cover_image?: string; // Base64 encoded image
   }): Promise<IStashScene> {
     const mutation = `
       mutation SceneUpdate($input: SceneUpdateInput!) {
