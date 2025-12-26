@@ -17,6 +17,16 @@ import { formatBytes, formatDownloadError, createLogger } from '@/utils';
 
 const debugLog = createLogger('EditMetadataModal');
 
+// Format seconds as "Xm Ys" or "Xs"
+function formatElapsedTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+}
+
 interface ScraperInfo {
   name: string;
   canHandle: boolean;
@@ -58,6 +68,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
   const [availableScrapers, setAvailableScrapers] = useState<ScraperInfo[]>([]);
   const [formKey, setFormKey] = useState(0); // Key to force form re-initialization
   const [effectiveItem, setEffectiveItem] = useState<IDownloadItem | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Get current state from item (persisted across modal open/close)
   const isImporting = item?.status === DownloadStatus.Processing || item?.status === DownloadStatus.Downloading;
@@ -71,6 +82,22 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       setEffectiveItem(item);
     }
   }, [item]);
+
+  // Track elapsed time during download
+  useEffect(() => {
+    if (!isImporting) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    // Start timer
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isImporting]);
 
   // Load available scrapers when item changes
   useEffect(() => {
@@ -327,37 +354,45 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
                   <div className="d-flex flex-column gap-3 align-items-center">
                     <LoadingSpinner size="lg" text={importStatus} />
 
-                    {downloadProgress && (
-                      <div className="w-100" style={{ maxWidth: '600px' }}>
-                        <div className="d-flex flex-column gap-2">
-                          <p className="text-center text-muted small mb-0">
-                            {downloadProgress.totalBytes > 0
-                              ? `${downloadProgress.percentage.toFixed(1)}% - ${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(downloadProgress.totalBytes)}`
-                              : `Downloaded: ${formatBytes(downloadProgress.bytesDownloaded)}`}
-                          </p>
+                    <div className="w-100" style={{ maxWidth: '600px' }}>
+                      <div className="d-flex flex-column gap-2">
+                        {/* Show elapsed time and progress info */}
+                        <p className="text-center text-muted small mb-0">
+                          {downloadProgress && downloadProgress.totalBytes > 0
+                            ? `${downloadProgress.percentage.toFixed(1)}% - ${formatBytes(downloadProgress.bytesDownloaded)} / ${formatBytes(downloadProgress.totalBytes)}`
+                            : downloadProgress && downloadProgress.bytesDownloaded > 0
+                              ? `Downloaded: ${formatBytes(downloadProgress.bytesDownloaded)}`
+                              : `Elapsed: ${formatElapsedTime(elapsedSeconds)}`}
+                        </p>
 
-                          <div className="progress" style={{ height: '8px' }}>
-                            <div
-                              className={`progress-bar ${downloadProgress.totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''}`}
-                              role="progressbar"
-                              style={{ width: `${downloadProgress.totalBytes > 0 ? downloadProgress.percentage : 100}%` }}
-                              aria-valuenow={downloadProgress.percentage}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            ></div>
-                          </div>
-
-                          {downloadProgress.speed > 0 && (
-                            <p className="text-center text-muted small mb-0">
-                              Speed: {formatBytes(downloadProgress.speed)}/s
-                              {downloadProgress.timeRemaining && downloadProgress.timeRemaining < 3600 && (
-                                <> • ETA: {Math.ceil(downloadProgress.timeRemaining)}s</>
-                              )}
-                            </p>
-                          )}
+                        <div className="progress" style={{ height: '8px' }}>
+                          <div
+                            className={`progress-bar ${!downloadProgress || downloadProgress.totalBytes === 0 ? 'progress-bar-striped progress-bar-animated' : ''}`}
+                            role="progressbar"
+                            style={{ width: `${downloadProgress && downloadProgress.totalBytes > 0 ? downloadProgress.percentage : 100}%` }}
+                            aria-valuenow={downloadProgress?.percentage || 0}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                          ></div>
                         </div>
+
+                        {/* Show speed/ETA if available, otherwise show elapsed time below progress */}
+                        {downloadProgress && downloadProgress.speed > 0 ? (
+                          <p className="text-center text-muted small mb-0">
+                            Speed: {formatBytes(downloadProgress.speed)}/s
+                            {downloadProgress.timeRemaining && downloadProgress.timeRemaining < 3600 && (
+                              <> • ETA: {Math.ceil(downloadProgress.timeRemaining)}s</>
+                            )}
+                          </p>
+                        ) : elapsedSeconds > 0 && (
+                          <p className="text-center small mb-0" style={{ color: '#6c757d' }}>
+                            <span className="me-2">⏱</span>
+                            {formatElapsedTime(elapsedSeconds)} elapsed
+                            {elapsedSeconds >= 5 && <span className="ms-2" style={{ color: '#28a745' }}>• Working...</span>}
+                          </p>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               ) : (

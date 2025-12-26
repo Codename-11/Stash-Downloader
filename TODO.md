@@ -5,7 +5,7 @@
 
 ## In Progress
 
-(None currently)
+- [ ] Fix stable release to contain version in index.yml
 
 ## Backlog
 
