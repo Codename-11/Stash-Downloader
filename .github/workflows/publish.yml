@@ -341,38 +341,146 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git log
 
       - name: Download stable ZIP
         uses: actions/download-artifact@v4
         with:
           name: stable-plugin-zip
 
+      - name: Get commits since last release
+        id: commits
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using all commits"
+            COMMITS=$(git log --oneline --no-decorate -50)
+          else
+            echo "Previous tag: $PREV_TAG"
+            COMMITS=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
+          fi
+
+          # Save to file for Claude (avoids escaping issues)
+          echo "$COMMITS" > /tmp/commits.txt
+          echo "commits_file=/tmp/commits.txt" >> $GITHUB_OUTPUT
+
+          # Also save for fallback
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate release summary with Claude
+        id: summary
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          COMMITS=$(cat /tmp/commits.txt)
+          VERSION="${{ needs.deploy-stable.outputs.version }}"
+
+          # Skip if no API key configured
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY configured, skipping AI summary"
+            echo "summary=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Build prompt
+          PROMPT="You are writing release notes for Stash Downloader, a plugin for Stash (media organization software). Generate a concise, user-friendly summary of what's new in version ${VERSION}.
+
+          Commits since last release:
+          ${COMMITS}
+
+          Instructions:
+          - Write 3-6 bullet points summarizing the most important changes
+          - Group related commits into single bullet points
+          - Use simple language, focus on user-facing changes
+          - Start each bullet with an emoji: ✨ for features, 🐛 for fixes, ⚡ for improvements, 🔧 for maintenance
+          - Do NOT include commit hashes
+          - Do NOT mention 'chore' or 'refactor' unless user-visible
+          - Keep it brief - one line per bullet point
+          - Output ONLY the bullet points, no headers or extra text"
+
+          # Call Claude API
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d "$(jq -n \
+              --arg prompt "$PROMPT" \
+              '{
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 500,
+                messages: [{role: "user", content: $prompt}]
+              }')")
+
+          # Extract text from response
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+
+          if [ -z "$SUMMARY" ]; then
+            echo "Claude API returned empty response"
+            echo "$RESPONSE" | head -c 500
+            echo "summary=" >> $GITHUB_OUTPUT
+          else
+            # Save to file to preserve formatting
+            echo "$SUMMARY" > /tmp/summary.txt
+            echo "summary_file=/tmp/summary.txt" >> $GITHUB_OUTPUT
+            echo "has_summary=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build release body
+        id: body
+        run: |
+          VERSION="${{ needs.deploy-stable.outputs.version }}"
+
+          # Start with header
+          cat > /tmp/release_body.md << 'HEADER'
+          ## 🚀 Stash Downloader v
+          HEADER
+          # Append version (avoiding heredoc variable issues)
+          sed -i "s/v$/v${VERSION}/" /tmp/release_body.md
+
+          # Add AI summary if available
+          if [ "${{ steps.summary.outputs.has_summary }}" = "true" ]; then
+            echo "" >> /tmp/release_body.md
+            echo "### ✨ What's New" >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+            cat /tmp/summary.txt >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+          fi
+
+          # Add installation instructions
+          cat >> /tmp/release_body.md << 'FOOTER'
+
+          ### 📦 Installation
+
+          **Via Stash Plugin Manager (Recommended):**
+          1. Settings → Plugins → Available Plugins → Add Source
+          2. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
+          3. Find "Stash Downloader" and click Install
+
+          **Manual Installation:**
+          1. Download `stash-downloader.zip` below
+          2. Extract to `~/.stash/plugins/stash-downloader/`
+          3. Reload plugins in Stash
+
+          ### 📋 Requirements
+          - Stash v0.20+
+          - Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+
+          ---
+
+          FOOTER
+
+          echo "Generated release body:"
+          cat /tmp/release_body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ needs.deploy-stable.outputs.version }}
           generate_release_notes: true
-          body: |
-            ## 🚀 Stash Downloader v${{ needs.deploy-stable.outputs.version }}
-
-            ### 📦 Installation
-
-            **Via Stash Plugin Manager (Recommended):**
-            1. Settings → Plugins → Available Plugins → Add Source
-            2. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
-            3. Find "Stash Downloader" and click Install
-
-            **Manual Installation:**
-            1. Download `stash-downloader.zip` below
-            2. Extract to `~/.stash/plugins/stash-downloader/`
-            3. Reload plugins in Stash
-
-            ### 📋 Requirements
-            - Stash v0.20+
-            - Python 3.7+ with yt-dlp (`pip install yt-dlp`)
-
-            ---
-
+          body_path: /tmp/release_body.md
           append_body: true
           files: stash-downloader.zip
           draft: false
