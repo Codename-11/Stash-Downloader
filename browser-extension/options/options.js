@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Elements
   const stashUrlInput = document.getElementById('stashUrl');
   const apiKeyInput = document.getElementById('apiKey');
+  const targetVersionSelect = document.getElementById('targetVersion');
   const showNotificationsCheckbox = document.getElementById('showNotifications');
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
@@ -37,13 +38,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = await browser.storage.sync.get({
       stashUrl: 'http://localhost:9999',
       apiKey: '',
+      targetVersion: 'stable',
       showNotifications: true
     });
 
-    log('Settings loaded: ' + settings.stashUrl);
+    log('Settings loaded: ' + settings.stashUrl + ' (target: ' + settings.targetVersion + ')');
 
     stashUrlInput.value = settings.stashUrl;
     apiKeyInput.value = settings.apiKey;
+    targetVersionSelect.value = settings.targetVersion;
     showNotificationsCheckbox.checked = settings.showNotifications;
 
     // Auto-test on load
@@ -171,6 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = {
       stashUrl: stashUrlInput.value.trim().replace(/\/$/, ''),
       apiKey: apiKeyInput.value.trim(),
+      targetVersion: targetVersionSelect.value,
       showNotifications: showNotificationsCheckbox.checked
     };
 

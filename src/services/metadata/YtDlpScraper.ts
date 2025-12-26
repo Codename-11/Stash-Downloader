@@ -13,11 +13,9 @@ import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { createLogger } from '@/utils';
+import { PLUGIN_ID, STORAGE_KEYS } from '@/constants';
 
 const log = createLogger('YtDlpScraper');
-
-// Plugin ID for runPluginTask/runPluginOperation calls
-const PLUGIN_ID = 'stash-downloader';
 
 export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
@@ -68,7 +66,7 @@ export class YtDlpScraper implements IMetadataScraper {
       // Get proxy setting from localStorage if available
       let proxy: string | undefined;
       if (typeof window !== 'undefined') {
-        const settings = localStorage.getItem('stash-downloader:settings');
+        const settings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (settings) {
           try {
             const parsed = JSON.parse(settings);

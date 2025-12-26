@@ -75,8 +75,19 @@ async function getSettings() {
   return await browser.storage.sync.get({
     stashUrl: 'http://localhost:9999',
     apiKey: '',
+    targetVersion: 'stable',
     showNotifications: true
   });
+}
+
+// Get plugin identifiers based on target version
+function getPluginIdentifiers(targetVersion) {
+  const isDev = targetVersion === 'dev';
+  return {
+    route: isDev ? '/plugin/stash-downloader-dev' : '/plugin/stash-downloader',
+    storageKey: isDev ? 'stash-downloader-dev-external-queue' : 'stash-downloader-external-queue',
+    eventName: isDev ? 'stash-downloader-dev-add-url' : 'stash-downloader-add-url',
+  };
 }
 
 async function sendToStash(url, contentType = 'Video', options = {}) {
@@ -136,16 +147,12 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
   // Fallback: Open Stash and use localStorage + SPA navigation
   // Can't use URL params because Stash is a SPA - direct URL access gives 404
 
+  // Get plugin identifiers based on target version setting
+  const ids = getPluginIdentifiers(settings.targetVersion);
+  console.log('[Stash Downloader] Using target version:', settings.targetVersion, ids);
+
   // Open Stash root (or find existing Stash tab)
   const newTab = await browser.tabs.create({ url: settings.stashUrl });
-
-  // Wait for tab to load, then inject the URL into localStorage and navigate
-  const queueData = JSON.stringify([{
-    url: url,
-    contentType: contentType,
-    options: options,
-    timestamp: Date.now()
-  }]);
 
   // Listen for tab to complete loading
   const onTabUpdated = (tabId, changeInfo) => {
@@ -158,9 +165,12 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
           (function() {
             const urlToQueue = ${JSON.stringify(url)};
             const contentType = ${JSON.stringify(contentType)};
+            const pluginRoute = ${JSON.stringify(ids.route)};
+            const storageKey = ${JSON.stringify(ids.storageKey)};
+            const eventName = ${JSON.stringify(ids.eventName)};
 
             console.log('[Stash Downloader Extension] URL to queue:', urlToQueue);
-            console.log('[Stash Downloader Extension] Content type:', contentType);
+            console.log('[Stash Downloader Extension] Target plugin:', pluginRoute);
 
             // Store in localStorage as backup
             const queueData = JSON.stringify([{
@@ -168,21 +178,21 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
               contentType: contentType,
               timestamp: Date.now()
             }]);
-            localStorage.setItem('stash-downloader-external-queue', queueData);
-            console.log('[Stash Downloader Extension] Stored in localStorage:', queueData);
+            localStorage.setItem(storageKey, queueData);
+            console.log('[Stash Downloader Extension] Stored in localStorage:', storageKey);
 
             // Navigate to downloader within the SPA
-            window.history.pushState({}, '', '/plugin/stash-downloader');
+            window.history.pushState({}, '', pluginRoute);
             window.dispatchEvent(new PopStateEvent('popstate'));
 
-            console.log('[Stash Downloader Extension] Navigating to downloader...');
+            console.log('[Stash Downloader Extension] Navigating to:', pluginRoute);
 
             // Wait for React to mount, then dispatch custom event
             function dispatchAddUrl() {
-              console.log('[Stash Downloader Extension] Dispatching event with URL:', urlToQueue);
+              console.log('[Stash Downloader Extension] Dispatching event:', eventName);
               // Use cloneInto() to safely pass data across Firefox security boundaries
               const detail = { url: urlToQueue, contentType: contentType };
-              window.dispatchEvent(new CustomEvent('stash-downloader-add-url', {
+              window.dispatchEvent(new CustomEvent(eventName, {
                 detail: typeof cloneInto !== 'undefined' ? cloneInto(detail, window) : detail
               }));
             }

@@ -16,11 +16,9 @@ import { StashScraper } from './StashScraper';
 import { BooruScraper } from './BooruScraper';
 import { withTimeout, createLogger } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
+import { PLUGIN_ID } from '@/constants';
 
 const log = createLogger('ScraperRegistry');
-
-// Plugin ID for yt-dlp check
-const PLUGIN_ID = 'stash-downloader';
 
 export class ScraperRegistry {
   private scrapers: IMetadataScraper[] = [];

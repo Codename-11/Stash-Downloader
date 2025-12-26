@@ -4,6 +4,7 @@
  */
 
 import { createLogger } from './Logger';
+import { PLUGIN_ID } from '@/constants';
 
 const log = createLogger('ProxyTest');
 
@@ -55,7 +56,7 @@ export async function testHttpProxy(
 
         // Run extract_metadata task with proxy
         const taskResult = await stashService.runPluginTaskAndWait(
-          'stash-downloader',
+          PLUGIN_ID,
           'Test Proxy',
           {
             mode: 'extract_metadata',
@@ -70,13 +71,13 @@ export async function testHttpProxy(
 
         if (taskResult.success) {
           // Read the result
-          const result = await stashService.runPluginOperation('stash-downloader', {
+          const result = await stashService.runPluginOperation(PLUGIN_ID, {
             mode: 'read_result',
             result_id: resultId,
           }) as any;
 
           // Cleanup
-          stashService.runPluginTask('stash-downloader', 'Cleanup Result', {
+          stashService.runPluginTask(PLUGIN_ID, 'Cleanup Result', {
             mode: 'cleanup_result',
             result_id: resultId,
           }).catch(() => {});
