@@ -4,7 +4,7 @@
 
 export const PLUGIN_ID = 'stash-downloader';
 export const PLUGIN_NAME = 'Stash Downloader';
-export const PLUGIN_VERSION = '0.1.0';
+// Version is injected at build time via __APP_VERSION__ (from package.json)
 
 export const ROUTES = {
   MAIN: '/plugin/stash-downloader',

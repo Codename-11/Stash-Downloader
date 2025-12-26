@@ -239,10 +239,7 @@ jobs:
 
           echo "=== MODIFICATION COMPLETE ==="
 
-      - name: Build plugin
-        run: npm run build
-
-      - name: Get version
+      - name: Get version and update package.json
         id: version
         run: |
           BASE_VERSION=$(node -p "require('./package.json').version")
@@ -250,6 +247,13 @@ jobs:
           VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Building DEV version: ${VERSION}"
+
+          # Update package.json version so __APP_VERSION__ is correct at build time
+          npm version ${VERSION} --no-git-tag-version --allow-same-version
+          echo "Updated package.json version to ${VERSION}"
+
+      - name: Build plugin
+        run: npm run build
 
       - name: Create dev plugin package
         run: |
