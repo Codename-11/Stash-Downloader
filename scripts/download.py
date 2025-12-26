@@ -599,6 +599,8 @@ def download_video(
         "--no-playlist",
         "--newline",  # Output progress on new lines for parsing
         "--progress",  # Show progress bar
+        # Use progress template to ensure consistent output format
+        "--progress-template", "download:[download] %(progress._percent_str)s of %(progress._total_bytes_str)s at %(progress._speed_str)s ETA %(progress._eta_str)s",
         "--print",
         "after_move:filepath",  # Print final path
     ]
@@ -642,70 +644,90 @@ def download_video(
 
     try:
         # Use Popen for streaming output to get real-time progress
+        # Merge stderr into stdout so we get all output in one stream
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,  # Line buffered
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
             env=env,  # Pass environment with TERM=xterm to enable progress output
         )
 
-        stdout_lines = []
+        import time
+
+        stdout_lines = []  # To capture the final file path
         last_progress_update = 0
         progress_update_interval = 0.5  # Update progress file every 0.5 seconds
 
-        # Read stderr for progress (yt-dlp outputs progress to stderr)
-        import time
-        import select
-        import threading
-
-        # Collect stdout in a separate thread
-        def read_stdout():
-            if process.stdout:
-                for line in process.stdout:
-                    stdout_lines.append(line.strip())
-
-        stdout_thread = threading.Thread(target=read_stdout)
-        stdout_thread.daemon = True
-        stdout_thread.start()
-
-        # Read stderr for progress updates
+        # Read combined stdout/stderr for progress updates
+        # yt-dlp uses \r (carriage return) to update progress in place
+        # We need to read in chunks and split on both \r and \n
         lines_read = 0
         progress_updates = 0
-        if process.stderr:
-            log.info("Reading yt-dlp stderr for progress updates...")
-            for line in process.stderr:
-                line = line.strip()
-                if not line:
-                    continue
-                lines_read += 1
+        log.info("Reading yt-dlp output for progress updates...")
 
-                # Parse progress from yt-dlp output
-                progress = parse_ytdlp_progress(line)
-                if progress:
-                    progress_updates += 1
-                    current_time = time.time()
-                    # Update progress file periodically (not on every line)
-                    if progress_id and (current_time - last_progress_update) >= progress_update_interval:
-                        progress["status"] = "downloading"
-                        save_result(f"progress-{progress_id}", progress)
-                        last_progress_update = current_time
-                        log.info(f"Progress: {progress['percentage']:.1f}% ({progress.get('downloaded_bytes', 0)}/{progress.get('total_bytes', 0)} bytes)")
+        output_buffer = ""
+        if process.stdout:
+            while True:
+                # Read in small chunks to handle progress updates in real-time
+                chunk = process.stdout.read(256)
+                if not chunk:
+                    break
 
-                    if progress_callback:
-                        progress_callback(progress)
-                else:
-                    # Log non-progress stderr lines at debug level
-                    if "[download]" in line or "[info]" in line:
-                        log.debug(f"yt-dlp: {line}")
-                    elif "ERROR" in line or "error" in line.lower():
-                        log.error(f"yt-dlp: {line}")
-            log.info(f"Finished reading stderr: {lines_read} lines, {progress_updates} progress updates")
+                # Decode and add to buffer
+                output_buffer += chunk.decode('utf-8', errors='replace')
+
+                # Split on both \r and \n to get progress lines
+                # yt-dlp uses \r to overwrite progress lines
+                while '\r' in output_buffer or '\n' in output_buffer:
+                    # Find the first line terminator
+                    r_pos = output_buffer.find('\r')
+                    n_pos = output_buffer.find('\n')
+
+                    if r_pos == -1:
+                        split_pos = n_pos
+                    elif n_pos == -1:
+                        split_pos = r_pos
+                    else:
+                        split_pos = min(r_pos, n_pos)
+
+                    line = output_buffer[:split_pos].strip()
+                    output_buffer = output_buffer[split_pos + 1:]
+
+                    if not line:
+                        continue
+                    lines_read += 1
+
+                    # Check if this is the final file path (from --print after_move:filepath)
+                    if line.startswith('/') or (len(line) > 2 and line[1] == ':'):  # Unix or Windows path
+                        stdout_lines.append(line)
+                        log.debug(f"Captured output path: {line}")
+                        continue
+
+                    # Parse progress from yt-dlp output
+                    progress = parse_ytdlp_progress(line)
+                    if progress:
+                        progress_updates += 1
+                        current_time = time.time()
+                        # Update progress file periodically (not on every line)
+                        if progress_id and (current_time - last_progress_update) >= progress_update_interval:
+                            progress["status"] = "downloading"
+                            save_result(f"progress-{progress_id}", progress)
+                            last_progress_update = current_time
+                            log.info(f"Progress: {progress['percentage']:.1f}% ({progress.get('downloaded_bytes', 0)}/{progress.get('total_bytes', 0)} bytes)")
+
+                        if progress_callback:
+                            progress_callback(progress)
+                    else:
+                        # Log non-progress lines at debug level
+                        if "[download]" in line or "[info]" in line:
+                            log.debug(f"yt-dlp: {line}")
+                        elif "ERROR" in line or "error" in line.lower():
+                            log.error(f"yt-dlp: {line}")
+
+        log.info(f"Finished reading output: {lines_read} lines, {progress_updates} progress updates")
 
         # Wait for process to complete
         process.wait()
-        stdout_thread.join(timeout=5)
 
         if process.returncode == 0:
             # Last line of stdout should be the file path
