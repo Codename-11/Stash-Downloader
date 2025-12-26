@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation - Stash Downloader</title>
+  <meta name="description" content="Documentation for Stash Downloader plugin - installation, usage, troubleshooting, and development guides.">
+  <meta name="theme-color" content="#1a2634">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <!-- Marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root {
+      --bg-primary: #1a2634;
+      --bg-secondary: #243340;
+      --bg-card: #30404d;
+      --border: #394b59;
+      --text-primary: #ffffff;
+      --text-muted: #8b9fad;
+      --accent: #4a9eff;
+      --accent-hover: #6bb3ff;
+      --success: #28a745;
+      --warning: #ffc107;
+      --code-bg: #1e2a36;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .logo:hover {
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 6px 12px;
+      border-radius: 4px;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+      background: var(--bg-card);
+      text-decoration: none;
+    }
+
+    /* Layout */
+    .container {
+      display: flex;
+      max-width: 1200px;
+      margin: 0 auto;
+      min-height: calc(100vh - 65px);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+      position: sticky;
+      top: 65px;
+      height: calc(100vh - 65px);
+      overflow-y: auto;
+    }
+
+    .sidebar-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-left: 12px;
+    }
+
+    .nav-item {
+      display: block;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      border-radius: 6px;
+      margin-bottom: 4px;
+      transition: all 0.15s;
+    }
+
+    .nav-item:hover {
+      color: var(--text-primary);
+      background: var(--bg-card);
+      text-decoration: none;
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+      background: rgba(74, 158, 255, 0.1);
+    }
+
+    /* Content */
+    .content {
+      flex: 1;
+      padding: 32px 48px;
+      max-width: calc(100% - 260px);
+      overflow-x: hidden;
+    }
+
+    /* Markdown Styles */
+    .markdown-body {
+      line-height: 1.7;
+    }
+
+    .markdown-body h1 {
+      font-size: 2rem;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .markdown-body h2 {
+      font-size: 1.5rem;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .markdown-body h3 {
+      font-size: 1.25rem;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    .markdown-body h4 {
+      font-size: 1.1rem;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    .markdown-body p {
+      margin-bottom: 16px;
+    }
+
+    .markdown-body ul, .markdown-body ol {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+
+    .markdown-body li {
+      margin-bottom: 8px;
+    }
+
+    .markdown-body code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      color: var(--accent);
+    }
+
+    .markdown-body pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    .markdown-body pre code {
+      background: none;
+      padding: 0;
+      color: var(--text-primary);
+    }
+
+    .markdown-body blockquote {
+      border-left: 4px solid var(--accent);
+      padding-left: 16px;
+      margin: 16px 0;
+      color: var(--text-muted);
+    }
+
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+
+    .markdown-body th, .markdown-body td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .markdown-body th {
+      background: var(--bg-secondary);
+      font-weight: 600;
+    }
+
+    .markdown-body tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    .markdown-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 32px 0;
+    }
+
+    .markdown-body strong {
+      font-weight: 600;
+    }
+
+    .markdown-body a {
+      color: var(--accent);
+    }
+
+    .markdown-body a:hover {
+      color: var(--accent-hover);
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--text-muted);
+    }
+
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        position: relative;
+        top: 0;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 16px;
+      }
+
+      .sidebar-title {
+        width: 100%;
+      }
+
+      .nav-item {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+
+      .content {
+        max-width: 100%;
+        padding: 24px 16px;
+      }
+
+      .markdown-body h1 {
+        font-size: 1.5rem;
+      }
+
+      .markdown-body h2 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <a href="./" class="logo">
+        <img src="logo.svg" alt="Stash Downloader" width="32" height="32">
+        Stash Downloader
+      </a>
+      <nav class="nav-links">
+        <a href="./">Home</a>
+        <a href="https://github.com/Codename-11/Stash-Downloader">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="sidebar-title">Documentation</div>
+      <a href="#installation" class="nav-item active" data-doc="INSTALLATION.md">Installation</a>
+      <a href="#usage" class="nav-item" data-doc="USAGE.md">Usage Guide</a>
+      <a href="#troubleshooting" class="nav-item" data-doc="TROUBLESHOOTING.md">Troubleshooting</a>
+      <a href="#development" class="nav-item" data-doc="DEVELOPMENT.md">Development</a>
+    </aside>
+
+    <main class="content">
+      <article id="doc-content" class="markdown-body">
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          Loading documentation...
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    const contentEl = document.getElementById('doc-content');
+    const navItems = document.querySelectorAll('.nav-item');
+    let currentDoc = 'INSTALLATION.md';
+
+    // Configure marked
+    marked.setOptions({
+      breaks: true,
+      gfm: true,
+    });
+
+    async function loadDoc(filename) {
+      contentEl.innerHTML = `
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          Loading documentation...
+        </div>
+      `;
+
+      try {
+        const response = await fetch(filename);
+        if (!response.ok) throw new Error('Doc not found');
+        const markdown = await response.text();
+        contentEl.innerHTML = marked.parse(markdown);
+        currentDoc = filename;
+
+        // Update active nav
+        navItems.forEach(item => {
+          item.classList.toggle('active', item.dataset.doc === filename);
+        });
+      } catch (err) {
+        contentEl.innerHTML = `
+          <h1>Error Loading Documentation</h1>
+          <p>Could not load ${filename}. Please try again or check the
+          <a href="https://github.com/Codename-11/Stash-Downloader/tree/main/docs">GitHub repository</a>.</p>
+        `;
+      }
+    }
+
+    // Navigation click handlers
+    navItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const doc = item.dataset.doc;
+        if (doc && doc !== currentDoc) {
+          loadDoc(doc);
+          history.pushState(null, '', item.getAttribute('href'));
+        }
+      });
+    });
+
+    // Handle back/forward
+    window.addEventListener('popstate', () => {
+      const hash = window.location.hash.slice(1) || 'installation';
+      const docMap = {
+        'installation': 'INSTALLATION.md',
+        'usage': 'USAGE.md',
+        'troubleshooting': 'TROUBLESHOOTING.md',
+        'development': 'DEVELOPMENT.md'
+      };
+      loadDoc(docMap[hash] || 'INSTALLATION.md');
+    });
+
+    // Initial load based on hash
+    const initialHash = window.location.hash.slice(1) || 'installation';
+    const docMap = {
+      'installation': 'INSTALLATION.md',
+      'usage': 'USAGE.md',
+      'troubleshooting': 'TROUBLESHOOTING.md',
+      'development': 'DEVELOPMENT.md'
+    };
+    loadDoc(docMap[initialHash] || 'INSTALLATION.md');
+  </script>
+</body>
+</html>

@@ -116,6 +116,14 @@ jobs:
           # Fetch existing index to get dev entry metadata
           curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || echo "No existing index"
 
+      - name: Copy product page
+        run: |
+          if [ -d "docs" ]; then
+            cp -r docs/* _site/
+            echo "Copied docs/ to _site/"
+            ls -la _site/
+          fi
+
       - name: Generate plugin index
         run: |
           CURRENT_DATETIME=$(date +'%Y-%m-%d %H:%M:%S')
@@ -276,6 +284,14 @@ jobs:
 
           # Fetch existing index to get stable entry metadata
           curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || echo "No existing index"
+
+      - name: Copy product page
+        run: |
+          if [ -d "docs" ]; then
+            cp -r docs/* _site/
+            echo "Copied docs/ to _site/"
+            ls -la _site/
+          fi
 
       - name: Generate plugin index
         run: |
