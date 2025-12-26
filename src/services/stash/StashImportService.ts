@@ -544,18 +544,24 @@ export class StashImportService {
 
       log.debug('Fetching cover image via server-side...');
 
+      interface FetchImageResult {
+        success?: boolean;
+        image_base64?: string;
+        result_error?: string;
+      }
+
       const result = await this.stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'fetch_image',
         url: imageUrl,
         proxy,
-      });
+      }) as FetchImageResult | null;
 
-      if (result && (result as any).success && (result as any).image_base64) {
+      if (result?.success && result?.image_base64) {
         log.debug('Cover image fetched successfully via server');
-        return (result as any).image_base64;
+        return result.image_base64;
       }
 
-      const errorMsg = (result as any)?.result_error || 'Unknown error';
+      const errorMsg = result?.result_error || 'Unknown error';
       log.warn(`Server-side image fetch failed: ${errorMsg}`);
       return null;
     } catch (err) {
