@@ -5,10 +5,10 @@
  */
 
 import { DownloaderMain } from './components/downloader/DownloaderMain';
-import { ROUTES } from './constants';
+import { ROUTES, PLUGIN_NAME } from './constants';
 import { createLogger } from './utils';
 
-const log = createLogger('Plugin');
+const log = createLogger(PLUGIN_NAME);
 
 // Import plugin styles as inline string (Stash plugins only load .js files)
 // The ?inline suffix tells Vite to return CSS as a string instead of extracting it
@@ -141,7 +141,7 @@ function initializePlugin() {
       return React.createElement(PluginWrapper, props);
     });
 
-    log.info(`Plugin registered successfully at ${ROUTES.MAIN}`);
+    log.info(`✓ Plugin registered successfully at ${ROUTES.MAIN}`);
 
     // Add navigation button using MutationObserver (community plugin pattern)
     // Uses .navbar-buttons selector like other community plugins
