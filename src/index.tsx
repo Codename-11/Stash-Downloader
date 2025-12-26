@@ -40,6 +40,7 @@ const { React } = window.PluginApi;
 /**
  * Wrapper component that provides Stash's IntlProvider context
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginApi passes unknown props
 function PluginWrapper(props: any) {
   const { IntlProvider } = window.PluginApi.libraries.Intl || {};
 
@@ -140,6 +141,7 @@ function initializePlugin() {
     log.debug('Available libraries:', JSON.stringify(Object.keys(window.PluginApi.libraries || {})));
 
     // Register main route with IntlProvider wrapper
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginApi route callback receives unknown props
     window.PluginApi.register.route(ROUTES.MAIN, (props?: any) => {
       return React.createElement(PluginWrapper, props);
     });

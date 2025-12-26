@@ -9,6 +9,8 @@
  * 5. Cleanup temp file
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- yt-dlp JSON output has dynamic structure */
+
 import type { IMetadataScraper, IScrapedMetadata } from '@/types';
 import { ContentType } from '@/types';
 import { getStashService } from '@/services/stash/StashGraphQLService';

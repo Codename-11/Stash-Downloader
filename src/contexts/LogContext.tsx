@@ -2,6 +2,8 @@
  * LogContext - Context for managing application logs with localStorage persistence
  */
 
+/* eslint-disable react-refresh/only-export-components -- Context files export both Provider and hook */
+
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { STORAGE_KEYS } from '@/constants';
 

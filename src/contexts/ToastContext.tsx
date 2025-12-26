@@ -2,6 +2,8 @@
  * ToastContext - Context for managing toast notifications
  */
 
+/* eslint-disable react-refresh/only-export-components -- Context files export both Provider and hook */
+
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';

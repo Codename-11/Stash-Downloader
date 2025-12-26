@@ -6,6 +6,8 @@
  * 2. Direct URL download (if videoUrl/imageUrl provided by scraper)
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- Python plugin task results have dynamic structure */
+
 import type { IDownloadProgress, IGalleryProgress } from '@/types';
 import { ContentType } from '@/types';
 import { fetchWithTimeout, getStorageItem, createLogger } from '@/utils';

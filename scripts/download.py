@@ -1209,6 +1209,7 @@ def task_fetch_image(args: dict) -> dict:
         or {success: False, result_error: "..."}
     """
     import base64
+    import requests
     from urllib.parse import urlparse
 
     url = args.get("url")

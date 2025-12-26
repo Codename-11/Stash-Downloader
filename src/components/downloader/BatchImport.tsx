@@ -63,7 +63,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
         setShowModal(true);
         setError(null);
       }
-    } catch (err) {
+    } catch (_err) {
       const errorMsg = 'Failed to read from clipboard. Please paste manually.';
       toast.showToast('error', 'Clipboard Error', errorMsg);
       setError(errorMsg);

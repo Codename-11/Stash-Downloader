@@ -131,8 +131,11 @@ export class StashImportService {
     });
 
     // Check if this was a server-side download (file already on disk)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const serverFilePath = (blob as any).__serverFilePath;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const libraryPath = (blob as any).__libraryPath;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info
     const scanJobId = (blob as any).__scanJobId;
 
     if (serverFilePath) {
@@ -285,6 +288,7 @@ export class StashImportService {
         }
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updateInput built dynamically from optional fields
       let updatedScene = await this.stashService.updateScene(scene.id, updateInput as any);
 
       if (onLog) onLog('success', 'Metadata applied');
@@ -498,6 +502,7 @@ export class StashImportService {
    * Create scene in Stash
    */
   private async createScene(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type varies by caller
     input: any,
     _fileData?: string
   ): Promise<IStashScene> {
@@ -509,6 +514,7 @@ export class StashImportService {
   /**
    * Create image in Stash
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type varies by caller
   private async createImage(input: any, _fileData?: string): Promise<IStashImage> {
     return await this.stashService.createImage(input);
   }

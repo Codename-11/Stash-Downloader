@@ -85,10 +85,12 @@ export class StashGraphQLService {
 
     // Check for GraphQL errors and log detailed information
     if (result.errors && result.errors.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL error shape varies
       const errorMessages = result.errors.map((e: any) => e.message || JSON.stringify(e));
       log.error('GraphQL errors:', JSON.stringify(errorMessages));
 
       // Log full error details for debugging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GraphQL error shape varies
       result.errors.forEach((error: any, index: number) => {
         log.error(`Error ${index + 1}:`, JSON.stringify({
           message: error.message,
@@ -735,6 +737,7 @@ export class StashGraphQLService {
    * - This is a JSON object like {"stash-downloader": {"httpProxy": "...", ...}}
    * - The plugins field accepts an optional include parameter to filter by plugin ID
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Plugin settings are dynamic key-value pairs
   async getPluginSettings(pluginId: string): Promise<Record<string, any> | null> {
     // Query configuration.plugins - this returns a PluginConfigMap scalar
     // PluginConfigMap is defined as "A plugin ID -> Map (String -> Any map) map"
@@ -748,6 +751,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
           plugins?: Record<string, Record<string, any>>;
@@ -769,8 +773,8 @@ export class StashGraphQLService {
         log.debug('Plugin found but no settings configured');
         return {};
       }
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       log.warn(`configuration.plugins query failed: ${errorMsg}`);
     }
 
@@ -784,6 +788,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
           plugins?: Record<string, Record<string, any>>;
@@ -802,8 +807,8 @@ export class StashGraphQLService {
         log.debug('Plugin found but no settings configured (fallback)');
         return {};
       }
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       log.warn(`configuration.plugins fallback query failed: ${errorMsg}`);
     }
 
@@ -834,6 +839,7 @@ export class StashGraphQLService {
     `;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Job type is complex and varies by operation
       const result = await this.gqlRequest<{ findJob: any }>(query, { input: { id: jobId } });
       return result.data?.findJob || null;
     } catch (error) {
@@ -942,6 +948,7 @@ export class StashGraphQLService {
    * Check if we're running in Stash (vs test-app)
    */
   isStashEnvironment(): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- __TEST_APP__ is test-app specific, not in Window type
     return !!(window.PluginApi && !(window as any).__TEST_APP__);
   }
 
@@ -1324,6 +1331,7 @@ export class StashGraphQLService {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updateInput built dynamically from scraped data
     return this.updateScene(sceneId, updateInput as any);
   }
 }

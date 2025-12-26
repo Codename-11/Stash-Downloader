@@ -278,7 +278,7 @@ export class ScraperRegistry {
     log.info('All scrapers failed, using generic fallback');
     try {
       return await this.fallbackScraper.scrape(url);
-    } catch (fallbackError) {
+    } catch (_fallbackError) {
       log.error('All scrapers failed', `URL: ${url}\nLast error: ${lastErrorMsg}`);
       throw new Error(`All scrapers failed for ${url}. Last error: ${lastErrorMsg}`);
     }

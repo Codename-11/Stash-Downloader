@@ -43,6 +43,7 @@ export function generateId(): string {
 /**
  * Debounce function
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic function type requires any for flexibility
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
