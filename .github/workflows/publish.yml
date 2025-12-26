@@ -147,6 +147,12 @@ jobs:
           cp README.md _package/
           cp LICENSE _package/
 
+          # Rename YAML for dev builds (Stash uses YAML filename as plugin ID)
+          if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
+            mv _package/stash-downloader.yml _package/stash-downloader-dev.yml
+            echo "Renamed YAML to stash-downloader-dev.yml for unique plugin ID"
+          fi
+
           # Create ZIP file (contents at root, not nested in folder)
           cd _package
           if [[ "${{ steps.check.outputs.is_dev }}" == "true" ]]; then
