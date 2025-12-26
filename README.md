@@ -5,8 +5,10 @@
 
   [![License](https://img.shields.io/github/license/Codename-11/Stash-Downloader)](LICENSE)
   [![GitHub Release](https://img.shields.io/github/v/release/Codename-11/Stash-Downloader)](https://github.com/Codename-11/Stash-Downloader/releases)
-  [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/ci.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
+  [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/publish.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
   [![Stash](https://img.shields.io/badge/Stash-v0.20%2B-blue)](https://github.com/stashapp/stash)
+
+  [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/codename_11)
 </div>
 
 ## Features

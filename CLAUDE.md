@@ -19,15 +19,50 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 | `npm run type-check` | TypeScript check |
 | `npm run lint` | ESLint check |
 
-## Release & Dev Workflow
+## Versioning & Release Workflow
 
-| Task | How |
-|------|-----|
-| **Stable release** | Create PR → merge → `git tag vX.Y.Z && git push origin vX.Y.Z` |
-| **Dev build** | Push to `dev` branch, or manual workflow dispatch with "Deploy as dev build" |
-| **Quick release** | Direct on main: bump version → commit → tag → push |
+### Two Independent Version Numbers
+| Component | Version Location | Release Trigger |
+|-----------|-----------------|-----------------|
+| **Stash Plugin** | `package.json` | Git tags (`vX.Y.Z`) |
+| **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO |
 
-Use `/release` skill for guided release process. See `.claude/conventions.md` for full details.
+**Important**: These versions are INDEPENDENT. Only bump what changed.
+
+### Stable vs Dev Builds
+| Build | Branch/Trigger | Plugin ID | Navbar Label |
+|-------|---------------|-----------|--------------|
+| **Stable** | Git tag `vX.Y.Z` | `stash-downloader` | "Downloader" |
+| **Dev** | Push to `dev` branch | `stash-downloader-dev` | "Downloader-Dev" |
+
+Both can be installed simultaneously in Stash from the same source URL.
+
+### When to Release What
+
+| Scenario | Action |
+|----------|--------|
+| Plugin code changed | Bump `package.json` → tag → push (use `/release` skill) |
+| Extension code changed | Bump `browser-extension/manifest.json` → manually upload ZIP to AMO |
+| Both changed | Bump both versions |
+| Testing changes | Push to `dev` branch (no version bump needed) |
+
+### Release Commands
+```bash
+# Quick stable release (on main)
+npm version patch|minor|major  # or edit package.json manually
+git add package.json && git commit -m "🔖 chore: release vX.Y.Z"
+git tag vX.Y.Z && git push origin main --tags
+
+# Dev build (for testing)
+git checkout dev && git merge main && git push origin dev
+```
+
+### After Releasing
+- **Stable**: GitHub Actions builds + deploys to GitHub Pages + creates GitHub Release
+- **Dev**: GitHub Actions builds with `-dev` suffix, deploys alongside stable
+- **Extension**: Manually run `python package_extension.py` and upload ZIP to AMO
+
+See `.claude/conventions.md` for full details.
 
 ## Tech Stack
 
