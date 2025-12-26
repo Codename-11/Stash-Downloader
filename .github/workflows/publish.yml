@@ -401,8 +401,8 @@ jobs:
           - Keep it brief - one line per bullet point
           - Output ONLY the bullet points, no headers or extra text"
 
-          # Call Gemini API (free tier: 15 req/min, 1M tokens/day)
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          # Call Gemini API (free tier)
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
               --arg prompt "$PROMPT" \
