@@ -33,8 +33,9 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 ```
 1. Work on dev branch
 2. Push to dev → triggers dev build (Downloader-Dev)
-3. When ready for release: PR or merge dev → main
-4. Tag on main → triggers stable release
+3. When ready for release: merge dev → main, bump version, tag
+4. Tag on main → triggers stable release (push to main alone does NOTHING)
+5. WAIT for workflow to complete before syncing dev
 ```
 
 ### Two Independent Versions
@@ -44,12 +45,13 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 | **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO |
 
 ### Stable vs Dev Builds
-| Build | Trigger | Plugin ID | Navbar Label |
-|-------|---------|-----------|--------------|
-| **Stable** | Git tag `vX.Y.Z` | `stash-downloader` | "Downloader" |
-| **Dev** | Push to `dev` | `stash-downloader-dev` | "Downloader-Dev" |
+| Build | Trigger | Plugin ID | Version Format |
+|-------|---------|-----------|----------------|
+| **Stable** | Git tag `vX.Y.Z` | `stash-downloader` | `X.Y.Z` |
+| **Dev** | Push to `dev` | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` |
 
-Both can be installed simultaneously in Stash.
+Both can be installed simultaneously in Stash (different plugin IDs via YAML filename).
+Both are served from the same `index.yml` - each deploy preserves the other's entry.
 
 ### Release Process
 ```bash
@@ -66,8 +68,10 @@ Or use `/release` skill for guided release.
 
 ### After Releasing
 - **Stable**: GitHub Actions builds + deploys to GitHub Pages + creates GitHub Release
-- **Dev**: Automatically stays ahead of main (no action needed)
+- **Dev**: Sync dev with main AFTER workflow completes (to avoid cancelling stable deploy)
 - **Extension**: Manually run `python package_extension.py` and upload ZIP to AMO
+
+**⚠️ WAIT for stable workflow to complete before pushing to dev** - concurrent deploys cancel each other!
 
 ## Tech Stack
 

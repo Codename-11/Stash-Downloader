@@ -540,11 +540,13 @@ Single workflow (`.github/workflows/publish.yml`) with conditional stages:
 **Flow:**
 ```
 PR to main       → test only
-Push to main     → test only
-Push to dev      → test → deploy (dev version)
-Tag push (v*)    → test → deploy (stable) → release
-Manual dispatch  → test → deploy (dev if checkbox enabled)
+Push to main     → NOTHING (workflow only triggers on dev branch or tags)
+Push to dev      → test → deploy-dev (dev version)
+Tag push (v*)    → test → deploy-stable → release
+Manual dispatch  → test → deploy-dev (if checkbox enabled)
 ```
+
+**IMPORTANT**: Push to `main` without a tag does NOT trigger any workflow. Only tags trigger stable builds.
 
 ### Stable vs Dev Channels
 
@@ -553,7 +555,7 @@ Both channels are served from the same `index.yml`:
 | Channel | Plugin ID | Version Format | Trigger |
 |---------|-----------|----------------|---------|
 | Stable | `stash-downloader` | `X.Y.Z` | Tag push (`v*`) |
-| Dev | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` | Push to `dev` branch |
+| Dev | `stash-downloader-dev` | `X.Y.Z-dev.{7-char-sha}` | Push to `dev` branch |
 
 **In Stash**, users see both plugins from the same source:
 - "Stash Downloader" - stable releases
@@ -562,6 +564,38 @@ Both channels are served from the same `index.yml`:
 **Manual dev deploy**: Use workflow_dispatch with "Deploy as dev build" checkbox.
 
 This ensures the stable plugin only updates on actual releases, while dev builds can be tested independently.
+
+### How index.yml Preserves Both Entries
+
+When deploying, each job preserves the OTHER build's entry in index.yml:
+
+**Stable deploy** (`deploy-stable`):
+1. Builds stable ZIP (`stash-downloader.zip`)
+2. Fetches existing dev ZIP from GitHub Pages (if exists)
+3. Fetches existing `index.yml` to get dev version/date metadata
+4. Generates new `index.yml` with BOTH entries (stable = new, dev = preserved)
+
+**Dev deploy** (`deploy-dev`):
+1. Builds dev ZIP (`stash-downloader-dev.zip`)
+2. Fetches existing stable ZIP from GitHub Pages (if exists)
+3. Fetches existing `index.yml` to get stable version/date metadata
+4. Generates new `index.yml` with BOTH entries (dev = new, stable = preserved)
+
+This ensures neither deploy overwrites the other channel's plugin.
+
+### Plugin ID from YAML Filename
+
+**CRITICAL**: Stash determines the plugin ID from the YAML filename, not contents.
+
+- `stash-downloader.yml` → Plugin ID: `stash-downloader`
+- `stash-downloader-dev.yml` → Plugin ID: `stash-downloader-dev`
+
+The dev workflow renames the YAML file to ensure both plugins can coexist:
+```bash
+mv _package/stash-downloader.yml _package/stash-downloader-dev.yml
+```
+
+Without this rename, installing dev would overwrite stable (same plugin ID).
 
 ## GitHub Pages Deployment
 

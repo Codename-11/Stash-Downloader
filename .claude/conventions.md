@@ -318,17 +318,24 @@ Or use `/release` skill for guided release.
 
 **⚠️ CRITICAL: GitHub Pages Concurrency**
 
-Do NOT push `main` and `dev` simultaneously or in quick succession. The GitHub Pages deployment uses concurrency control that will **cancel** whichever workflow started first.
+Do NOT push `main` (with tag) and `dev` simultaneously or in quick succession. GitHub Pages deployment uses a concurrency group - if a second deployment starts while the first is running, **the first will be cancelled**.
 
 ```yaml
 concurrency:
   group: "pages"
-  cancel-in-progress: false  # But still cancels if new deployment starts
+  cancel-in-progress: false  # Misleading - new deploys still cancel queued ones
 ```
+
+**What actually happens:**
+- Stable deploy starts (tag push)
+- Dev deploy starts before stable finishes (push to dev)
+- Stable deploy gets **CANCELLED** mid-way
+- Only dev build ends up deployed
+- Stable plugin disappears from index.yml!
 
 **Correct sequence:**
 1. Push `main` with tag
-2. **Wait for workflow to complete** (check Actions tab)
+2. **Wait for workflow to complete** (check Actions tab: https://github.com/Codename-11/Stash-Downloader/actions)
 3. Then sync `dev` with version bump
 
 **If release was cancelled:** Re-push the tag to trigger the workflow again:
@@ -347,7 +354,7 @@ git push origin vX.Y.Z
 **What Happens Automatically (on tag push):**
 1. GitHub Actions runs CI (tests, lint, type-check)
 2. Plugin is built and packaged
-3. GitHub Pages index.yml is updated (only on tags, not on regular pushes)
+3. GitHub Pages index.yml is updated with BOTH stable (new) and dev (preserved) entries
 4. AI generates "What's New" summary (if `GOOGLE_API_KEY` configured)
 5. GitHub Release is created with release notes + ZIP attached
 
@@ -360,7 +367,10 @@ To enable:
 
 Without the key, releases still work but skip the "What's New" AI summary.
 
-**Note:** Regular pushes to main only run the test job. The plugin index is NOT updated on every push - this prevents false "update available" notifications in Stash.
+**Note:** Push to `main` without a tag triggers NOTHING (no test, no deploy). The workflow only triggers on:
+- Push to `dev` branch → deploys dev build
+- Tag push (`v*`) → deploys stable build + creates release
+- Pull requests → test only
 
 **Important:**
 - Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
@@ -370,13 +380,16 @@ Without the key, releases still work but skip the "What's New" AI summary.
 
 Every push to `dev` branch auto-deploys a dev build:
 - Plugin ID: `stash-downloader-dev`
+- Version format: `X.Y.Z-dev.{7-char-sha}` (e.g., `0.4.2-dev.2e8a74e`)
 - Navbar: "Downloader-Dev"
-- Can run alongside stable version
+- Can run alongside stable version (different plugin ID via renamed YAML)
 
 **In Stash**, both stable and dev appear in the same source:
 ```
 https://codename-11.github.io/Stash-Downloader/index.yml
 ```
+
+The index.yml contains BOTH plugin entries - each deploy preserves the other's entry.
 
 ### Extension vs Plugin Versioning
 
