@@ -565,16 +565,26 @@ export const QueuePage: React.FC = () => {
     for (const item of pendingItems) {
       if (!item.metadata) continue;
 
+      // Build editedMetadata from scraped metadata (required for import)
+      const editedMetadata = {
+        title: item.metadata.title,
+        description: item.metadata.description,
+        date: item.metadata.date,
+        performerNames: item.metadata.performers || [],
+        tagNames: item.metadata.tags || [],
+        studioName: item.metadata.studio,
+      };
+
       // Build item for import with default settings
       const itemForImport: IDownloadItem = {
         ...item,
+        editedMetadata,
         postImportAction: 'none',
       };
 
-      // Update status to Processing
+      // Update status to Processing (preserve existing logs from scraping phase)
       queue.updateItem(item.id, {
         status: DownloadStatus.Processing,
-        logs: [],
         startedAt: new Date(),
       });
 
