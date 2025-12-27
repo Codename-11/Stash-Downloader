@@ -560,10 +560,28 @@ jobs:
           echo "Generated release body:"
           cat /tmp/release_body.md
 
+      - name: Generate release title
+        id: title
+        run: |
+          VERSION="${{ needs.deploy-stable.outputs.version }}"
+
+          # Extract first feature commit message for release subtitle
+          FEATURE_MSG=$(cat /tmp/commits.txt | grep -E "^- (feat|✨)" | head -1 | sed 's/^- \(feat:\|✨ feat:\) //' || echo "")
+
+          if [ -n "$FEATURE_MSG" ]; then
+            # Capitalize first letter and use as subtitle
+            SUBTITLE=$(echo "$FEATURE_MSG" | sed 's/\b\(.\)/\u\1/')
+            echo "title=v${VERSION}: ${SUBTITLE}" >> $GITHUB_OUTPUT
+          else
+            echo "title=v${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Release title: $(cat $GITHUB_OUTPUT | grep title)"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ needs.deploy-stable.outputs.version }}
+          name: ${{ steps.title.outputs.title }}
           body_path: /tmp/release_body.md
           files: stash-downloader.zip
           draft: false
