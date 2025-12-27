@@ -804,9 +804,9 @@ export class StashGraphQLService {
     `;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
           plugins?: Record<string, Record<string, any>>;
         };
       }>(query, {
@@ -841,9 +841,9 @@ export class StashGraphQLService {
     `;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
       const result = await this.gqlRequest<{
         configuration?: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginConfigMap is a dynamic scalar
           plugins?: Record<string, Record<string, any>>;
         };
       }>(fallbackQuery);

@@ -118,9 +118,9 @@ export function AutocompleteInput<T>({
           className="list-group position-absolute w-100 shadow"
           style={{ zIndex: 1000, maxHeight: '300px', overflowY: 'auto' }}
         >
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic item type may have id */}
           {suggestions.map((item, index) => (
             <li
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic item type may have id
               key={(item as any).id || index}
               className="list-group-item list-group-item-action cursor-pointer"
               onClick={() => handleSelectItem(item)}

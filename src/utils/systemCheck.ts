@@ -71,10 +71,10 @@ export async function testHttpProxy(
 
         if (taskResult.success) {
           // Read the result
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Python plugin task result
           const result = await stashService.runPluginOperation(PLUGIN_ID, {
             mode: 'read_result',
             result_id: resultId,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Python plugin task result
           }) as any;
 
           // Cleanup
