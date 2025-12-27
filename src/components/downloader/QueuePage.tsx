@@ -557,7 +557,7 @@ export const QueuePage: React.FC = () => {
   };
 
   // Handle batch auto-import - imports all pending items without edit modal
-  // Uses concurrent processing based on concurrentDownloads setting
+  // Stash processes jobs sequentially, so we import one at a time
   const handleBatchAutoImport = async () => {
     // Prevent double-clicks
     if (isBatchImporting) return;
@@ -575,9 +575,8 @@ export const QueuePage: React.FC = () => {
     setBatchImportProgress({ current: 0, total: pendingItems.length });
     batchImportCancelledRef.current = false;
 
-    const concurrency = settings.concurrentDownloads || DEFAULT_SETTINGS.concurrentDownloads;
-    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items (${concurrency} concurrent)`);
-    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items (${concurrency} concurrent)...`);
+    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items`);
+    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items...`);
 
     const importService = getStashImportService();
     let completedCount = 0;
@@ -663,7 +662,7 @@ export const QueuePage: React.FC = () => {
             throw importError;
           }
         },
-        concurrency
+        1 // Stash processes jobs sequentially - no benefit to queuing multiple
       );
 
       // Show summary
@@ -690,33 +689,24 @@ export const QueuePage: React.FC = () => {
     batchImportCancelledRef.current = true;
     toast.showToast('info', 'Cancelling', 'Cancelling batch import...');
 
-    // Cancel all currently active downloads
+    // Cancel all plugin jobs in Stash's queue (running + waiting)
+    const cancelledJobCount = await stashService.cancelAllPluginJobs(PLUGIN_ID);
+    debugLog.info(`Cancelled ${cancelledJobCount} jobs in Stash queue`);
+
+    // Update UI state for all active/processing items
     const activeItems = queue.items.filter(
       (item) => item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing
     );
 
     for (const item of activeItems) {
-      if (item.stashJobId) {
-        try {
-          await stashService.stopJob(item.stashJobId);
-          queue.updateItem(item.id, {
-            status: DownloadStatus.Cancelled,
-            error: 'Batch import cancelled by user',
-            stashJobId: undefined,
-          });
-        } catch (error) {
-          debugLog.warn(`Failed to cancel job ${item.stashJobId}:`, String(error));
-        }
-      } else {
-        // No job ID yet, just mark as cancelled
-        queue.updateItem(item.id, {
-          status: DownloadStatus.Cancelled,
-          error: 'Batch import cancelled by user',
-        });
-      }
+      queue.updateItem(item.id, {
+        status: DownloadStatus.Cancelled,
+        error: 'Batch import cancelled by user',
+        stashJobId: undefined,
+      });
     }
 
-    log.addLog('warning', 'batch-import', `Cancelled batch import (${activeItems.length} active items stopped)`);
+    log.addLog('warning', 'batch-import', `Cancelled batch import (${cancelledJobCount} Stash jobs, ${activeItems.length} queue items)`);
   };
 
   // Handle clearing all items - cancel active jobs first
@@ -726,22 +716,11 @@ export const QueuePage: React.FC = () => {
       (item) => item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing
     );
 
-    // If there are active items, cancel them first
+    // If there are active items, cancel all plugin jobs in Stash's queue
     if (activeItems.length > 0) {
-      log.addLog('info', 'queue', `Cancelling ${activeItems.length} active job(s) before clearing queue...`);
-
-      for (const item of activeItems) {
-        if (item.stashJobId) {
-          try {
-            await stashService.stopJob(item.stashJobId);
-            debugLog.debug(`Cancelled job ${item.stashJobId} for item ${item.id}`);
-          } catch (error) {
-            debugLog.warn(`Failed to cancel job ${item.stashJobId}:`, String(error));
-          }
-        }
-      }
-
-      toast.showToast('info', 'Jobs Cancelled', `Cancelled ${activeItems.length} active job(s)`);
+      log.addLog('info', 'queue', `Cancelling active job(s) before clearing queue...`);
+      const cancelledJobCount = await stashService.cancelAllPluginJobs(PLUGIN_ID);
+      toast.showToast('info', 'Jobs Cancelled', `Cancelled ${cancelledJobCount} job(s)`);
     }
 
     // Now clear the queue

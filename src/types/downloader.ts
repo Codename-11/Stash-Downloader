@@ -174,7 +174,6 @@ export interface IPluginSettings {
   /** Fallback directory if no Stash library is configured. Downloads normally go to Stash video library. */
   serverDownloadPath?: string;
   httpProxy?: string;
-  concurrentDownloads: number;
   autoCreatePerformers: boolean;
   autoCreateTags: boolean;
   autoCreateStudios: boolean;

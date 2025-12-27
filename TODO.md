@@ -12,7 +12,6 @@
 
 ### Features
 - [ ] Resume interrupted downloads
-- [ ] Concurrent download limit UI control
 - [ ] Download history view
 
 ### UI/UX
@@ -25,6 +24,8 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
+- [x] Proper job cancellation via Stash jobQueue (cancels all queued + running jobs)
+- [x] Remove concurrency setting (Stash processes jobs sequentially anyway)
 - [x] In-modal download progress with auto-advance to next item (no close/reopen cycle)
 - [x] Firefox clipboard UX - opens modal directly with manual paste note
 - [x] Retry button for failed queue items

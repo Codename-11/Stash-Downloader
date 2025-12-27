@@ -729,6 +729,59 @@ export class StashGraphQLService {
   }
 
   /**
+   * Cancel all jobs from a specific plugin
+   * Queries the job queue and stops any jobs matching the plugin's description pattern
+   * @returns Number of jobs cancelled
+   */
+  async cancelAllPluginJobs(pluginId: string): Promise<number> {
+    const query = `
+      query JobQueue {
+        jobQueue {
+          id
+          status
+          description
+        }
+      }
+    `;
+
+    try {
+      const result = await this.gqlRequest<{ jobQueue: Array<{ id: string; status: string; description: string }> }>(query);
+      const allJobs = result.data?.jobQueue || [];
+
+      // Filter for jobs that belong to our plugin (running or waiting)
+      // Plugin jobs typically have descriptions like "Running plugin task: Download Video"
+      // or contain the plugin ID in the description
+      const pluginJobs = allJobs.filter(job =>
+        (job.status === 'RUNNING' || job.status === 'READY') &&
+        (job.description.toLowerCase().includes(pluginId.toLowerCase()) ||
+         job.description.includes('Download Video') ||
+         job.description.includes('Extract Metadata') ||
+         job.description.includes('Cleanup Result'))
+      );
+
+      log.debug(`Found ${pluginJobs.length} plugin jobs to cancel out of ${allJobs.length} total`);
+
+      let cancelledCount = 0;
+      for (const job of pluginJobs) {
+        try {
+          const stopped = await this.stopJob(job.id);
+          if (stopped) {
+            cancelledCount++;
+            log.debug(`Cancelled job ${job.id}: ${job.description}`);
+          }
+        } catch (err) {
+          log.warn(`Failed to cancel job ${job.id}: ${String(err)}`);
+        }
+      }
+
+      return cancelledCount;
+    } catch (error) {
+      log.error(`cancelAllPluginJobs failed: ${String(error)}`);
+      return 0;
+    }
+  }
+
+  /**
    * Get plugin settings from Stash
    * Plugin settings are stored server-side and accessed via GraphQL
    *
