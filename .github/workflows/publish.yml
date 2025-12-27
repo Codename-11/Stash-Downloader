@@ -476,20 +476,35 @@ jobs:
 
           Output the categorized release notes in markdown format."
 
-          # Call Gemini API with system instruction
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg system "$SYSTEM_INSTRUCTION" \
-              --arg prompt "$PROMPT" \
-              '{
-                system_instruction: {parts: [{text: $system}]},
-                contents: [{parts: [{text: $prompt}]}],
-                generationConfig: {
-                  maxOutputTokens: 2048,
-                  temperature: 0.7
-                }
-              }')")
+          # Call Gemini API with retry logic for rate limits
+          MAX_RETRIES=3
+          RETRY_DELAY=35
+          RESPONSE=""
+
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Gemini API attempt $i of $MAX_RETRIES"
+            RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n \
+                --arg system "$SYSTEM_INSTRUCTION" \
+                --arg prompt "$PROMPT" \
+                '{
+                  system_instruction: {parts: [{text: $system}]},
+                  contents: [{parts: [{text: $prompt}]}],
+                  generationConfig: {
+                    maxOutputTokens: 2048,
+                    temperature: 0.7
+                  }
+                }')")
+
+            # Check if rate limited (429)
+            if echo "$RESPONSE" | grep -q '"code": 429'; then
+              echo "Rate limited, waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            else
+              break
+            fi
+          done
 
           # Debug: show finish reason
           FINISH_REASON=$(echo "$RESPONSE" | jq -r '.candidates[0].finishReason // "unknown"')
@@ -565,12 +580,13 @@ jobs:
         run: |
           VERSION="${{ needs.deploy-stable.outputs.version }}"
 
-          # Extract first feature commit message for release subtitle
-          FEATURE_MSG=$(cat /tmp/commits.txt | grep -E "^- (feat|✨)" | head -1 | sed 's/^- \(feat:\|✨ feat:\) //' || echo "")
+          # Extract first feature commit that's NOT about CI/workflow/release
+          # Skip commits containing: release, workflow, ci, github, title
+          FEATURE_MSG=$(cat /tmp/commits.txt | grep -E "^- (feat|✨)" | grep -viE "(release|workflow|ci|github|title)" | head -1 | sed 's/^- \(feat:\|✨ feat:\|feat!:\|✨ \)//g' || echo "")
 
           if [ -n "$FEATURE_MSG" ]; then
-            # Capitalize first letter and use as subtitle
-            SUBTITLE=$(echo "$FEATURE_MSG" | sed 's/\b\(.\)/\u\1/')
+            # Capitalize first letter of each word for title case
+            SUBTITLE=$(echo "$FEATURE_MSG" | sed 's/\b\(.\)/\U\1/g')
             echo "title=v${VERSION}: ${SUBTITLE}" >> $GITHUB_OUTPUT
           else
             echo "title=v${VERSION}" >> $GITHUB_OUTPUT
