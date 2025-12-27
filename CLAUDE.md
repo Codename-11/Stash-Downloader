@@ -4,28 +4,34 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 
 ## Documentation
 
-@.claude/project.md
-@.claude/architecture.md
+@.claude/project.md  
+@.claude/architecture.md  
 @.claude/conventions.md
+
+## Task Tracking
+
+- **See [`TODO.md`](TODO.md)** — All tasks, backlog items, feature ideas, and completed features are tracked here.
+- When making changes or planning features, always refer to the TODO.md file for current project priorities and progress.
+- Claude: Use information from TODO.md to inform, update, or cross-reference project documentation, code changes, and pull request review summaries where relevant.
 
 ## Quick Reference
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Build with watch mode |
-| `npm run build` | Production build |
-| `npm run build:stash` | Build and create plugin folder |
-| `npm test` | Run tests |
-| `npm run type-check` | TypeScript check |
-| `npm run lint` | ESLint check |
+| Command                | Description                  |
+|------------------------|------------------------------|
+| `npm run dev`          | Build with watch mode        |
+| `npm run build`        | Production build             |
+| `npm run build:stash`  | Build and create plugin folder|
+| `npm test`             | Run tests                    |
+| `npm run type-check`   | TypeScript check             |
+| `npm run lint`         | ESLint check                 |
 
 ## Branch & Release Workflow
 
 ### Branch Strategy
-| Branch | Purpose |
-|--------|---------|
+| Branch  | Purpose                                   |
+|---------|-------------------------------------------|
 | **dev** | Active development - all work happens here |
-| **main** | Stable releases only - merged from dev |
+| **main**| Stable releases only - merged from dev     |
 
 **ALWAYS develop on `dev` branch.** Never commit directly to `main`.
 
@@ -39,18 +45,18 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 ```
 
 ### Two Independent Versions
-| Component | Version Location | Release Trigger |
-|-----------|-----------------|-----------------|
-| **Stash Plugin** | `package.json` | Git tags (`vX.Y.Z`) on main |
-| **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO |
+| Component         | Version Location                | Release Trigger                     |
+|-------------------|-------------------------------|-------------------------------------|
+| **Stash Plugin**  | `package.json`                | Git tags (`vX.Y.Z`) on main         |
+| **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO         |
 
 ### Stable vs Dev Builds
-| Build | Trigger | Plugin ID | Version Format |
-|-------|---------|-----------|----------------|
-| **Stable** | Git tag `vX.Y.Z` | `stash-downloader` | `X.Y.Z` |
-| **Dev** | Push to `dev` | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` |
+| Build      | Trigger             | Plugin ID            | Version Format    |
+|------------|---------------------|----------------------|-------------------|
+| **Stable** | Git tag `vX.Y.Z`    | `stash-downloader`   | `X.Y.Z`           |
+| **Dev**    | Push to `dev`       | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` |
 
-Both can be installed simultaneously in Stash (different plugin IDs via YAML filename).
+Both can be installed simultaneously in Stash (different plugin IDs via YAML filename).  
 Both are served from the same `index.yml` - each deploy preserves the other's entry.
 
 ### Release Process
@@ -145,6 +151,11 @@ When reviewing pull requests, check:
    - README updated if needed
    - Code comments for complex logic
 
+   - **Also review/triage with TODO.md:** Check that new/changed tasks and backlog items are up-to-date in `TODO.md`. When features are completed, ensure they are checked off in `TODO.md`.
+
 # Documentation Instructions
-Keep the documentation concise and to the point. Use markdown formatting for the documentation.
-Update relevant files with the new information and remove any outdated information when necessary.
+
+- Keep the documentation concise and to the point.
+- Use markdown formatting for the documentation.
+- Update relevant files with the new information and remove any outdated information when necessary.
+- Always reference and update `TODO.md` for tasks, backlog, and progress tracking.

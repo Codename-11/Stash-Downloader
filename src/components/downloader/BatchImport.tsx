@@ -36,6 +36,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
   }, [showModal]);
 
   const handleImportFromClipboard = async () => {
+    // Detect Firefox for different clipboard UX
+    const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
     // Check if Clipboard API is available
     if (!navigator.clipboard || !navigator.clipboard.readText) {
       console.warn('[BatchImport] Clipboard API not available - opening manual paste dialog');
@@ -45,7 +48,20 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
       return;
     }
 
+    // Firefox uses an ephemeral "Paste" prompt instead of a permission dialog.
+    // Show a toast explaining what will happen, then call readText() which triggers the prompt.
+    if (isFirefox) {
+      toast.showToast(
+        'info',
+        'Firefox Clipboard',
+        'Click "Paste" in the popup that appears (wait 1 second for it to become active).'
+      );
+    }
+
     try {
+      // Ensure window is focused (required for clipboard access in some browsers)
+      window.focus();
+
       const text = await navigator.clipboard.readText();
       const trimmedText = text.trim();
 
@@ -85,10 +101,19 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
       // Log actual error for debugging
       console.error('[BatchImport] Clipboard read failed:', err);
 
-      // Firefox and some browsers don't support clipboard.readText() without special permissions
-      // Just open the modal and let user paste manually - this is the best UX
+      // Firefox shows a paste prompt - if we got here, user cancelled or it failed
+      // Other browsers may have denied permission
       console.info('[BatchImport] Opening manual paste dialog as fallback');
-      toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
+
+      if (isFirefox) {
+        toast.showToast(
+          'info',
+          'Paste Manually',
+          'Firefox clipboard access was cancelled. Use Ctrl+V to paste your URLs.'
+        );
+      } else {
+        toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
+      }
       setShowModal(true);
       setError(null);
     }

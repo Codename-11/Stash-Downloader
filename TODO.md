@@ -19,14 +19,13 @@
 - [ ] Keyboard shortcuts (using Mousetrap from PluginApi)
 - [ ] Drag-and-drop queue reordering
 - [ ] Bulk select/delete queue items
-- [ ] Fix Firefox clipboard permissions for Batch Import
-- [ ] Verify clipboard permissions for other browsers
 
 ### Testing
 - [ ] Add unit tests for Logger utility
 - [ ] Add integration tests for download flow
 
 ## Completed
+- [x] Firefox clipboard permission UX improvements (browser-specific messaging + manual fallback)
 - [x] Retry button for failed queue items
 - [x] Navbar icon for quick access to downloader
 - [x] Queue position indicator in edit modal (1 of X)
