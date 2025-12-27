@@ -50,6 +50,7 @@ JavaScript Extension / Web-UI Plugin for Stash
    - GraphQL mutations for scene/image/gallery creation
    - Server-side scraping: `scrapeSceneURL`, `scrapeGalleryURL`
    - Plugin task execution: `runPluginTask`, `runPluginOperation`
+   - **Auto-import toggle**: Batch import all pending items without edit modal (uses scraped metadata as-is)
    - **Post-Import Actions** - Choose how Stash handles metadata after import:
      - **None**: Just import the file, edit metadata in Stash later
      - **Identify**: Match via StashDB fingerprints + installed scrapers

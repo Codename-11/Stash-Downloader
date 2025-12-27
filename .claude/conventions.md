@@ -290,6 +290,49 @@ For significant changes, PRs enable Claude review:
 - Breaking changes (if any)
 - Related issues (closes #123)
 
+### Issue & Feature Workflow
+
+**Full flow from issue to release:**
+
+```
+1. Create Issue    → GitHub Issues (bug report, feature request)
+2. Branch          → Work on dev (or feature/issue-123 for larger work)
+3. Implement       → Make changes, commit with issue reference
+4. Test            → Push to dev, test dev build in Stash
+5. Release         → Merge to main, bump version, tag
+```
+
+**Creating Issues:**
+- Use GitHub Issues to track bugs, features, and tasks
+- Add labels: `bug`, `enhancement`, `documentation`
+- Include reproduction steps for bugs
+- Reference related code/files if known
+
+**Referencing Issues in Commits:**
+```bash
+# Closes issue when merged to default branch
+fix: resolve navbar crash (closes #123)
+feat: add batch import (closes #45)
+
+# Just references without closing
+fix: partial fix for download issue (#123)
+chore: refactor related to #45
+```
+
+**Branch Strategy for Issues:**
+| Issue Size | Approach |
+|------------|----------|
+| Small fix (< 1 hour) | Commit directly to `dev` |
+| Medium feature (1-4 hours) | Feature branch → merge to `dev` |
+| Large feature (> 4 hours) | Feature branch with multiple commits → PR to `dev` |
+
+**Testing Before Release:**
+1. Push to `dev` branch
+2. Wait for dev build to deploy (check GitHub Actions)
+3. Install "Stash Downloader (Dev)" in Stash
+4. Verify the fix/feature works
+5. If good, proceed to release; if not, iterate on dev
+
 ### Releasing (Tag-Based)
 
 This project uses **tag-based releases**:

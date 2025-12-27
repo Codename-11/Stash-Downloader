@@ -16,10 +16,10 @@ import { useDownloadQueue, useExternalQueue } from '@/hooks';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
-import { getStashService } from '@/services/stash/StashGraphQLService';
+import { getStashService, getStashImportService } from '@/services/stash';
 import { DownloadStatus } from '@/types';
-import type { IDownloadItem, IScrapedMetadata } from '@/types';
-import { createLogger } from '@/utils';
+import type { IDownloadItem, IScrapedMetadata, IEditedMetadata } from '@/types';
+import { createLogger, createImportCallbacks, processConcurrently } from '@/utils';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID, PLUGIN_NAME } from '@/constants';
 import type { IPluginSettings } from '@/types';
@@ -41,6 +41,11 @@ export const QueuePage: React.FC = () => {
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+
+  // Batch import state
+  const [isBatchImporting, setIsBatchImporting] = useState(false);
+  const [batchImportProgress, setBatchImportProgress] = useState({ current: 0, total: 0 });
+  const batchImportCancelledRef = useRef(false);
 
   // Re-scrape modal state
   const [rescrapeItem, setRescrapeItem] = useState<IDownloadItem | null>(null);
@@ -336,10 +341,10 @@ export const QueuePage: React.FC = () => {
   const handleBatchImport = async (urls: string[]) => {
     log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs`);
     toast.showToast('info', 'Batch Import Started', `Processing ${urls.length} URLs...`);
-    
+
     let successCount = 0;
     let errorCount = 0;
-    
+
     for (const url of urls) {
       try {
         await handleAddUrl(url);
@@ -348,12 +353,13 @@ export const QueuePage: React.FC = () => {
         errorCount++;
       }
     }
-    
-    log.addLog('success', 'scrape', `Batch import complete: ${successCount} succeeded, ${errorCount} failed`);
+
+    const message = `${successCount} added to queue${errorCount > 0 ? `, ${errorCount} failed` : ''}`;
+    log.addLog('success', 'scrape', `Batch complete: ${message}`);
     toast.showToast(
       errorCount > 0 ? 'warning' : 'success',
-      'Batch Import Complete',
-      `${successCount} succeeded, ${errorCount} failed`
+      'Batch Complete',
+      message
     );
   };
 
@@ -543,6 +549,169 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  // Handle batch auto-import - imports all pending items without edit modal
+  // Uses concurrent processing based on concurrentDownloads setting
+  const handleBatchAutoImport = async () => {
+    // Prevent double-clicks
+    if (isBatchImporting) return;
+
+    const pendingItems = queue.items.filter(
+      (item) => item.status === DownloadStatus.Pending && item.metadata
+    );
+
+    if (pendingItems.length === 0) {
+      toast.showToast('warning', 'No Items', 'No pending items with metadata to import');
+      return;
+    }
+
+    setIsBatchImporting(true);
+    setBatchImportProgress({ current: 0, total: pendingItems.length });
+    batchImportCancelledRef.current = false;
+
+    const concurrency = settings.concurrentDownloads || DEFAULT_SETTINGS.concurrentDownloads;
+    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items (${concurrency} concurrent)`);
+    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items (${concurrency} concurrent)...`);
+
+    const importService = getStashImportService();
+    let completedCount = 0;
+
+    try {
+      // Process items concurrently using the shared utility
+      const { successCount, failCount } = await processConcurrently(
+        pendingItems,
+        async (item) => {
+          // Check for cancellation before starting each item
+          if (batchImportCancelledRef.current) {
+            throw new Error('Batch import cancelled');
+          }
+
+          if (!item.metadata) throw new Error('No metadata');
+
+          // Build editedMetadata from scraped metadata (required for import)
+          const editedMetadata: IEditedMetadata = {
+            title: item.metadata.title,
+            description: item.metadata.description,
+            date: item.metadata.date,
+            performerNames: item.metadata.performers || [],
+            tagNames: item.metadata.tags || [],
+            studioName: item.metadata.studio,
+          };
+
+          // Build item for import with default settings
+          const itemForImport: IDownloadItem = {
+            ...item,
+            editedMetadata,
+            postImportAction: 'none',
+          };
+
+          // Update status to Processing (preserve existing logs from scraping phase)
+          queue.updateItem(item.id, {
+            status: DownloadStatus.Processing,
+            startedAt: new Date(),
+          });
+
+          try {
+            // Use shared callback factory
+            const callbacks = createImportCallbacks({
+              itemId: item.id,
+              updateItem: queue.updateItem,
+              debugLog,
+            });
+
+            const result = await importService.importToStash(itemForImport, callbacks);
+
+            // Mark as complete and update progress
+            queue.updateItem(item.id, {
+              status: DownloadStatus.Complete,
+              stashId: result.id,
+              completedAt: new Date(),
+            });
+
+            completedCount++;
+            setBatchImportProgress((prev) => ({ ...prev, current: completedCount }));
+
+            debugLog.debug(`Batch import: completed ${item.metadata.title || item.url}`);
+            return result;
+          } catch (importError) {
+            // Check if this was a cancellation
+            if (batchImportCancelledRef.current) {
+              queue.updateItem(item.id, {
+                status: DownloadStatus.Cancelled,
+                error: 'Batch import cancelled',
+              });
+              throw importError;
+            }
+
+            const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
+            debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
+
+            queue.updateItem(item.id, {
+              status: DownloadStatus.Failed,
+              error: `Import failed: ${errorMessage}`,
+            });
+
+            completedCount++;
+            setBatchImportProgress((prev) => ({ ...prev, current: completedCount }));
+
+            throw importError;
+          }
+        },
+        concurrency
+      );
+
+      // Show summary
+      const wasCancelled = batchImportCancelledRef.current;
+      const summaryMessage = wasCancelled
+        ? `Cancelled after ${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`
+        : `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
+      log.addLog(wasCancelled ? 'warning' : failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import ${wasCancelled ? 'cancelled' : 'complete'}: ${summaryMessage}`);
+      toast.showToast(
+        wasCancelled ? 'warning' : failCount > 0 ? 'warning' : 'success',
+        wasCancelled ? 'Batch Import Cancelled' : 'Batch Import Complete',
+        summaryMessage
+      );
+    } finally {
+      setIsBatchImporting(false);
+      setBatchImportProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // Cancel all active batch imports
+  const handleCancelBatchImport = async () => {
+    if (!isBatchImporting) return;
+
+    batchImportCancelledRef.current = true;
+    toast.showToast('info', 'Cancelling', 'Cancelling batch import...');
+
+    // Cancel all currently active downloads
+    const activeItems = queue.items.filter(
+      (item) => item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing
+    );
+
+    for (const item of activeItems) {
+      if (item.stashJobId) {
+        try {
+          await stashService.stopJob(item.stashJobId);
+          queue.updateItem(item.id, {
+            status: DownloadStatus.Cancelled,
+            error: 'Batch import cancelled by user',
+            stashJobId: undefined,
+          });
+        } catch (error) {
+          debugLog.warn(`Failed to cancel job ${item.stashJobId}:`, String(error));
+        }
+      } else {
+        // No job ID yet, just mark as cancelled
+        queue.updateItem(item.id, {
+          status: DownloadStatus.Cancelled,
+          error: 'Batch import cancelled by user',
+        });
+      }
+    }
+
+    log.addLog('warning', 'batch-import', `Cancelled batch import (${activeItems.length} active items stopped)`);
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
@@ -687,13 +856,37 @@ export const QueuePage: React.FC = () => {
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  const firstPending = queue.items.find(item => item.status === DownloadStatus.Pending);
-                  if (firstPending) setEditingItem(firstPending);
+                  if (settings.autoImport) {
+                    // Auto-import: process all pending items without edit modal
+                    handleBatchAutoImport();
+                  } else {
+                    // Manual: open edit modal for first pending item
+                    const firstPending = queue.items.find(item => item.status === DownloadStatus.Pending);
+                    if (firstPending) setEditingItem(firstPending);
+                  }
                 }}
-                disabled={queue.stats.pending === 0}
+                disabled={queue.stats.pending === 0 || isBatchImporting}
+                title={settings.autoImport
+                  ? 'Download and import all pending items without editing'
+                  : 'Review and import each item individually'
+                }
               >
-                📝 Edit & Import ({queue.stats.pending} items)
+                {isBatchImporting
+                  ? `⏳ Importing ${batchImportProgress.current}/${batchImportProgress.total}...`
+                  : settings.autoImport
+                    ? `⚡ Import All (${queue.stats.pending} items)`
+                    : `📝 Edit & Import (${queue.stats.pending} items)`
+                }
               </button>
+              {isBatchImporting && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleCancelBatchImport}
+                  title="Cancel all active downloads"
+                >
+                  ⏹️ Cancel All
+                </button>
+              )}
               <button
                 className="btn btn-outline-secondary btn-sm"
                 onClick={queue.clearCompleted}
@@ -704,13 +897,14 @@ export const QueuePage: React.FC = () => {
               <button
                 className="btn btn-outline-danger btn-sm"
                 onClick={queue.clearAll}
+                disabled={isBatchImporting}
               >
                 Clear All
               </button>
             </div>
           )}
 
-          {/* Queue Toolbar - Preview toggle and Log level */}
+          {/* Queue Toolbar - Preview toggle, Auto-import toggle, and Log level */}
           <div className="d-flex justify-content-between align-items-center mb-2 px-2">
             <div className="d-flex align-items-center gap-2">
               <button
@@ -720,6 +914,18 @@ export const QueuePage: React.FC = () => {
                 style={{ minWidth: '140px' }}
               >
                 {settings.showThumbnailPreviews ? '🖼️ Thumbnails On' : '🖼️ Thumbnails Off'}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${settings.autoImport ? 'btn-primary' : 'btn-outline-secondary'}`}
+                onClick={() => updateSettings({ autoImport: !settings.autoImport })}
+                title={settings.autoImport
+                  ? 'ON: Click "Import All" to download & import all pending items at once (skips edit modal)'
+                  : 'OFF: Click "Edit & Import" to review each item before importing'
+                }
+                style={{ minWidth: '140px' }}
+              >
+                {settings.autoImport ? '⚡ Auto-Import On' : '⚡ Auto-Import Off'}
               </button>
             </div>
             <div className="d-flex align-items-center gap-2">

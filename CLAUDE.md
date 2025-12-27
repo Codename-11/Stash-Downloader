@@ -111,6 +111,12 @@ The plugin registers via `PluginApi.register.route()` and adds navbar link via M
 
 **Re-scrape**: Users can manually try different scrapers via dropdown menu on queue items.
 
+## Key Features
+
+- **Auto-import toggle**: Batch import all pending items at once without edit modal (uses scraped metadata as-is)
+- **Edit & Import**: Review/edit each item individually before import (default mode)
+- **Post-import actions**: None, Identify (StashDB), or Scrape URL after import
+
 ## PR Review Criteria (for Claude GitHub Action)
 
 When reviewing pull requests, check:

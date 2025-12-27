@@ -185,9 +185,9 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
       const { percentage, bytesDownloaded, totalBytes, speed } = item.progress;
       const hasRealProgress = totalBytes > 0 || bytesDownloaded > 0 || speed > 0;
 
-      // Build stale indicator suffix
+      // Build stale indicator suffix (use ? to indicate uncertainty - yt-dlp downloads can be slow)
       const staleIndicator = isStaleCritical
-        ? ` • ⚠️ Stalled (${formatElapsedTime(secondsSinceActivity)})`
+        ? ` • ⚠️ Stalled? (${formatElapsedTime(secondsSinceActivity)})`
         : isStaleWarning
           ? ` • ⏳ ${formatElapsedTime(secondsSinceActivity)} since activity`
           : '';
@@ -229,7 +229,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
         </div>
         <small className={`d-block mt-1 ${isStaleCritical ? 'text-danger' : isStaleWarning ? 'text-warning' : 'text-muted'}`}>
           {isStaleCritical
-            ? `⚠️ No activity for ${formatElapsedTime(secondsSinceActivity)} - may be stalled`
+            ? `⚠️ Stalled? No activity for ${formatElapsedTime(secondsSinceActivity)} (yt-dlp downloads may take longer)`
             : isStaleWarning
               ? `⏳ Last activity: ${formatElapsedTime(secondsSinceActivity)} ago`
               : elapsedSeconds > 0
@@ -543,7 +543,7 @@ export const QueueItem: React.FC<QueueItemProps> = ({ item, onRemove, onEdit, on
               <button
                 className={`btn btn-sm ${isStaleCritical ? 'btn-danger' : 'btn-outline-danger'}`}
                 onClick={() => onCancel(item.id)}
-                title={isStaleCritical ? "Cancel stalled download" : "Cancel download"}
+                title={isStaleCritical ? "Cancel possibly stalled download" : "Cancel download"}
               >
                 ⏹️ Cancel
               </button>
