@@ -303,84 +303,6 @@ export const QueuePage: React.FC = () => {
           debugLog.debug('ℹ️ No direct video/image URL extracted - download service will use yt-dlp or page URL');
         }
         toast.showToast('success', 'Metadata Scraped', `Successfully scraped metadata for ${metadata.title || url}`);
-
-        // Auto-import if enabled (uses scraped metadata as-is, post-import action = none)
-        if (settings.autoImport) {
-          debugLog.debug(`Auto-import enabled, starting import for: ${metadata.title || url}`);
-
-          // Build the item for import
-          const itemForImport: IDownloadItem = {
-            id: itemId,
-            url,
-            status: DownloadStatus.Processing,
-            metadata,
-            addedAt: new Date(),
-            postImportAction: 'none', // Default to none for auto-import
-          };
-
-          // Update status to Processing
-          queue.updateItem(itemId, {
-            status: DownloadStatus.Processing,
-            logs: [],
-            startedAt: new Date(),
-          });
-
-          try {
-            const importService = getStashImportService();
-            const result = await importService.importToStash(itemForImport, {
-              onProgress: (progress) => {
-                queue.updateItem(itemId, {
-                  progress,
-                  status: DownloadStatus.Downloading,
-                  lastActivityAt: new Date(),
-                });
-              },
-              onStatusChange: (status) => {
-                const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
-                queue.updateItem(itemId, { status: newStatus });
-              },
-              onLog: (level, message, details) => {
-                const newLog = {
-                  timestamp: new Date(),
-                  level,
-                  message,
-                  details,
-                };
-                queue.updateItem(itemId, (currentItem) => ({
-                  logs: [...(currentItem.logs || []), newLog],
-                }));
-              },
-              onJobStart: (jobId) => {
-                debugLog.debug('Auto-import job started with ID:', jobId);
-                queue.updateItem(itemId, {
-                  stashJobId: jobId,
-                  lastActivityAt: new Date(),
-                });
-              },
-            });
-
-            // Mark as complete
-            queue.updateItem(itemId, {
-              status: DownloadStatus.Complete,
-              stashId: result.id,
-              completedAt: new Date(),
-            });
-
-            log.addLog('success', 'download', `Auto-imported: ${metadata.title || url}`, `Stash ID: ${result.id}`);
-            toast.showToast('success', 'Auto-Import Complete', `Successfully imported: ${metadata.title || url}`);
-          } catch (importError) {
-            const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
-            debugLog.error('Auto-import failed:', errorMessage);
-
-            queue.updateItem(itemId, {
-              status: DownloadStatus.Failed,
-              error: `Auto-import failed: ${errorMessage}`,
-            });
-
-            log.addLog('error', 'download', `Auto-import failed: ${errorMessage}`);
-            toast.showToast('error', 'Auto-Import Failed', errorMessage);
-          }
-        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorStack = error instanceof Error ? error.stack : undefined;
@@ -412,8 +334,7 @@ export const QueuePage: React.FC = () => {
     handleAddUrlRef.current = handleAddUrl;
   });
   const handleBatchImport = async (urls: string[]) => {
-    const autoImportEnabled = settings.autoImport;
-    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs${autoImportEnabled ? ' (auto-import enabled)' : ''}`);
+    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs`);
     toast.showToast('info', 'Batch Import Started', `Processing ${urls.length} URLs...`);
 
     let successCount = 0;
@@ -428,15 +349,12 @@ export const QueuePage: React.FC = () => {
       }
     }
 
-    // Build completion message
-    const baseMessage = `${successCount} added to queue${errorCount > 0 ? `, ${errorCount} failed` : ''}`;
-    const autoImportNote = autoImportEnabled ? '. Auto-importing in background...' : '';
-
-    log.addLog('success', 'scrape', `Batch complete: ${baseMessage}${autoImportNote}`);
+    const message = `${successCount} added to queue${errorCount > 0 ? `, ${errorCount} failed` : ''}`;
+    log.addLog('success', 'scrape', `Batch complete: ${message}`);
     toast.showToast(
       errorCount > 0 ? 'warning' : 'success',
       'Batch Complete',
-      `${baseMessage}${autoImportNote}`
+      message
     );
   };
 
@@ -626,6 +544,105 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  // Handle batch auto-import - imports all pending items without edit modal
+  const handleBatchAutoImport = async () => {
+    const pendingItems = queue.items.filter(
+      (item) => item.status === DownloadStatus.Pending && item.metadata
+    );
+
+    if (pendingItems.length === 0) {
+      toast.showToast('warning', 'No Items', 'No pending items with metadata to import');
+      return;
+    }
+
+    log.addLog('info', 'download', `Starting batch auto-import of ${pendingItems.length} items`);
+    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items...`);
+
+    const importService = getStashImportService();
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of pendingItems) {
+      if (!item.metadata) continue;
+
+      // Build item for import with default settings
+      const itemForImport: IDownloadItem = {
+        ...item,
+        postImportAction: 'none',
+      };
+
+      // Update status to Processing
+      queue.updateItem(item.id, {
+        status: DownloadStatus.Processing,
+        logs: [],
+        startedAt: new Date(),
+      });
+
+      try {
+        const result = await importService.importToStash(itemForImport, {
+          onProgress: (progress) => {
+            queue.updateItem(item.id, {
+              progress,
+              status: DownloadStatus.Downloading,
+              lastActivityAt: new Date(),
+            });
+          },
+          onStatusChange: (status) => {
+            const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
+            queue.updateItem(item.id, { status: newStatus });
+          },
+          onLog: (level, message, details) => {
+            const newLog = {
+              timestamp: new Date(),
+              level,
+              message,
+              details,
+            };
+            queue.updateItem(item.id, (currentItem) => ({
+              logs: [...(currentItem.logs || []), newLog],
+            }));
+          },
+          onJobStart: (jobId) => {
+            debugLog.debug('Batch import job started with ID:', jobId);
+            queue.updateItem(item.id, {
+              stashJobId: jobId,
+              lastActivityAt: new Date(),
+            });
+          },
+        });
+
+        // Mark as complete
+        queue.updateItem(item.id, {
+          status: DownloadStatus.Complete,
+          stashId: result.id,
+          completedAt: new Date(),
+        });
+
+        successCount++;
+        debugLog.debug(`Batch import: completed ${item.metadata.title || item.url}`);
+      } catch (importError) {
+        const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
+        debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
+
+        queue.updateItem(item.id, {
+          status: DownloadStatus.Failed,
+          error: `Import failed: ${errorMessage}`,
+        });
+
+        failCount++;
+      }
+    }
+
+    // Show summary
+    const summaryMessage = `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
+    log.addLog(failCount > 0 ? 'warning' : 'success', 'download', `Batch import complete: ${summaryMessage}`);
+    toast.showToast(
+      failCount > 0 ? 'warning' : 'success',
+      'Batch Import Complete',
+      summaryMessage
+    );
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
@@ -770,12 +787,25 @@ export const QueuePage: React.FC = () => {
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  const firstPending = queue.items.find(item => item.status === DownloadStatus.Pending);
-                  if (firstPending) setEditingItem(firstPending);
+                  if (settings.autoImport) {
+                    // Auto-import: process all pending items without edit modal
+                    handleBatchAutoImport();
+                  } else {
+                    // Manual: open edit modal for first pending item
+                    const firstPending = queue.items.find(item => item.status === DownloadStatus.Pending);
+                    if (firstPending) setEditingItem(firstPending);
+                  }
                 }}
                 disabled={queue.stats.pending === 0}
+                title={settings.autoImport
+                  ? 'Download and import all pending items without editing'
+                  : 'Review and import each item individually'
+                }
               >
-                📝 Edit & Import ({queue.stats.pending} items)
+                {settings.autoImport
+                  ? `⚡ Import All (${queue.stats.pending} items)`
+                  : `📝 Edit & Import (${queue.stats.pending} items)`
+                }
               </button>
               <button
                 className="btn btn-outline-secondary btn-sm"
@@ -808,7 +838,10 @@ export const QueuePage: React.FC = () => {
                 type="button"
                 className={`btn btn-sm ${settings.autoImport ? 'btn-primary' : 'btn-outline-secondary'}`}
                 onClick={() => updateSettings({ autoImport: !settings.autoImport })}
-                title="When enabled, items are automatically imported after scraping without manual confirmation"
+                title={settings.autoImport
+                  ? 'ON: Click "Import All" to download & import all pending items at once (skips edit modal)'
+                  : 'OFF: Click "Edit & Import" to review each item before importing'
+                }
                 style={{ minWidth: '140px' }}
               >
                 {settings.autoImport ? '⚡ Auto-Import On' : '⚡ Auto-Import Off'}
