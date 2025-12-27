@@ -536,26 +536,26 @@ jobs:
             echo "" >> /tmp/release_body.md
           fi
 
-          # Add installation instructions
-          cat >> /tmp/release_body.md << 'FOOTER'
----
-
-### 📦 Installation
-
-**Via Stash Plugin Manager (Recommended):**
-1. Settings → Plugins → Available Plugins → Add Source
-2. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
-3. Find "Stash Downloader" and click Install
-
-**Manual Installation:**
-1. Download `stash-downloader.zip` below
-2. Extract to `~/.stash/plugins/stash-downloader/`
-3. Reload plugins in Stash
-
-### 📋 Requirements
-- Stash v0.20+
-- Python 3.7+ with yt-dlp (`pip install yt-dlp`)
-FOOTER
+          # Add installation instructions (using echo to avoid YAML ** parsing issues)
+          {
+            echo "---"
+            echo ""
+            echo "### 📦 Installation"
+            echo ""
+            echo "**Via Stash Plugin Manager (Recommended):**"
+            echo "1. Settings → Plugins → Available Plugins → Add Source"
+            echo "2. Enter: \`https://codename-11.github.io/Stash-Downloader/index.yml\`"
+            echo "3. Find \"Stash Downloader\" and click Install"
+            echo ""
+            echo "**Manual Installation:**"
+            echo "1. Download \`stash-downloader.zip\` below"
+            echo "2. Extract to \`~/.stash/plugins/stash-downloader/\`"
+            echo "3. Reload plugins in Stash"
+            echo ""
+            echo "### 📋 Requirements"
+            echo "- Stash v0.20+"
+            echo "- Python 3.7+ with yt-dlp (\`pip install yt-dlp\`)"
+          } >> /tmp/release_body.md
 
           echo "Generated release body:"
           cat /tmp/release_body.md
