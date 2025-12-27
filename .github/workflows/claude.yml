@@ -81,6 +81,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_tools: |
+            Bash(gh:*)
+            Read
+            Glob
+            Grep
           prompt: |
             Review PR #${{ github.event.pull_request.number }} against CLAUDE.md standards.
             Post your review as a PR comment using gh pr comment.
@@ -100,6 +105,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_tools: |
+            Bash(gh:*)
+            Read
+            Glob
+            Grep
           additional_permissions: |
             actions: read
           # No prompt - Claude will respond to the mention naturally
