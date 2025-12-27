@@ -82,17 +82,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            REPO: ${{ github.repository }}
-            PR: ${{ github.event.pull_request.number }}
-
-            Review this PR against CLAUDE.md standards:
-            - Code quality & best practices
-            - Potential bugs or security issues
-            - Test coverage
-            - Documentation updates
-
-            Be concise and constructive. Use `gh pr comment` to post your review.
-          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*)" --max-turns 10'
+            Review this PR against CLAUDE.md standards. Be concise and constructive.
 
   # Stage 3: Interactive Response - Respond to @claude mentions
   respond:

@@ -116,9 +116,8 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         status: DownloadStatus.Processing,
       };
 
-      // Initialize logs array and set start time (for reconnection tracking)
+      // Set start time for reconnection tracking (preserve existing logs from scraping)
       onUpdateItem(item.id, {
-        logs: [],
         startedAt: new Date(),
         status: DownloadStatus.Processing,
       });
