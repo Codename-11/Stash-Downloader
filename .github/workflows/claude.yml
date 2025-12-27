@@ -92,7 +92,7 @@ jobs:
             - Documentation updates
 
             Be concise and constructive. Use `gh pr comment` to post your review.
-          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*)" --max-turns 3'
+          claude_args: '--allowed-tools "Bash(gh pr:*),Bash(gh issue:*)" --max-turns 10'
 
   # Stage 3: Interactive Response - Respond to @claude mentions
   respond:
