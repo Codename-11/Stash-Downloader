@@ -44,6 +44,8 @@ export const QueuePage: React.FC = () => {
 
   // Batch import state
   const [isBatchImporting, setIsBatchImporting] = useState(false);
+  const [batchImportProgress, setBatchImportProgress] = useState({ current: 0, total: 0 });
+  const batchImportCancelledRef = useRef(false);
 
   // Re-scrape modal state
   const [rescrapeItem, setRescrapeItem] = useState<IDownloadItem | null>(null);
@@ -563,17 +565,26 @@ export const QueuePage: React.FC = () => {
     }
 
     setIsBatchImporting(true);
+    setBatchImportProgress({ current: 0, total: pendingItems.length });
+    batchImportCancelledRef.current = false;
+
     const concurrency = settings.concurrentDownloads || DEFAULT_SETTINGS.concurrentDownloads;
     log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items (${concurrency} concurrent)`);
     toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items (${concurrency} concurrent)...`);
 
     const importService = getStashImportService();
+    let completedCount = 0;
 
     try {
       // Process items concurrently using the shared utility
       const { successCount, failCount } = await processConcurrently(
         pendingItems,
         async (item) => {
+          // Check for cancellation before starting each item
+          if (batchImportCancelledRef.current) {
+            throw new Error('Batch import cancelled');
+          }
+
           if (!item.metadata) throw new Error('No metadata');
 
           // Build editedMetadata from scraped metadata (required for import)
@@ -609,16 +620,28 @@ export const QueuePage: React.FC = () => {
 
             const result = await importService.importToStash(itemForImport, callbacks);
 
-            // Mark as complete
+            // Mark as complete and update progress
             queue.updateItem(item.id, {
               status: DownloadStatus.Complete,
               stashId: result.id,
               completedAt: new Date(),
             });
 
+            completedCount++;
+            setBatchImportProgress((prev) => ({ ...prev, current: completedCount }));
+
             debugLog.debug(`Batch import: completed ${item.metadata.title || item.url}`);
             return result;
           } catch (importError) {
+            // Check if this was a cancellation
+            if (batchImportCancelledRef.current) {
+              queue.updateItem(item.id, {
+                status: DownloadStatus.Cancelled,
+                error: 'Batch import cancelled',
+              });
+              throw importError;
+            }
+
             const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
             debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
 
@@ -627,6 +650,9 @@ export const QueuePage: React.FC = () => {
               error: `Import failed: ${errorMessage}`,
             });
 
+            completedCount++;
+            setBatchImportProgress((prev) => ({ ...prev, current: completedCount }));
+
             throw importError;
           }
         },
@@ -634,16 +660,56 @@ export const QueuePage: React.FC = () => {
       );
 
       // Show summary
-      const summaryMessage = `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
-      log.addLog(failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import complete: ${summaryMessage}`);
+      const wasCancelled = batchImportCancelledRef.current;
+      const summaryMessage = wasCancelled
+        ? `Cancelled after ${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`
+        : `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
+      log.addLog(wasCancelled ? 'warning' : failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import ${wasCancelled ? 'cancelled' : 'complete'}: ${summaryMessage}`);
       toast.showToast(
-        failCount > 0 ? 'warning' : 'success',
-        'Batch Import Complete',
+        wasCancelled ? 'warning' : failCount > 0 ? 'warning' : 'success',
+        wasCancelled ? 'Batch Import Cancelled' : 'Batch Import Complete',
         summaryMessage
       );
     } finally {
       setIsBatchImporting(false);
+      setBatchImportProgress({ current: 0, total: 0 });
     }
+  };
+
+  // Cancel all active batch imports
+  const handleCancelBatchImport = async () => {
+    if (!isBatchImporting) return;
+
+    batchImportCancelledRef.current = true;
+    toast.showToast('info', 'Cancelling', 'Cancelling batch import...');
+
+    // Cancel all currently active downloads
+    const activeItems = queue.items.filter(
+      (item) => item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing
+    );
+
+    for (const item of activeItems) {
+      if (item.stashJobId) {
+        try {
+          await stashService.stopJob(item.stashJobId);
+          queue.updateItem(item.id, {
+            status: DownloadStatus.Cancelled,
+            error: 'Batch import cancelled by user',
+            stashJobId: undefined,
+          });
+        } catch (error) {
+          debugLog.warn(`Failed to cancel job ${item.stashJobId}:`, String(error));
+        }
+      } else {
+        // No job ID yet, just mark as cancelled
+        queue.updateItem(item.id, {
+          status: DownloadStatus.Cancelled,
+          error: 'Batch import cancelled by user',
+        });
+      }
+    }
+
+    log.addLog('warning', 'batch-import', `Cancelled batch import (${activeItems.length} active items stopped)`);
   };
 
   return (
@@ -806,12 +872,21 @@ export const QueuePage: React.FC = () => {
                 }
               >
                 {isBatchImporting
-                  ? '⏳ Importing...'
+                  ? `⏳ Importing ${batchImportProgress.current}/${batchImportProgress.total}...`
                   : settings.autoImport
                     ? `⚡ Import All (${queue.stats.pending} items)`
                     : `📝 Edit & Import (${queue.stats.pending} items)`
                 }
               </button>
+              {isBatchImporting && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleCancelBatchImport}
+                  title="Cancel all active downloads"
+                >
+                  ⏹️ Cancel All
+                </button>
+              )}
               <button
                 className="btn btn-outline-secondary btn-sm"
                 onClick={queue.clearCompleted}
@@ -822,6 +897,7 @@ export const QueuePage: React.FC = () => {
               <button
                 className="btn btn-outline-danger btn-sm"
                 onClick={queue.clearAll}
+                disabled={isBatchImporting}
               >
                 Clear All
               </button>

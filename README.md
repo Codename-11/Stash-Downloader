@@ -7,6 +7,7 @@
   [![GitHub Release](https://img.shields.io/github/v/release/Codename-11/Stash-Downloader)](https://github.com/Codename-11/Stash-Downloader/releases)
   [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/publish.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
   [![Stash](https://img.shields.io/badge/Stash-v0.20%2B-blue)](https://github.com/stashapp/stash)
+  [![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
 
   [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/codename_11)
 </div>
@@ -119,6 +120,16 @@ Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
 > **Note**: Video downloads support SOCKS proxies via yt-dlp. Cover image fetching will fall back to direct connection if PySocks isn't installed (image CDNs typically don't require proxies).
 
 ---
+## Feedback & Support
+
+Have questions, ideas, or need help?  
+- **Stash Forums**: Join the discussion and get support  
+  [![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Codename-11/Stash-Downloader/issues)
+
+We welcome all feedback—thanks for helping improve Stash Downloader! 
+
+---
 
 ## Troubleshooting
 
@@ -155,7 +166,7 @@ See [Development Guide](docs/DEVELOPMENT.md) for architecture and contribution g
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Development](docs/DEVELOPMENT.md)
 - [GitHub Issues](https://github.com/Codename-11/Stash-Downloader/issues)
-- [Stash Discord](https://discord.gg/stash)
+- [Stash Forums](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
 
 ---
 

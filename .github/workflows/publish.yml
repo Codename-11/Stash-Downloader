@@ -376,7 +376,7 @@ jobs:
         with:
           name: stable-plugin-zip
 
-      - name: Get commits since last release
+      - name: Get commits and changes since last release
         id: commits
         run: |
           # Get previous tag
@@ -384,15 +384,33 @@ jobs:
 
           if [ -z "$PREV_TAG" ]; then
             echo "No previous tag found, using all commits"
-            COMMITS=$(git log --oneline --no-decorate -50)
+            COMMITS=$(git log --pretty=format:"- %s" -50)
+            DIFF_STAT=$(git diff --stat HEAD~50 HEAD 2>/dev/null | tail -20 || echo "")
           else
             echo "Previous tag: $PREV_TAG"
-            COMMITS=$(git log --oneline --no-decorate ${PREV_TAG}..HEAD)
+            # Get formatted commit messages with more detail
+            COMMITS=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+            # Get file change summary
+            DIFF_STAT=$(git diff --stat ${PREV_TAG}..HEAD | tail -20)
           fi
 
-          # Save to file for Claude (avoids escaping issues)
+          # Save commits to file
           echo "$COMMITS" > /tmp/commits.txt
           echo "commits_file=/tmp/commits.txt" >> $GITHUB_OUTPUT
+
+          # Save diff stats to file
+          echo "$DIFF_STAT" > /tmp/diff_stat.txt
+
+          # Get list of changed files by category
+          if [ -n "$PREV_TAG" ]; then
+            echo "### Changed Files by Area:" > /tmp/changed_areas.txt
+            echo "**Components:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'src/components/*.tsx' 'src/components/**/*.tsx' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Services:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'src/services/*.ts' 'src/services/**/*.ts' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Python Backend:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'scripts/*.py' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Workflow/CI:** $(git diff --name-only ${PREV_TAG}..HEAD -- '.github/**' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+          else
+            echo "" > /tmp/changed_areas.txt
+          fi
 
           # Also save for fallback
           echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
@@ -403,7 +421,10 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           COMMITS=$(cat /tmp/commits.txt)
+          DIFF_STAT=$(cat /tmp/diff_stat.txt)
+          CHANGED_AREAS=$(cat /tmp/changed_areas.txt)
           VERSION="${{ needs.deploy-stable.outputs.version }}"
+          PREV_TAG="${{ steps.commits.outputs.prev_tag }}"
 
           # Skip if no API key configured
           if [ -z "$GOOGLE_API_KEY" ]; then
@@ -412,30 +433,62 @@ jobs:
             exit 0
           fi
 
-          # Build prompt
-          PROMPT="Generate release notes for Stash Downloader v${VERSION}, a plugin for Stash (media organization software).
+          # Build comprehensive prompt with system context
+          SYSTEM_INSTRUCTION="You are a technical writer creating release notes for Stash Downloader, a plugin for Stash (open-source media organization software). The plugin allows users to:
+          - Download videos/images from URLs using yt-dlp backend
+          - Extract and edit metadata (title, performers, tags, studio) before import
+          - Batch import content with automatic Stash integration
+          - Use HTTP/SOCKS proxy for geo-restricted content
+          - Scrape metadata from booru sites (Rule34, Gelbooru, Danbooru)
 
-          Commits since last release:
+          Write release notes that are informative and helpful for end users who want to understand what changed and why they should update."
+
+          PROMPT="Generate comprehensive release notes for v${VERSION} (previous: ${PREV_TAG:-first release}).
+
+          ## Commits since last release:
           ${COMMITS}
 
-          Instructions:
-          - Write 3-6 bullet points summarizing the most important changes
-          - Group related commits into single bullet points
-          - Use simple language, focus on user-facing changes
-          - Start each bullet with an emoji: ✨ for features, 🐛 for fixes, ⚡ for improvements, 🔧 for maintenance
-          - Do NOT include commit hashes
-          - Do NOT mention 'chore' or 'refactor' unless user-visible
-          - Keep it brief - one line per bullet point
-          - Output ONLY the bullet points, no headers or extra text"
+          ## Files changed summary:
+          ${DIFF_STAT}
 
-          # Call Gemini API (free tier)
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GOOGLE_API_KEY}" \
+          ${CHANGED_AREAS}
+
+          ## Instructions:
+          1. **Categorize changes** into these sections (only include sections that have changes):
+             - **New Features** (✨) - New capabilities users can now do
+             - **Improvements** (⚡) - Enhancements to existing features
+             - **Bug Fixes** (🐛) - Issues that were resolved
+             - **Breaking Changes** (⚠️) - Changes that require user action
+             - **Developer/Maintenance** (🔧) - Only if significant (CI/CD, dependencies)
+
+          2. **For each item**:
+             - Write 1-2 sentences explaining the change and its benefit
+             - Be specific about what changed (e.g., 'Added retry button for failed downloads' not just 'UI improvements')
+             - Mention which component/area was affected when relevant
+
+          3. **Formatting**:
+             - Use markdown headers (###) for each category
+             - Use bullet points with emoji prefix
+             - Group related commits into single items
+             - Skip internal refactors unless they improve performance/reliability
+
+          4. **Tone**: Professional but friendly, focus on user value
+
+          Output the categorized release notes in markdown format."
+
+          # Call Gemini API with system instruction
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
+              --arg system "$SYSTEM_INSTRUCTION" \
               --arg prompt "$PROMPT" \
               '{
+                system_instruction: {parts: [{text: $system}]},
                 contents: [{parts: [{text: $prompt}]}],
-                generationConfig: {maxOutputTokens: 10000}
+                generationConfig: {
+                  maxOutputTokens: 2048,
+                  temperature: 0.7
+                }
               }')")
 
           # Debug: show finish reason
@@ -459,45 +512,50 @@ jobs:
         id: body
         run: |
           VERSION="${{ needs.deploy-stable.outputs.version }}"
+          PREV_TAG="${{ steps.commits.outputs.prev_tag }}"
 
           # Start with header
-          cat > /tmp/release_body.md << 'HEADER'
-          ## 🚀 Stash Downloader v
-          HEADER
-          # Append version (avoiding heredoc variable issues)
-          sed -i "s/v$/v${VERSION}/" /tmp/release_body.md
+          echo "## 🚀 Stash Downloader v${VERSION}" > /tmp/release_body.md
+          echo "" >> /tmp/release_body.md
 
-          # Add AI summary if available
+          # Add comparison link if we have a previous tag
+          if [ -n "$PREV_TAG" ]; then
+            echo "[Full Changelog](https://github.com/${{ github.repository }}/compare/${PREV_TAG}...v${VERSION})" >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+          fi
+
+          # Add AI summary if available (already categorized with headers)
           if [ "${{ steps.summary.outputs.has_summary }}" = "true" ]; then
-            echo "" >> /tmp/release_body.md
-            echo "### ✨ What's New" >> /tmp/release_body.md
-            echo "" >> /tmp/release_body.md
             cat /tmp/summary.txt >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+          else
+            # Fallback: show raw commits if no AI summary
+            echo "### 📝 Changes" >> /tmp/release_body.md
+            echo "" >> /tmp/release_body.md
+            cat /tmp/commits.txt >> /tmp/release_body.md
             echo "" >> /tmp/release_body.md
           fi
 
           # Add installation instructions
           cat >> /tmp/release_body.md << 'FOOTER'
+---
 
-          ### 📦 Installation
+### 📦 Installation
 
-          **Via Stash Plugin Manager (Recommended):**
-          1. Settings → Plugins → Available Plugins → Add Source
-          2. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
-          3. Find "Stash Downloader" and click Install
+**Via Stash Plugin Manager (Recommended):**
+1. Settings → Plugins → Available Plugins → Add Source
+2. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
+3. Find "Stash Downloader" and click Install
 
-          **Manual Installation:**
-          1. Download `stash-downloader.zip` below
-          2. Extract to `~/.stash/plugins/stash-downloader/`
-          3. Reload plugins in Stash
+**Manual Installation:**
+1. Download `stash-downloader.zip` below
+2. Extract to `~/.stash/plugins/stash-downloader/`
+3. Reload plugins in Stash
 
-          ### 📋 Requirements
-          - Stash v0.20+
-          - Python 3.7+ with yt-dlp (`pip install yt-dlp`)
-
-          ---
-
-          FOOTER
+### 📋 Requirements
+- Stash v0.20+
+- Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+FOOTER
 
           echo "Generated release body:"
           cat /tmp/release_body.md
