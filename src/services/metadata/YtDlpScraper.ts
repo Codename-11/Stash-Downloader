@@ -86,10 +86,17 @@ export class YtDlpScraper implements IMetadataScraper {
         log.debug('No HTTP proxy configured - using direct connection');
       }
 
-      // Check if Stash is busy with scans/generates (can block plugin tasks)
+      // Check if Stash is busy with long-running tasks (Scan, Generate) that could block us
+      // Note: Our own plugin jobs queueing is expected and not a concern
       const runningJobs = await stashService.getRunningJobs();
-      if (runningJobs.length > 0) {
-        log.warn(`⚠️ Stash is busy: ${runningJobs.join(', ')} - this may cause timeouts`);
+      const blockingJobs = runningJobs.filter(job =>
+        !job.includes('Extract Metadata') &&
+        !job.includes('Download Video') &&
+        !job.includes('Cleanup Result') &&
+        !job.toLowerCase().includes('stash-downloader')
+      );
+      if (blockingJobs.length > 0) {
+        log.warn(`⚠️ Stash is busy: ${blockingJobs.join(', ')} - this may cause timeouts`);
       }
 
       taskResult = await stashService.runPluginTaskAndWait(
