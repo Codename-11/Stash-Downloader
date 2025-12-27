@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS = {
   enableNotifications: true,
   logLevel: 'info' as const,
   showThumbnailPreviews: true,
+  autoImport: false,
 };
 
 export const STORAGE_KEYS = {
