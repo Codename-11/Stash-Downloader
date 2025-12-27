@@ -25,7 +25,8 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
-- [x] Firefox clipboard permission UX improvements (browser-specific messaging + manual fallback)
+- [x] In-modal download progress with auto-advance to next item (no close/reopen cycle)
+- [x] Firefox clipboard UX - opens modal directly with manual paste note
 - [x] Retry button for failed queue items
 - [x] Navbar icon for quick access to downloader
 - [x] Queue position indicator in edit modal (1 of X)

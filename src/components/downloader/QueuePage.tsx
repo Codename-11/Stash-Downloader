@@ -379,17 +379,15 @@ export const QueuePage: React.FC = () => {
       completedAt: new Date(),
     });
 
-    // Auto-advance to next pending item
+    // Auto-advance to next pending item immediately (modal stays open)
     const pendingItems = queue.items.filter(
       (i) => i.status === DownloadStatus.Pending && i.id !== itemId
     );
     const nextItem = pendingItems[0];
     if (nextItem) {
-      // Small delay to let state update before opening next item
-      setTimeout(() => {
-        setEditingItem(nextItem);
-      }, 100);
+      setEditingItem(nextItem);
     } else {
+      // No more pending items - close modal
       setEditingItem(null);
     }
   };

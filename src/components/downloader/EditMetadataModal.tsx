@@ -122,8 +122,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         status: DownloadStatus.Processing,
       });
 
-      // Close modal immediately so import happens in background
-      onClose();
+      // Modal stays open to show progress - will auto-advance on complete
 
       // Import to Stash with shared callback factory
       const callbacks = createImportCallbacks({

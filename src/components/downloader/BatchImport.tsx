@@ -15,8 +15,12 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
   const [showModal, setShowModal] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showFirefoxNote, setShowFirefoxNote] = useState(false);
   const toast = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Detect Firefox once
+  const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
 
   // Auto-focus textarea when modal opens (allows immediate Ctrl+V paste)
   useEffect(() => {
@@ -36,8 +40,14 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
   }, [showModal]);
 
   const handleImportFromClipboard = async () => {
-    // Detect Firefox for different clipboard UX
-    const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+    // Firefox doesn't support clipboard.readText() for web pages - just open modal with manual paste
+    if (isFirefox) {
+      toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
+      setShowFirefoxNote(true);
+      setShowModal(true);
+      setError(null);
+      return;
+    }
 
     // Check if Clipboard API is available
     if (!navigator.clipboard || !navigator.clipboard.readText) {
@@ -46,16 +56,6 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
       setShowModal(true);
       setError(null);
       return;
-    }
-
-    // Firefox uses an ephemeral "Paste" prompt instead of a permission dialog.
-    // Show a toast explaining what will happen, then call readText() which triggers the prompt.
-    if (isFirefox) {
-      toast.showToast(
-        'info',
-        'Firefox Clipboard',
-        'Click "Paste" in the popup that appears (wait 1 second for it to become active).'
-      );
     }
 
     try {
@@ -100,20 +100,8 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
     } catch (err) {
       // Log actual error for debugging
       console.error('[BatchImport] Clipboard read failed:', err);
-
-      // Firefox shows a paste prompt - if we got here, user cancelled or it failed
-      // Other browsers may have denied permission
       console.info('[BatchImport] Opening manual paste dialog as fallback');
-
-      if (isFirefox) {
-        toast.showToast(
-          'info',
-          'Paste Manually',
-          'Firefox clipboard access was cancelled. Use Ctrl+V to paste your URLs.'
-        );
-      } else {
-        toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
-      }
+      toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
       setShowModal(true);
       setError(null);
     }
@@ -123,6 +111,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
     setShowModal(true);
     setTextInput('');
     setError(null);
+    setShowFirefoxNote(false);
   };
 
   const handleImport = () => {
@@ -144,6 +133,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
     setShowModal(false);
     setTextInput('');
     setError(null);
+    setShowFirefoxNote(false);
   };
 
   const getUrlCount = () => {
@@ -193,6 +183,14 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
                   />
                 </div>
                 <div className="modal-body">
+                  {showFirefoxNote && (
+                    <div className="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" role="alert">
+                      <span style={{ fontSize: '1.2em' }}>🦊</span>
+                      <span>
+                        <strong>Firefox:</strong> Clipboard access requires manual paste. Press <kbd>Ctrl+V</kbd> (or <kbd>Cmd+V</kbd>) below.
+                      </span>
+                    </div>
+                  )}
                   <p className="text-muted mb-3">
                     Paste URLs (one per line). Invalid URLs will be automatically filtered out.
                   </p>
