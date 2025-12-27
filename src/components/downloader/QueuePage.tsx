@@ -721,6 +721,37 @@ export const QueuePage: React.FC = () => {
     log.addLog('warning', 'batch-import', `Cancelled batch import (${activeItems.length} active items stopped)`);
   };
 
+  // Handle clearing all items - cancel active jobs first
+  const handleClearAll = async () => {
+    // Check for active items
+    const activeItems = queue.items.filter(
+      (item) => item.status === DownloadStatus.Downloading || item.status === DownloadStatus.Processing
+    );
+
+    // If there are active items, cancel them first
+    if (activeItems.length > 0) {
+      log.addLog('info', 'queue', `Cancelling ${activeItems.length} active job(s) before clearing queue...`);
+
+      for (const item of activeItems) {
+        if (item.stashJobId) {
+          try {
+            await stashService.stopJob(item.stashJobId);
+            debugLog.debug(`Cancelled job ${item.stashJobId} for item ${item.id}`);
+          } catch (error) {
+            debugLog.warn(`Failed to cancel job ${item.stashJobId}:`, String(error));
+          }
+        }
+      }
+
+      toast.showToast('info', 'Jobs Cancelled', `Cancelled ${activeItems.length} active job(s)`);
+    }
+
+    // Now clear the queue
+    queue.clearAll();
+    log.addLog('info', 'queue', 'Queue cleared');
+    toast.showToast('success', 'Queue Cleared', 'All items have been removed from the queue');
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
       <div className="container-lg py-4">
@@ -905,8 +936,9 @@ export const QueuePage: React.FC = () => {
               </button>
               <button
                 className="btn btn-outline-danger btn-sm"
-                onClick={queue.clearAll}
+                onClick={handleClearAll}
                 disabled={isBatchImporting}
+                title="Cancel active jobs and clear all items from queue"
               >
                 Clear All
               </button>
