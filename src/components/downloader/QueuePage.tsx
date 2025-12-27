@@ -42,6 +42,9 @@ export const QueuePage: React.FC = () => {
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
+  // Batch import state
+  const [isBatchImporting, setIsBatchImporting] = useState(false);
+
   // Re-scrape modal state
   const [rescrapeItem, setRescrapeItem] = useState<IDownloadItem | null>(null);
   const [rescrapeScraperName, setRescrapeScraperName] = useState('');
@@ -546,6 +549,9 @@ export const QueuePage: React.FC = () => {
 
   // Handle batch auto-import - imports all pending items without edit modal
   const handleBatchAutoImport = async () => {
+    // Prevent double-clicks
+    if (isBatchImporting) return;
+
     const pendingItems = queue.items.filter(
       (item) => item.status === DownloadStatus.Pending && item.metadata
     );
@@ -555,13 +561,15 @@ export const QueuePage: React.FC = () => {
       return;
     }
 
-    log.addLog('info', 'download', `Starting batch auto-import of ${pendingItems.length} items`);
+    setIsBatchImporting(true);
+    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items`);
     toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items...`);
 
     const importService = getStashImportService();
     let successCount = 0;
     let failCount = 0;
 
+    try {
     for (const item of pendingItems) {
       if (!item.metadata) continue;
 
@@ -645,12 +653,15 @@ export const QueuePage: React.FC = () => {
 
     // Show summary
     const summaryMessage = `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
-    log.addLog(failCount > 0 ? 'warning' : 'success', 'download', `Batch import complete: ${summaryMessage}`);
+    log.addLog(failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import complete: ${summaryMessage}`);
     toast.showToast(
       failCount > 0 ? 'warning' : 'success',
       'Batch Import Complete',
       summaryMessage
     );
+    } finally {
+      setIsBatchImporting(false);
+    }
   };
 
   return (
@@ -806,15 +817,17 @@ export const QueuePage: React.FC = () => {
                     if (firstPending) setEditingItem(firstPending);
                   }
                 }}
-                disabled={queue.stats.pending === 0}
+                disabled={queue.stats.pending === 0 || isBatchImporting}
                 title={settings.autoImport
                   ? 'Download and import all pending items without editing'
                   : 'Review and import each item individually'
                 }
               >
-                {settings.autoImport
-                  ? `⚡ Import All (${queue.stats.pending} items)`
-                  : `📝 Edit & Import (${queue.stats.pending} items)`
+                {isBatchImporting
+                  ? '⏳ Importing...'
+                  : settings.autoImport
+                    ? `⚡ Import All (${queue.stats.pending} items)`
+                    : `📝 Edit & Import (${queue.stats.pending} items)`
                 }
               </button>
               <button
