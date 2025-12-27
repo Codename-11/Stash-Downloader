@@ -1,6 +1,6 @@
 {
   "name": "stash-downloader-plugin",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "React-based Stash plugin for downloading images and videos with automatic metadata extraction and tagging",
   "type": "module",
   "main": "dist/stash-downloader.js",
