@@ -281,23 +281,26 @@ export class DownloadService {
   }
 
   /**
-   * Check if yt-dlp is available on the server
+   * Check if yt-dlp is available on the server and get version
    */
-  async checkServerYtDlp(): Promise<boolean> {
+  async checkServerYtDlp(): Promise<{ available: boolean; version?: string }> {
     try {
       const stashService = getStashService();
 
       if (!stashService.isStashEnvironment()) {
-        return false;
+        return { available: false };
       }
 
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      }) as any;
+      }) as { available?: boolean; version?: string } | null;
 
-      return result?.available === true;
+      return {
+        available: result?.available === true,
+        version: result?.version || undefined,
+      };
     } catch {
-      return false;
+      return { available: false };
     }
   }
 

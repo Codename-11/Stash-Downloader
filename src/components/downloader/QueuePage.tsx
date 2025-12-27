@@ -41,6 +41,7 @@ export const QueuePage: React.FC = () => {
   const [showYtDlpWarning, setShowYtDlpWarning] = useState(false);
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [ytDlpVersion, setYtDlpVersion] = useState<string | null>(null);
 
   // Batch import state
   const [isBatchImporting, setIsBatchImporting] = useState(false);
@@ -141,6 +142,29 @@ export const QueuePage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStashEnvironment]);
 
+  // Fetch yt-dlp version on mount
+  useEffect(() => {
+    if (!isStashEnvironment) return;
+
+    const checkYtDlp = async () => {
+      try {
+        const { getDownloadService } = await import('@/services/download');
+        const downloadService = getDownloadService();
+        const result = await downloadService.checkServerYtDlp();
+        if (result.available && result.version) {
+          setYtDlpVersion(result.version);
+          debugLog.debug(`yt-dlp version: ${result.version}`);
+        } else {
+          setYtDlpVersion(null);
+        }
+      } catch (error) {
+        debugLog.warn('Could not check yt-dlp:', String(error));
+        setYtDlpVersion(null);
+      }
+    };
+
+    checkYtDlp();
+  }, [isStashEnvironment]);
 
   const handleAddUrl = async (url: string, contentTypeOption: ContentTypeOption = 'auto') => {
     // Clear URL field after adding
@@ -778,6 +802,17 @@ export const QueuePage: React.FC = () => {
               {serverConfigExpanded && (
                 <div className="card-body">
                   <div className="d-flex flex-column gap-2">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: '#8b9fad' }}>yt-dlp:</span>
+                      {ytDlpVersion ? (
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-success">Installed</span>
+                          <code className="text-light" style={{ fontSize: '0.85em' }}>{ytDlpVersion}</code>
+                        </div>
+                      ) : (
+                        <span className="badge bg-danger">Not Installed</span>
+                      )}
+                    </div>
                     <div className="d-flex justify-content-between align-items-center">
                       <span style={{ color: '#8b9fad' }}>Server Download Path:</span>
                       <code className="text-light">{serverDownloadPath}</code>
