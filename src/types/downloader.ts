@@ -183,6 +183,8 @@ export interface IPluginSettings {
   enableNotifications: boolean;
   logLevel: LogLevelSetting;
   showThumbnailPreviews: boolean;
+  /** Auto-import items after scraping without manual confirmation */
+  autoImport: boolean;
 }
 
 // Metadata scraper interface

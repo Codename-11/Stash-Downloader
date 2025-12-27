@@ -16,7 +16,7 @@ import { useDownloadQueue, useExternalQueue } from '@/hooks';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
-import { getStashService } from '@/services/stash/StashGraphQLService';
+import { getStashService, getStashImportService } from '@/services/stash';
 import { DownloadStatus } from '@/types';
 import type { IDownloadItem, IScrapedMetadata } from '@/types';
 import { createLogger } from '@/utils';
@@ -303,6 +303,84 @@ export const QueuePage: React.FC = () => {
           debugLog.debug('ℹ️ No direct video/image URL extracted - download service will use yt-dlp or page URL');
         }
         toast.showToast('success', 'Metadata Scraped', `Successfully scraped metadata for ${metadata.title || url}`);
+
+        // Auto-import if enabled (uses scraped metadata as-is, post-import action = none)
+        if (settings.autoImport) {
+          debugLog.debug(`Auto-import enabled, starting import for: ${metadata.title || url}`);
+
+          // Build the item for import
+          const itemForImport: IDownloadItem = {
+            id: itemId,
+            url,
+            status: DownloadStatus.Processing,
+            metadata,
+            addedAt: new Date(),
+            postImportAction: 'none', // Default to none for auto-import
+          };
+
+          // Update status to Processing
+          queue.updateItem(itemId, {
+            status: DownloadStatus.Processing,
+            logs: [],
+            startedAt: new Date(),
+          });
+
+          try {
+            const importService = getStashImportService();
+            const result = await importService.importToStash(itemForImport, {
+              onProgress: (progress) => {
+                queue.updateItem(itemId, {
+                  progress,
+                  status: DownloadStatus.Downloading,
+                  lastActivityAt: new Date(),
+                });
+              },
+              onStatusChange: (status) => {
+                const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
+                queue.updateItem(itemId, { status: newStatus });
+              },
+              onLog: (level, message, details) => {
+                const newLog = {
+                  timestamp: new Date(),
+                  level,
+                  message,
+                  details,
+                };
+                queue.updateItem(itemId, (currentItem) => ({
+                  logs: [...(currentItem.logs || []), newLog],
+                }));
+              },
+              onJobStart: (jobId) => {
+                debugLog.debug('Auto-import job started with ID:', jobId);
+                queue.updateItem(itemId, {
+                  stashJobId: jobId,
+                  lastActivityAt: new Date(),
+                });
+              },
+            });
+
+            // Mark as complete
+            queue.updateItem(itemId, {
+              status: DownloadStatus.Complete,
+              stashId: result.id,
+              completedAt: new Date(),
+            });
+
+            log.addLog('success', 'download', `Auto-imported: ${metadata.title || url}`, `Stash ID: ${result.id}`);
+            toast.showToast('success', 'Auto-Import Complete', `Successfully imported: ${metadata.title || url}`);
+          } catch (importError) {
+            const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
+            debugLog.error('Auto-import failed:', errorMessage);
+
+            queue.updateItem(itemId, {
+              status: DownloadStatus.Failed,
+              error: `Auto-import failed: ${errorMessage}`,
+            });
+
+            log.addLog('error', 'download', `Auto-import failed: ${errorMessage}`);
+            toast.showToast('error', 'Auto-Import Failed', errorMessage);
+          }
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorStack = error instanceof Error ? error.stack : undefined;
@@ -334,12 +412,13 @@ export const QueuePage: React.FC = () => {
     handleAddUrlRef.current = handleAddUrl;
   });
   const handleBatchImport = async (urls: string[]) => {
-    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs`);
+    const autoImportEnabled = settings.autoImport;
+    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs${autoImportEnabled ? ' (auto-import enabled)' : ''}`);
     toast.showToast('info', 'Batch Import Started', `Processing ${urls.length} URLs...`);
-    
+
     let successCount = 0;
     let errorCount = 0;
-    
+
     for (const url of urls) {
       try {
         await handleAddUrl(url);
@@ -348,12 +427,16 @@ export const QueuePage: React.FC = () => {
         errorCount++;
       }
     }
-    
-    log.addLog('success', 'scrape', `Batch import complete: ${successCount} succeeded, ${errorCount} failed`);
+
+    // Build completion message
+    const baseMessage = `${successCount} added to queue${errorCount > 0 ? `, ${errorCount} failed` : ''}`;
+    const autoImportNote = autoImportEnabled ? '. Auto-importing in background...' : '';
+
+    log.addLog('success', 'scrape', `Batch complete: ${baseMessage}${autoImportNote}`);
     toast.showToast(
       errorCount > 0 ? 'warning' : 'success',
-      'Batch Import Complete',
-      `${successCount} succeeded, ${errorCount} failed`
+      'Batch Complete',
+      `${baseMessage}${autoImportNote}`
     );
   };
 
@@ -710,7 +793,7 @@ export const QueuePage: React.FC = () => {
             </div>
           )}
 
-          {/* Queue Toolbar - Preview toggle and Log level */}
+          {/* Queue Toolbar - Preview toggle, Auto-import toggle, and Log level */}
           <div className="d-flex justify-content-between align-items-center mb-2 px-2">
             <div className="d-flex align-items-center gap-2">
               <button
@@ -720,6 +803,15 @@ export const QueuePage: React.FC = () => {
                 style={{ minWidth: '140px' }}
               >
                 {settings.showThumbnailPreviews ? '🖼️ Thumbnails On' : '🖼️ Thumbnails Off'}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${settings.autoImport ? 'btn-primary' : 'btn-outline-secondary'}`}
+                onClick={() => updateSettings({ autoImport: !settings.autoImport })}
+                title="When enabled, items are automatically imported after scraping without manual confirmation"
+                style={{ minWidth: '140px' }}
+              >
+                {settings.autoImport ? '⚡ Auto-Import On' : '⚡ Auto-Import Off'}
               </button>
             </div>
             <div className="d-flex align-items-center gap-2">
