@@ -19,7 +19,7 @@ import { getScraperRegistry } from '@/services/metadata';
 import { getStashService, getStashImportService } from '@/services/stash';
 import { DownloadStatus } from '@/types';
 import type { IDownloadItem, IScrapedMetadata, IEditedMetadata } from '@/types';
-import { createLogger } from '@/utils';
+import { createLogger, createImportCallbacks, processConcurrently } from '@/utils';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID, PLUGIN_NAME } from '@/constants';
 import type { IPluginSettings } from '@/types';
@@ -548,6 +548,7 @@ export const QueuePage: React.FC = () => {
   };
 
   // Handle batch auto-import - imports all pending items without edit modal
+  // Uses concurrent processing based on concurrentDownloads setting
   const handleBatchAutoImport = async () => {
     // Prevent double-clicks
     if (isBatchImporting) return;
@@ -562,103 +563,84 @@ export const QueuePage: React.FC = () => {
     }
 
     setIsBatchImporting(true);
-    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items`);
-    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items...`);
+    const concurrency = settings.concurrentDownloads || DEFAULT_SETTINGS.concurrentDownloads;
+    log.addLog('info', 'batch-import', `Starting batch auto-import of ${pendingItems.length} items (${concurrency} concurrent)`);
+    toast.showToast('info', 'Batch Import Started', `Importing ${pendingItems.length} items (${concurrency} concurrent)...`);
 
     const importService = getStashImportService();
-    let successCount = 0;
-    let failCount = 0;
 
     try {
-    for (const item of pendingItems) {
-      if (!item.metadata) continue;
+      // Process items concurrently using the shared utility
+      const { successCount, failCount } = await processConcurrently(
+        pendingItems,
+        async (item) => {
+          if (!item.metadata) throw new Error('No metadata');
 
-      // Build editedMetadata from scraped metadata (required for import)
-      const editedMetadata: IEditedMetadata = {
-        title: item.metadata.title,
-        description: item.metadata.description,
-        date: item.metadata.date,
-        performerNames: item.metadata.performers || [],
-        tagNames: item.metadata.tags || [],
-        studioName: item.metadata.studio,
-      };
+          // Build editedMetadata from scraped metadata (required for import)
+          const editedMetadata: IEditedMetadata = {
+            title: item.metadata.title,
+            description: item.metadata.description,
+            date: item.metadata.date,
+            performerNames: item.metadata.performers || [],
+            tagNames: item.metadata.tags || [],
+            studioName: item.metadata.studio,
+          };
 
-      // Build item for import with default settings
-      const itemForImport: IDownloadItem = {
-        ...item,
-        editedMetadata,
-        postImportAction: 'none',
-      };
+          // Build item for import with default settings
+          const itemForImport: IDownloadItem = {
+            ...item,
+            editedMetadata,
+            postImportAction: 'none',
+          };
 
-      // Update status to Processing (preserve existing logs from scraping phase)
-      queue.updateItem(item.id, {
-        status: DownloadStatus.Processing,
-        startedAt: new Date(),
-      });
+          // Update status to Processing (preserve existing logs from scraping phase)
+          queue.updateItem(item.id, {
+            status: DownloadStatus.Processing,
+            startedAt: new Date(),
+          });
 
-      try {
-        const result = await importService.importToStash(itemForImport, {
-          onProgress: (progress) => {
-            queue.updateItem(item.id, {
-              progress,
-              status: DownloadStatus.Downloading,
-              lastActivityAt: new Date(),
+          try {
+            // Use shared callback factory
+            const callbacks = createImportCallbacks({
+              itemId: item.id,
+              updateItem: queue.updateItem,
+              debugLog,
             });
-          },
-          onStatusChange: (status) => {
-            const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
-            queue.updateItem(item.id, { status: newStatus });
-          },
-          onLog: (level, message, details) => {
-            const newLog = {
-              timestamp: new Date(),
-              level,
-              message,
-              details,
-            };
-            queue.updateItem(item.id, (currentItem) => ({
-              logs: [...(currentItem.logs || []), newLog],
-            }));
-          },
-          onJobStart: (jobId) => {
-            debugLog.debug('Batch import job started with ID:', jobId);
+
+            const result = await importService.importToStash(itemForImport, callbacks);
+
+            // Mark as complete
             queue.updateItem(item.id, {
-              stashJobId: jobId,
-              lastActivityAt: new Date(),
+              status: DownloadStatus.Complete,
+              stashId: result.id,
+              completedAt: new Date(),
             });
-          },
-        });
 
-        // Mark as complete
-        queue.updateItem(item.id, {
-          status: DownloadStatus.Complete,
-          stashId: result.id,
-          completedAt: new Date(),
-        });
+            debugLog.debug(`Batch import: completed ${item.metadata.title || item.url}`);
+            return result;
+          } catch (importError) {
+            const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
+            debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
 
-        successCount++;
-        debugLog.debug(`Batch import: completed ${item.metadata.title || item.url}`);
-      } catch (importError) {
-        const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
-        debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
+            queue.updateItem(item.id, {
+              status: DownloadStatus.Failed,
+              error: `Import failed: ${errorMessage}`,
+            });
 
-        queue.updateItem(item.id, {
-          status: DownloadStatus.Failed,
-          error: `Import failed: ${errorMessage}`,
-        });
+            throw importError;
+          }
+        },
+        concurrency
+      );
 
-        failCount++;
-      }
-    }
-
-    // Show summary
-    const summaryMessage = `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
-    log.addLog(failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import complete: ${summaryMessage}`);
-    toast.showToast(
-      failCount > 0 ? 'warning' : 'success',
-      'Batch Import Complete',
-      summaryMessage
-    );
+      // Show summary
+      const summaryMessage = `${successCount} imported${failCount > 0 ? `, ${failCount} failed` : ''}`;
+      log.addLog(failCount > 0 ? 'warning' : 'success', 'batch-import', `Batch import complete: ${summaryMessage}`);
+      toast.showToast(
+        failCount > 0 ? 'warning' : 'success',
+        'Batch Import Complete',
+        summaryMessage
+      );
     } finally {
       setIsBatchImporting(false);
     }

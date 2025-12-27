@@ -11,7 +11,7 @@ import { DownloadStatus } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { useLog } from '@/contexts/LogContext';
 import { getStashImportService } from '@/services/stash';
-import { formatBytes, formatDownloadError, createLogger } from '@/utils';
+import { formatBytes, formatDownloadError, createLogger, createImportCallbacks } from '@/utils';
 
 const debugLog = createLogger('EditMetadataModal');
 
@@ -126,41 +126,14 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       // Close modal immediately so import happens in background
       onClose();
 
-      // Import to Stash with progress callbacks
-      const result = await importService.importToStash(itemWithMetadata, {
-        onProgress: (progress) => {
-          // Include lastActivityAt from progress for stale detection
-          const progressWithActivity = 'lastActivityAt' in progress ? progress : progress;
-          onUpdateItem(item.id, {
-            progress: progressWithActivity,
-            status: DownloadStatus.Downloading,
-            // Update lastActivityAt from progress heartbeat
-            lastActivityAt: (progress as { lastActivityAt?: Date }).lastActivityAt || new Date(),
-          });
-        },
-        onStatusChange: (status) => {
-          const newStatus = status.includes('Downloading') ? DownloadStatus.Downloading : DownloadStatus.Processing;
-          onUpdateItem(item.id, { status: newStatus });
-        },
-        onLog: (level, message, details) => {
-          const newLog = {
-            timestamp: new Date(),
-            level,
-            message,
-            details,
-          };
-          onUpdateItem(item.id, (currentItem) => ({
-            logs: [...(currentItem.logs || []), newLog],
-          }));
-        },
-        onJobStart: (jobId) => {
-          debugLog.debug('Job started with ID:', jobId);
-          onUpdateItem(item.id, {
-            stashJobId: jobId,
-            lastActivityAt: new Date(),
-          });
-        },
+      // Import to Stash with shared callback factory
+      const callbacks = createImportCallbacks({
+        itemId: item.id,
+        updateItem: onUpdateItem,
+        debugLog,
       });
+
+      const result = await importService.importToStash(itemWithMetadata, callbacks);
 
       log.addLog('success', 'download', `Successfully imported: ${itemTitle}`, `Stash ID: ${result.id}`);
       toast.showToast('success', 'Import Successful', `Successfully imported: ${itemTitle}`);
