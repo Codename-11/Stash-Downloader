@@ -27,6 +27,15 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
   }, [showModal]);
 
   const handleImportFromClipboard = async () => {
+    // Check if Clipboard API is available
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      console.warn('[BatchImport] Clipboard API not available - opening manual paste dialog');
+      toast.showToast('warning', 'Clipboard Unavailable', 'Clipboard API not available. Please paste manually.');
+      setShowModal(true);
+      setError('Clipboard API not available in this browser/context');
+      return;
+    }
+
     try {
       const text = await navigator.clipboard.readText();
       const trimmedText = text.trim();
@@ -63,8 +72,22 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
         setShowModal(true);
         setError(null);
       }
-    } catch (_err) {
-      const errorMsg = 'Failed to read from clipboard. Please paste manually.';
+    } catch (err) {
+      // Log actual error for debugging
+      console.error('[BatchImport] Clipboard read failed:', err);
+
+      // Provide helpful error message based on error type
+      let errorMsg = 'Failed to read from clipboard. Please paste manually.';
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') {
+          errorMsg = 'Clipboard permission denied. Please paste manually or allow clipboard access.';
+          console.warn('[BatchImport] Clipboard permission denied - user may need to grant permission');
+        } else if (err.name === 'SecurityError') {
+          errorMsg = 'Clipboard access blocked (requires HTTPS). Please paste manually.';
+          console.warn('[BatchImport] Security error - likely HTTP context instead of HTTPS');
+        }
+      }
+
       toast.showToast('error', 'Clipboard Error', errorMsg);
       setError(errorMsg);
       setShowModal(true);
