@@ -18,7 +18,7 @@ import { useLog } from '@/contexts/LogContext';
 import { getScraperRegistry } from '@/services/metadata';
 import { getStashService, getStashImportService } from '@/services/stash';
 import { DownloadStatus } from '@/types';
-import type { IDownloadItem, IScrapedMetadata } from '@/types';
+import type { IDownloadItem, IScrapedMetadata, IEditedMetadata } from '@/types';
 import { createLogger } from '@/utils';
 import { useSettings } from '@/hooks';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PLUGIN_ID, PLUGIN_NAME } from '@/constants';
@@ -574,7 +574,7 @@ export const QueuePage: React.FC = () => {
       if (!item.metadata) continue;
 
       // Build editedMetadata from scraped metadata (required for import)
-      const editedMetadata = {
+      const editedMetadata: IEditedMetadata = {
         title: item.metadata.title,
         description: item.metadata.description,
         date: item.metadata.date,
