@@ -2,7 +2,7 @@
  * BatchImport - Component for importing multiple URLs
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { isValidUrl } from '@/utils';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -16,6 +16,15 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus textarea when modal opens (allows immediate Ctrl+V paste)
+  useEffect(() => {
+    if (showModal && textareaRef.current) {
+      // Small delay to ensure modal is fully rendered
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [showModal]);
 
   useEffect(() => {
     if (showModal) {
@@ -30,9 +39,9 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
     // Check if Clipboard API is available
     if (!navigator.clipboard || !navigator.clipboard.readText) {
       console.warn('[BatchImport] Clipboard API not available - opening manual paste dialog');
-      toast.showToast('warning', 'Clipboard Unavailable', 'Clipboard API not available. Please paste manually.');
+      toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
       setShowModal(true);
-      setError('Clipboard API not available in this browser/context');
+      setError(null);
       return;
     }
 
@@ -76,21 +85,12 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
       // Log actual error for debugging
       console.error('[BatchImport] Clipboard read failed:', err);
 
-      // Provide helpful error message based on error type
-      let errorMsg = 'Failed to read from clipboard. Please paste manually.';
-      if (err instanceof DOMException) {
-        if (err.name === 'NotAllowedError') {
-          errorMsg = 'Clipboard permission denied. Please paste manually or allow clipboard access.';
-          console.warn('[BatchImport] Clipboard permission denied - user may need to grant permission');
-        } else if (err.name === 'SecurityError') {
-          errorMsg = 'Clipboard access blocked (requires HTTPS). Please paste manually.';
-          console.warn('[BatchImport] Security error - likely HTTP context instead of HTTPS');
-        }
-      }
-
-      toast.showToast('error', 'Clipboard Error', errorMsg);
-      setError(errorMsg);
+      // Firefox and some browsers don't support clipboard.readText() without special permissions
+      // Just open the modal and let user paste manually - this is the best UX
+      console.info('[BatchImport] Opening manual paste dialog as fallback');
+      toast.showToast('info', 'Paste URLs', 'Use Ctrl+V to paste your URLs.');
       setShowModal(true);
+      setError(null);
     }
   };
 
@@ -172,6 +172,7 @@ export const BatchImport: React.FC<BatchImportProps> = ({ onImport, onSingleUrl 
                     Paste URLs (one per line). Invalid URLs will be automatically filtered out.
                   </p>
                   <textarea
+                    ref={textareaRef}
                     className={`form-control bg-dark text-light border-secondary ${error ? 'is-invalid' : ''}`}
                     rows={10}
                     value={textInput}

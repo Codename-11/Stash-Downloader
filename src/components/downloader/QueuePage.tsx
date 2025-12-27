@@ -339,16 +339,25 @@ export const QueuePage: React.FC = () => {
     handleAddUrlRef.current = handleAddUrl;
   });
   const handleBatchImport = async (urls: string[]) => {
-    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs`);
+    log.addLog('info', 'scrape', `Starting batch import of ${urls.length} URLs (rate-limited to avoid overwhelming Stash)`);
     toast.showToast('info', 'Batch Import Started', `Processing ${urls.length} URLs...`);
 
     let successCount = 0;
     let errorCount = 0;
 
-    for (const url of urls) {
+    // Process URLs one at a time with a small delay to prevent overwhelming Stash
+    // This ensures yt-dlp tasks don't all start simultaneously
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i] as string; // Safe cast - loop bounds guarantee valid index
       try {
         await handleAddUrl(url);
         successCount++;
+
+        // Add a small delay between URLs to let Stash process tasks
+        // This prevents "Stash is busy" warnings
+        if (i < urls.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+        }
       } catch (_error) {
         errorCount++;
       }

@@ -19,6 +19,8 @@
 - [ ] Keyboard shortcuts (using Mousetrap from PluginApi)
 - [ ] Drag-and-drop queue reordering
 - [ ] Bulk select/delete queue items
+- [ ] Fix Firefox clipboard permissions for Batch Import
+- [ ] Verify clipboard permissions for other browsers
 
 ### Testing
 - [ ] Add unit tests for Logger utility
