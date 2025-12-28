@@ -90,8 +90,8 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       return;
     }
 
-    // Set loading state after a brief delay to avoid flicker
-    const loadingTimeout = setTimeout(() => setIsLoading(true), 100);
+    // Show loading immediately to mask API delay
+    setIsLoading(true);
 
     // Debounce the actual API call
     debounceRef.current = setTimeout(async () => {
@@ -125,14 +125,12 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       } finally {
         // Only clear loading if this is still the current request
         if (currentRequestId === requestIdRef.current) {
-          clearTimeout(loadingTimeout);
           setIsLoading(false);
         }
       }
     }, DEBOUNCE_DELAY);
 
     return () => {
-      clearTimeout(loadingTimeout);
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
@@ -274,30 +272,45 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       </div>
 
       {/* Suggestions dropdown */}
-      {isOpen && suggestions.length > 0 && (
+      {(isOpen && suggestions.length > 0) || (isLoading && inputValue.trim().length >= MIN_SEARCH_LENGTH) ? (
         <div className="autocomplete-dropdown">
-          {suggestions.map((tag, index) => (
-            <div
-              key={tag.name}
-              className={`autocomplete-item ${index === selectedIndex ? 'selected' : ''}`}
-              onClick={() => addTag(tag.name)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              <span
-                className="autocomplete-item-name"
-                style={{ color: CATEGORY_COLORS[tag.category] || '#fff' }}
+          {isLoading ? (
+            // Loading skeleton items
+            <>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n} className="autocomplete-item autocomplete-skeleton">
+                  <span
+                    className="skeleton-text"
+                    style={{ width: `${40 + Math.random() * 80}px` }}
+                  />
+                  <span className="skeleton-text" style={{ width: '30px' }} />
+                </div>
+              ))}
+            </>
+          ) : (
+            suggestions.map((tag, index) => (
+              <div
+                key={tag.name}
+                className={`autocomplete-item ${index === selectedIndex ? 'selected' : ''}`}
+                onClick={() => addTag(tag.name)}
+                onMouseEnter={() => setSelectedIndex(index)}
               >
-                {tag.name.replace(/_/g, ' ')}
-              </span>
-              {tag.count > 0 && (
-                <span className="autocomplete-item-count">
-                  {formatCount(tag.count)}
+                <span
+                  className="autocomplete-item-name"
+                  style={{ color: CATEGORY_COLORS[tag.category] || '#fff' }}
+                >
+                  {tag.name.replace(/_/g, ' ')}
                 </span>
-              )}
-            </div>
-          ))}
+                {tag.count > 0 && (
+                  <span className="autocomplete-item-count">
+                    {formatCount(tag.count)}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

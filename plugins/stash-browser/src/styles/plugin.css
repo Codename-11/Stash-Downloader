@@ -404,6 +404,16 @@
   color: var(--stash-muted);
 }
 
+/* Autocomplete loading skeleton */
+.stash-browser .autocomplete-skeleton {
+  pointer-events: none;
+}
+
+.stash-browser .autocomplete-skeleton .skeleton-text {
+  display: inline-block;
+  height: 0.9rem;
+}
+
 /* ==========================================================================
    Tag Pills
    ========================================================================== */

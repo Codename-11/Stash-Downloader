@@ -10,7 +10,7 @@ import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
 import { Pagination } from './Pagination';
 import { SettingsPanel } from './SettingsPanel';
-import { loadSettings, type BrowserSettings } from '@/utils';
+import { loadSettings, saveSettings, type BrowserSettings } from '@/utils';
 import { PostDetailModal } from './PostDetailModal';
 import { SkeletonGrid } from './SkeletonGrid';
 
@@ -137,6 +137,12 @@ export const BrowserMain: React.FC = () => {
     handleSearch(newParams);
   }, [searchParams, handleSearch]);
 
+  const handleToggleThumbnails = useCallback(() => {
+    const newSettings = { ...settings, showThumbnails: !settings.showThumbnails };
+    setSettings(newSettings);
+    saveSettings(newSettings);
+  }, [settings]);
+
   const totalPages = Math.ceil(totalCount / searchParams.limit);
 
   return (
@@ -199,6 +205,8 @@ export const BrowserMain: React.FC = () => {
           onSourceChange={handleSourceChange}
           onSearch={(tags) => handleSearch({ ...searchParams, tags, page: 0 })}
           isLoading={isLoading}
+          showThumbnails={settings.showThumbnails}
+          onToggleThumbnails={handleToggleThumbnails}
         />
       </div>
 
