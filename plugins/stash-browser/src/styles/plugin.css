@@ -1,0 +1,588 @@
+/**
+ * Stash Browser Plugin - Style Enhancements
+ *
+ * Skeleton loading, fluid animations, and dark theme styling.
+ */
+
+/* ==========================================================================
+   CSS Custom Properties
+   ========================================================================== */
+
+:root {
+  --stash-card-bg: #30404d;
+  --stash-header-bg: #243340;
+  --stash-input-bg: #243340;
+  --stash-border: #394b59;
+  --stash-muted: #8b9fad;
+  --stash-text: #fff;
+  --stash-hover-bg: #3a4f5f;
+  --stash-focus-ring: rgba(13, 110, 253, 0.25);
+
+  /* Skeleton colors */
+  --skeleton-base: #243340;
+  --skeleton-shine: #394b59;
+
+  /* Animation timing */
+  --transition-fast: 0.15s;
+  --transition-normal: 0.25s;
+  --transition-slow: 0.35s;
+}
+
+/* ==========================================================================
+   Skeleton Loading Animation
+   ========================================================================== */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.25rem;
+}
+
+.skeleton-card {
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.skeleton-image {
+  aspect-ratio: 1;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 1rem;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.25rem;
+}
+
+.skeleton-text-sm {
+  height: 0.75rem;
+}
+
+.skeleton-button {
+  height: 2rem;
+  width: 3rem;
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-shine) 50%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.25rem;
+}
+
+/* ==========================================================================
+   Fade Animations
+   ========================================================================== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.stash-browser .animate-fade-in {
+  animation: fade-in var(--transition-normal) ease-out;
+}
+
+.stash-browser .animate-fade-in-up {
+  animation: fade-in-up var(--transition-normal) ease-out;
+}
+
+.stash-browser .animate-fade-in-scale {
+  animation: fade-in-scale var(--transition-normal) ease-out;
+}
+
+/* ==========================================================================
+   Post Card Styles
+   ========================================================================== */
+
+.stash-browser .post-card {
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  transition:
+    transform var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease,
+    border-color var(--transition-fast) ease;
+  animation: fade-in-up var(--transition-normal) ease-out;
+  animation-fill-mode: both;
+}
+
+.stash-browser .post-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: var(--stash-muted);
+}
+
+.stash-browser .post-card.selected {
+  border-color: #0d6efd;
+  border-width: 2px;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+/* Staggered animation for grid items */
+.stash-browser .post-card:nth-child(1) { animation-delay: 0ms; }
+.stash-browser .post-card:nth-child(2) { animation-delay: 25ms; }
+.stash-browser .post-card:nth-child(3) { animation-delay: 50ms; }
+.stash-browser .post-card:nth-child(4) { animation-delay: 75ms; }
+.stash-browser .post-card:nth-child(5) { animation-delay: 100ms; }
+.stash-browser .post-card:nth-child(6) { animation-delay: 125ms; }
+.stash-browser .post-card:nth-child(7) { animation-delay: 150ms; }
+.stash-browser .post-card:nth-child(8) { animation-delay: 175ms; }
+.stash-browser .post-card:nth-child(9) { animation-delay: 200ms; }
+.stash-browser .post-card:nth-child(10) { animation-delay: 225ms; }
+.stash-browser .post-card:nth-child(11) { animation-delay: 250ms; }
+.stash-browser .post-card:nth-child(12) { animation-delay: 275ms; }
+
+/* Post card thumbnail */
+.stash-browser .post-thumbnail {
+  aspect-ratio: 1;
+  background-color: var(--stash-header-bg);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.stash-browser .post-thumbnail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 60%, rgba(0, 0, 0, 0.5) 100%);
+  opacity: 0;
+  transition: opacity var(--transition-fast) ease;
+}
+
+.stash-browser .post-card:hover .post-thumbnail::after {
+  opacity: 1;
+}
+
+/* Checkbox animation */
+.stash-browser .post-card .form-check-input {
+  transition:
+    transform var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease;
+}
+
+.stash-browser .post-card .form-check-input:checked {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+}
+
+/* Action buttons */
+.stash-browser .post-card .card-body .btn {
+  transition:
+    transform var(--transition-fast) ease,
+    background-color var(--transition-fast) ease,
+    opacity var(--transition-fast) ease;
+}
+
+.stash-browser .post-card .card-body .btn:hover {
+  transform: scale(1.1);
+}
+
+.stash-browser .post-card .card-body .btn:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Modal Styles
+   ========================================================================== */
+
+.stash-browser .modal-overlay {
+  animation: fade-in var(--transition-fast) ease-out;
+}
+
+.stash-browser .modal-content-wrapper {
+  animation: fade-in-scale var(--transition-normal) ease-out;
+}
+
+.stash-browser .detail-modal-image {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 0.5rem;
+}
+
+.stash-browser .detail-modal-video {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 0.5rem;
+}
+
+/* ==========================================================================
+   Autocomplete Dropdown
+   ========================================================================== */
+
+.stash-browser .autocomplete-dropdown {
+  animation: fade-in-up var(--transition-fast) ease-out;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.stash-browser .autocomplete-item {
+  transition: background-color var(--transition-fast) ease;
+  cursor: pointer;
+}
+
+.stash-browser .autocomplete-item:hover,
+.stash-browser .autocomplete-item.selected {
+  background-color: var(--stash-hover-bg);
+}
+
+/* ==========================================================================
+   Tag Pills
+   ========================================================================== */
+
+.stash-browser .tag-pill {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 1rem;
+  background-color: var(--stash-header-bg);
+  border: 1px solid var(--stash-border);
+  color: var(--stash-text);
+  transition:
+    background-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+  cursor: pointer;
+}
+
+.stash-browser .tag-pill:hover {
+  background-color: var(--stash-hover-bg);
+  transform: translateY(-1px);
+}
+
+/* Tag categories */
+.stash-browser .tag-pill.tag-general { color: #0075f8; }
+.stash-browser .tag-pill.tag-artist { color: #e00; }
+.stash-browser .tag-pill.tag-copyright { color: #a0a; }
+.stash-browser .tag-pill.tag-character { color: #0a0; }
+.stash-browser .tag-pill.tag-meta { color: #f80; }
+
+/* ==========================================================================
+   Settings Panel
+   ========================================================================== */
+
+.stash-browser .settings-panel {
+  animation: fade-in-scale var(--transition-normal) ease-out;
+}
+
+.stash-browser .settings-panel .form-switch .form-check-input {
+  transition: background-color var(--transition-fast) ease;
+}
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.stash-browser .pagination .page-link {
+  transition:
+    background-color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.stash-browser .pagination .page-link:hover {
+  transform: translateY(-2px);
+}
+
+.stash-browser .pagination .page-item.active .page-link {
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+}
+
+/* ==========================================================================
+   Form Controls
+   ========================================================================== */
+
+.stash-browser .form-control,
+.stash-browser .form-select {
+  background-color: var(--stash-input-bg);
+  border-color: var(--stash-border);
+  color: var(--stash-text);
+  transition:
+    border-color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease;
+}
+
+.stash-browser .form-control:focus,
+.stash-browser .form-select:focus {
+  background-color: var(--stash-input-bg);
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
+  color: var(--stash-text);
+}
+
+.stash-browser .form-control::placeholder {
+  color: var(--stash-muted);
+  opacity: 0.7;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.stash-browser .btn {
+  transition:
+    color var(--transition-fast) ease,
+    background-color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.stash-browser .btn:active {
+  transform: scale(0.97);
+}
+
+.stash-browser .btn-success {
+  box-shadow: 0 2px 4px rgba(25, 135, 84, 0.3);
+}
+
+.stash-browser .btn-success:hover {
+  box-shadow: 0 4px 12px rgba(25, 135, 84, 0.4);
+}
+
+.stash-browser .btn-primary {
+  box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+}
+
+.stash-browser .btn-primary:hover {
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+}
+
+/* ==========================================================================
+   Scrollbar Styling
+   ========================================================================== */
+
+.stash-browser ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.stash-browser ::-webkit-scrollbar-track {
+  background: var(--stash-input-bg);
+  border-radius: 4px;
+}
+
+.stash-browser ::-webkit-scrollbar-thumb {
+  background: var(--stash-border);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.stash-browser ::-webkit-scrollbar-thumb:hover {
+  background: var(--stash-muted);
+}
+
+/* ==========================================================================
+   Loading Spinner Enhancement
+   ========================================================================== */
+
+@keyframes spinner-grow {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.stash-browser .loading-dots {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.stash-browser .loading-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: var(--stash-muted);
+  border-radius: 50%;
+  animation: spinner-grow 1s ease-in-out infinite;
+}
+
+.stash-browser .loading-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.stash-browser .loading-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ==========================================================================
+   Selection Toolbar
+   ========================================================================== */
+
+.stash-browser .selection-toolbar {
+  animation: fade-in-up var(--transition-fast) ease-out;
+  background-color: var(--stash-header-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.stash-browser .empty-state {
+  animation: fade-in var(--transition-slow) ease-out;
+}
+
+.stash-browser .empty-state-icon {
+  opacity: 0.3;
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+/* ==========================================================================
+   Alert Improvements
+   ========================================================================== */
+
+.stash-browser .alert {
+  animation: fade-in-up var(--transition-fast) ease-out;
+  border-radius: 0.375rem;
+}
+
+.stash-browser .alert-danger {
+  background-color: rgba(220, 53, 69, 0.15);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #ea868f;
+}
+
+.stash-browser .alert-info {
+  background-color: rgba(13, 110, 253, 0.15);
+  border-color: rgba(13, 110, 253, 0.3);
+  color: #6ea8fe;
+}
+
+/* ==========================================================================
+   Responsive Grid Adjustments
+   ========================================================================== */
+
+@media (max-width: 575.98px) {
+  .stash-browser .container-fluid {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .stash-browser .post-card .card-body {
+    padding: 0.375rem;
+  }
+
+  .stash-browser .post-card .card-body .btn {
+    padding: 0.125rem 0.375rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .stash-browser .results-grid .col-lg-2 {
+    flex: 0 0 14.285%;
+    max-width: 14.285%;
+  }
+}
+
+@media (min-width: 1800px) {
+  .stash-browser .results-grid .col-lg-2 {
+    flex: 0 0 12.5%;
+    max-width: 12.5%;
+  }
+}
+
+/* ==========================================================================
+   Rating Badges
+   ========================================================================== */
+
+.stash-browser .rating-safe { background-color: #28a745; }
+.stash-browser .rating-questionable { background-color: #ffc107; color: #000; }
+.stash-browser .rating-explicit { background-color: #dc3545; }
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.stash-browser .gap-1 { gap: 0.25rem !important; }
+.stash-browser .gap-2 { gap: 0.5rem !important; }
+.stash-browser .gap-3 { gap: 1rem !important; }
+
+.stash-browser .transition-all {
+  transition: all var(--transition-normal) ease;
+}
+
+.stash-browser .cursor-pointer {
+  cursor: pointer;
+}
+
+/* Hover brightness effect for images */
+.stash-browser .hover-brighten {
+  transition: filter var(--transition-fast) ease;
+}
+
+.stash-browser .hover-brighten:hover {
+  filter: brightness(1.1);
+}

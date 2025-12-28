@@ -13,6 +13,7 @@ import { Pagination } from './Pagination';
 import { SettingsPanel } from './SettingsPanel';
 import { loadSettings, type BrowserSettings } from '@/utils';
 import { PostDetailModal } from './PostDetailModal';
+import { SkeletonGrid } from './SkeletonGrid';
 
 export const BrowserMain: React.FC = () => {
   // Settings
@@ -140,7 +141,7 @@ export const BrowserMain: React.FC = () => {
   const totalPages = Math.ceil(totalCount / searchParams.limit);
 
   return (
-    <div className="container-fluid px-4 py-3">
+    <div className="stash-browser container-fluid px-4 py-3">
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -216,11 +217,11 @@ export const BrowserMain: React.FC = () => {
 
       {/* Results */}
       {isLoading ? (
-        <div className="text-center py-5">
-          <div className="spinner-border text-light" role="status">
-            <span className="visually-hidden">Loading...</span>
+        <div className="animate-fade-in">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div className="skeleton-text" style={{ width: '120px', height: '1rem' }} />
           </div>
-          <p className="text-muted mt-2">Searching...</p>
+          <SkeletonGrid count={settings.resultsPerPage} />
         </div>
       ) : posts.length > 0 ? (
         <>

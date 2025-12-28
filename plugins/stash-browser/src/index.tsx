@@ -8,6 +8,26 @@ import './types/plugin';
 import { PLUGIN_ID, PLUGIN_NAME, ROUTES } from '@/constants';
 import { BrowserMain } from '@/components/browser';
 
+// Import plugin styles as inline string (Stash plugins only load .js files)
+import pluginStyles from './styles/plugin.css?inline';
+
+// =============================================================================
+// Inject CSS
+// =============================================================================
+
+function injectStyles() {
+  const styleId = 'stash-browser-styles';
+  if (document.getElementById(styleId)) return;
+
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = pluginStyles;
+  document.head.appendChild(style);
+}
+
+// Inject styles immediately
+injectStyles();
+
 // Ensure PluginApi is available
 if (!window.PluginApi) {
   throw new Error('PluginApi not found - Stash Browser must be loaded as a Stash plugin');

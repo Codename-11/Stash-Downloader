@@ -3,8 +3,6 @@
  */
 
 import React from 'react';
-import { stashColors } from '@stash-plugins/shared';
-import { RATING_COLORS } from '@/constants';
 import type { IBooruPost } from '@/types';
 
 interface ResultsGridProps {
@@ -23,8 +21,8 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({
   onViewDetail,
 }) => {
   return (
-    <div className="row g-3">
-      {posts.map((post) => (
+    <div className="row g-3 results-grid">
+      {posts.map((post, index) => (
         <div key={post.id} className="col-6 col-sm-4 col-md-3 col-lg-2">
           <PostCard
             post={post}
@@ -32,6 +30,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({
             onSelect={() => onSelectPost(post.id)}
             onAddToQueue={() => onAddToQueue(post)}
             onViewDetail={() => onViewDetail(post)}
+            index={index}
           />
         </div>
       ))}
@@ -45,6 +44,7 @@ interface PostCardProps {
   onSelect: () => void;
   onAddToQueue: () => void;
   onViewDetail: () => void;
+  index: number;
 }
 
 const PostCard: React.FC<PostCardProps> = ({
@@ -53,31 +53,20 @@ const PostCard: React.FC<PostCardProps> = ({
   onSelect,
   onAddToQueue,
   onViewDetail,
+  index,
 }) => {
-  const ratingColor = RATING_COLORS[post.rating] || RATING_COLORS.explicit;
+  const ratingClass = `rating-${post.rating}`;
 
   return (
     <div
-      className="card h-100 position-relative"
+      className={`post-card card h-100 position-relative ${isSelected ? 'selected' : ''}`}
       style={{
-        backgroundColor: stashColors.cardBg,
-        borderColor: isSelected ? '#0d6efd' : stashColors.border,
-        borderWidth: isSelected ? 2 : 1,
-        cursor: 'pointer',
-        transition: 'transform 0.15s, box-shadow 0.15s',
+        animationDelay: `${Math.min(index * 25, 300)}ms`,
       }}
       onClick={onSelect}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onViewDetail();
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = 'none';
       }}
     >
       {/* Selection checkbox */}
@@ -97,26 +86,17 @@ const PostCard: React.FC<PostCardProps> = ({
 
       {/* Rating badge */}
       <div
-        className="position-absolute top-0 end-0 m-2 px-2 py-1 rounded small"
-        style={{
-          backgroundColor: ratingColor,
-          color: '#fff',
-          fontSize: '0.7rem',
-          zIndex: 10,
-        }}
+        className={`position-absolute top-0 end-0 m-2 px-2 py-1 rounded small ${ratingClass}`}
+        style={{ fontSize: '0.7rem', zIndex: 10 }}
       >
         {post.rating.charAt(0).toUpperCase()}
       </div>
 
       {/* Thumbnail */}
       <div
-        className="card-img-top"
+        className="post-thumbnail card-img-top"
         style={{
-          aspectRatio: '1',
-          backgroundColor: stashColors.headerBg,
           backgroundImage: `url(${post.previewUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
         }}
       >
         {/* Video indicator */}
