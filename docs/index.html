@@ -225,6 +225,12 @@
       color: #000;
     }
 
+    .plugin-header .badge.version {
+      background: var(--bg-secondary);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+
     .plugin-card p {
       color: var(--text-muted);
       margin-bottom: 20px;
@@ -570,6 +576,7 @@
               <div>
                 <h3>Stash Downloader</h3>
                 <span class="badge">Stable</span>
+                <span class="badge version" id="downloader-version">...</span>
               </div>
             </div>
             <p>Download videos and images from URLs with automatic metadata extraction. Supports 1000+ sites via yt-dlp, plus dedicated scrapers for booru sites.</p>
@@ -589,6 +596,7 @@
               <div>
                 <h3>Stash Browser</h3>
                 <span class="badge beta">Beta</span>
+                <span class="badge version" id="browser-version">...</span>
               </div>
             </div>
             <p>Browse and search booru sites directly within Stash. Search Rule34, Gelbooru, and Danbooru with tag autocomplete, then add posts to your download queue.</p>
@@ -739,5 +747,38 @@
       </p>
     </div>
   </footer>
+
+  <script>
+    // Fetch latest release versions from GitHub API
+    async function fetchVersions() {
+      try {
+        const response = await fetch('https://api.github.com/repos/Codename-11/Stash-Downloader/releases');
+        const releases = await response.json();
+
+        // Find latest Downloader release (v* tags, not browser-v* or *-dev*)
+        const downloaderRelease = releases.find(r =>
+          r.tag_name.match(/^v\d/) && !r.prerelease
+        );
+
+        // Find latest Browser release (browser-v* tags)
+        const browserRelease = releases.find(r =>
+          r.tag_name.startsWith('browser-v') && !r.prerelease
+        );
+
+        // Update badges
+        if (downloaderRelease) {
+          document.getElementById('downloader-version').textContent = downloaderRelease.tag_name;
+        }
+        if (browserRelease) {
+          document.getElementById('browser-version').textContent = browserRelease.tag_name.replace('browser-', '');
+        }
+      } catch (e) {
+        // Silently fail - badges will just show "..."
+        console.log('Failed to fetch versions:', e);
+      }
+    }
+
+    fetchVersions();
+  </script>
 </body>
 </html>
