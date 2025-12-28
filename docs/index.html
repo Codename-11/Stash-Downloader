@@ -755,9 +755,9 @@
         const response = await fetch('https://api.github.com/repos/Codename-11/Stash-Downloader/releases');
         const releases = await response.json();
 
-        // Find latest Downloader release (v* tags, not browser-v* or *-dev*)
+        // Find latest Downloader release (downloader-v* tags)
         const downloaderRelease = releases.find(r =>
-          r.tag_name.match(/^v\d/) && !r.prerelease
+          r.tag_name.startsWith('downloader-v') && !r.prerelease
         );
 
         // Find latest Browser release (browser-v* tags)
@@ -767,7 +767,7 @@
 
         // Update badges
         if (downloaderRelease) {
-          document.getElementById('downloader-version').textContent = downloaderRelease.tag_name;
+          document.getElementById('downloader-version').textContent = downloaderRelease.tag_name.replace('downloader-', '');
         }
         if (browserRelease) {
           document.getElementById('browser-version').textContent = browserRelease.tag_name.replace('browser-', '');

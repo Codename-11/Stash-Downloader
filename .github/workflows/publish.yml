@@ -311,13 +311,14 @@ jobs:
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
 
-              # Extract values with proper empty handling
-              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+              # Extract values with proper empty handling (version is 2 lines after id)
+              VERSION_ENTRY=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
               DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
-              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
-              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
+              NAME=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
+              DESC=$(grep -A6 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
 
-              # Apply fallbacks - use package.json versions instead of 0.0.0
+              # Apply fallbacks - use package.json versions for STABLE entries only
+              # Dev entries should keep their -dev.sha suffix from existing index
               if [[ -z "$VERSION_ENTRY" ]]; then
                 if [[ "$entry" == *"browser"* ]]; then
                   VERSION_ENTRY="${BROWSER_FALLBACK}"
@@ -442,13 +443,14 @@ jobs:
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
 
-              # Extract values with proper empty handling
-              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+              # Extract values with proper empty handling (version is 2 lines after id)
+              VERSION_ENTRY=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
               DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
-              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
-              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
+              NAME=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
+              DESC=$(grep -A6 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
 
-              # Apply fallbacks - use package.json versions instead of 0.0.0
+              # Apply fallbacks - use package.json versions for STABLE entries only
+              # Dev entries should keep their -dev.sha suffix from existing index
               if [[ -z "$VERSION_ENTRY" ]]; then
                 if [[ "$entry" == *"browser"* ]]; then
                   VERSION_ENTRY="${BROWSER_FALLBACK}"
@@ -586,7 +588,7 @@ jobs:
           - Use bold for feature names
           - Skip internal/minor changes in What's New section"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
@@ -715,7 +717,7 @@ jobs:
           - Use bold for feature names
           - Skip internal/minor changes in What's New section"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
