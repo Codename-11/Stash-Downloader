@@ -552,6 +552,14 @@ interface: raw
 - `interface: raw` required for Python exec (NOT `interface: js`)
 - `exec` defines the Python script for server-side tasks
 - `tasks` defines available plugin operations (must match Python task handlers)
+- `requires` at root level NOT supported - use `ui.requires` instead
+
+**ui.requires Behavior:**
+- `ui.requires: [plugin-id]` controls **JS/CSS load order only** - not installation dependency
+- Ensures required plugin's JS loads before this plugin's JS
+- Does NOT prompt user to install missing plugins
+- Does NOT prevent installation if dependency is missing
+- Use plugin description to communicate soft dependencies to users
 
 ### Version Management
 - Single source of truth in `plugins/stash-downloader/package.json`
