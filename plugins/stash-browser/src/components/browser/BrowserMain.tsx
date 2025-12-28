@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { PLUGIN_NAME, APP_VERSION, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
-import type { IBooruPost, ISearchParams } from '@/types';
+import type { IBooruPost, ISearchParams, SortOption, RatingFilter } from '@/types';
 import { searchPosts, getPostUrl } from '@/services/BooruService';
 import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
@@ -54,9 +54,18 @@ export const BrowserMain: React.FC = () => {
     setError(null);
     setHasSearched(true);
 
-    // Apply safe mode if enabled
+    // Build search query with filters
     let searchTags = params.tags;
-    if (settings.safeMode && !searchTags.includes('rating:')) {
+
+    // Apply sort filter (format: sort:field:direction)
+    if (params.sort) {
+      searchTags = `${searchTags} sort:${params.sort}:desc`.trim();
+    }
+
+    // Apply rating filter (from search bar or settings safe mode)
+    if (params.rating && params.rating !== 'all') {
+      searchTags = `${searchTags} rating:${params.rating}`.trim();
+    } else if (settings.safeMode && !searchTags.includes('rating:')) {
       searchTags = `${searchTags} rating:safe`.trim();
     }
 
@@ -203,7 +212,9 @@ export const BrowserMain: React.FC = () => {
         <SearchBar
           source={searchParams.source}
           onSourceChange={handleSourceChange}
-          onSearch={(tags) => handleSearch({ ...searchParams, tags, page: 0 })}
+          onSearch={(tags: string, sort: SortOption, rating: RatingFilter) =>
+            handleSearch({ ...searchParams, tags, page: 0, sort, rating })
+          }
           isLoading={isLoading}
           showThumbnails={settings.showThumbnails}
           onToggleThumbnails={handleToggleThumbnails}

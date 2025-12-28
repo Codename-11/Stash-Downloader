@@ -519,6 +519,118 @@
 }
 
 /* ==========================================================================
+   Search Filters
+   ========================================================================== */
+
+.stash-browser .search-filters {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--stash-border);
+}
+
+.stash-browser .filter-label {
+  font-size: 0.8rem;
+  color: var(--stash-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Sort buttons */
+.stash-browser .sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.stash-browser .sort-icon {
+  font-size: 0.9rem;
+}
+
+.stash-browser .sort-label {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .stash-browser .sort-label {
+    display: inline;
+  }
+}
+
+/* Rating chips */
+.stash-browser .rating-chips {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.stash-browser .rating-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--stash-border);
+  border-radius: 1rem;
+  background-color: transparent;
+  color: var(--stash-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast) ease,
+    border-color var(--transition-fast) ease,
+    color var(--transition-fast) ease,
+    transform var(--transition-fast) ease;
+}
+
+.stash-browser .rating-chip:hover {
+  transform: translateY(-1px);
+}
+
+/* Rating chip colors */
+.stash-browser .rating-chip.rating-all.active {
+  background-color: var(--stash-hover-bg);
+  border-color: var(--stash-muted);
+  color: var(--stash-text);
+}
+
+.stash-browser .rating-chip.rating-safe {
+  border-color: #28a74580;
+}
+.stash-browser .rating-chip.rating-safe:hover {
+  background-color: #28a74520;
+}
+.stash-browser .rating-chip.rating-safe.active {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: #fff;
+}
+
+.stash-browser .rating-chip.rating-questionable {
+  border-color: #ffc10780;
+}
+.stash-browser .rating-chip.rating-questionable:hover {
+  background-color: #ffc10720;
+}
+.stash-browser .rating-chip.rating-questionable.active {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #000;
+}
+
+.stash-browser .rating-chip.rating-explicit {
+  border-color: #dc354580;
+}
+.stash-browser .rating-chip.rating-explicit:hover {
+  background-color: #dc354520;
+}
+.stash-browser .rating-chip.rating-explicit.active {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+/* ==========================================================================
    Form Controls
    ========================================================================== */
 

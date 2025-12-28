@@ -96,6 +96,16 @@ export interface IBooruPost {
 }
 
 /**
+ * Sort options for search
+ */
+export type SortOption = 'score' | 'id' | 'updated';
+
+/**
+ * Rating filter options
+ */
+export type RatingFilter = 'all' | 'safe' | 'questionable' | 'explicit';
+
+/**
  * Search parameters
  */
 export interface ISearchParams {
@@ -103,6 +113,8 @@ export interface ISearchParams {
   tags: string;
   page: number;
   limit: number;
+  sort?: SortOption;
+  rating?: RatingFilter;
 }
 
 /**
