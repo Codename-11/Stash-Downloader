@@ -295,15 +295,24 @@ jobs:
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
 
-          # Preserve other entries
+          # Preserve other entries with proper fallbacks
           for entry in "stash-downloader-dev" "stash-browser" "stash-browser-dev"; do
             ZIP="_site/${entry}.zip"
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
-              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "0.0.0")
-              DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
-              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: //' || echo "${entry}")
-              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: //' || echo "Stash plugin")
+
+              # Extract values with proper empty handling
+              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+              DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
+              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
+
+              # Apply fallbacks for empty values
+              [[ -z "$VERSION_ENTRY" ]] && VERSION_ENTRY="0.0.0"
+              [[ -z "$DATE_ENTRY" ]] && DATE_ENTRY="${CURRENT_DATETIME}"
+              [[ -z "$NAME" ]] && NAME="${entry}"
+              [[ -z "$DESC" ]] && DESC="Stash plugin"
+
               cat >> _site/index.yml << EOF
           - id: ${entry}
             name: ${NAME}
@@ -405,15 +414,24 @@ jobs:
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
 
-          # Preserve other entries
+          # Preserve other entries with proper fallbacks
           for entry in "stash-downloader" "stash-downloader-dev" "stash-browser-dev"; do
             ZIP="_site/${entry}.zip"
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
-              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "0.0.0")
-              DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
-              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: //' || echo "${entry}")
-              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: //' || echo "Stash plugin")
+
+              # Extract values with proper empty handling
+              VERSION_ENTRY=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+              DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+              NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
+              DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
+
+              # Apply fallbacks for empty values
+              [[ -z "$VERSION_ENTRY" ]] && VERSION_ENTRY="0.0.0"
+              [[ -z "$DATE_ENTRY" ]] && DATE_ENTRY="${CURRENT_DATETIME}"
+              [[ -z "$NAME" ]] && NAME="${entry}"
+              [[ -z "$DESC" ]] && DESC="Stash plugin"
+
               cat >> _site/index.yml << EOF
           - id: ${entry}
             name: ${NAME}
