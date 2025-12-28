@@ -46,7 +46,7 @@ jobs:
         run: npm run type-check
 
       - name: Lint
-        run: npm run lint -- --max-warnings 60
+        run: npm run lint
 
       - name: Run tests
         run: npm test -- --run
