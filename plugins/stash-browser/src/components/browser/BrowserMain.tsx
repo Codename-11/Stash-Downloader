@@ -10,7 +10,8 @@ import { searchPosts, getPostUrl } from '@/services/BooruService';
 import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
 import { Pagination } from './Pagination';
-import { SettingsPanel, loadSettings, type BrowserSettings } from './SettingsPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { loadSettings, type BrowserSettings } from '@/utils';
 import { PostDetailModal } from './PostDetailModal';
 
 export const BrowserMain: React.FC = () => {
