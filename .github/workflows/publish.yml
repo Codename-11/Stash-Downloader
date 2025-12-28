@@ -482,11 +482,14 @@ jobs:
 
       - name: Generate AI release notes
         id: ai_notes
-        if: ${{ vars.GOOGLE_API_KEY != '' || secrets.GOOGLE_API_KEY != '' }}
         continue-on-error: true
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY configured, skipping AI release notes"
+            exit 0
+          fi
           VERSION="${{ needs.deploy-downloader-stable.outputs.version }}"
           COMMITS="${{ steps.changelog.outputs.commits }}"
 
@@ -597,11 +600,14 @@ jobs:
 
       - name: Generate AI release notes
         id: ai_notes
-        if: ${{ vars.GOOGLE_API_KEY != '' || secrets.GOOGLE_API_KEY != '' }}
         continue-on-error: true
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY configured, skipping AI release notes"
+            exit 0
+          fi
           VERSION="${{ needs.deploy-browser-stable.outputs.version }}"
           COMMITS="${{ steps.changelog.outputs.commits }}"
 
