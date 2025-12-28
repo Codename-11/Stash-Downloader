@@ -86,11 +86,12 @@ export const BrowserMain: React.FC = () => {
     const sourceUrl = getPostUrl(post);
 
     // Dispatch event for Stash Downloader to pick up
+    // Uses same event format as browser extension for compatibility
     const event = new CustomEvent(DOWNLOADER_EVENTS.ADD_TO_QUEUE, {
       detail: {
         url: post.fileUrl,
         contentType: post.fileType === 'video' ? 'Video' : 'Image',
-        metadata: {
+        options: {
           title: `${post.source}_${post.id}`,
           tags: post.tags,
           source: sourceUrl,

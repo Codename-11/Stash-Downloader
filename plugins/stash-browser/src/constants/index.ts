@@ -51,9 +51,9 @@ export const RATING_COLORS = {
   explicit: '#dc3545',
 } as const;
 
-// Stash Downloader integration
+// Stash Downloader integration (uses same event names as browser extension)
 export const DOWNLOADER_EVENTS = {
-  ADD_TO_QUEUE: 'stash-downloader:add-to-queue',
+  ADD_TO_QUEUE: 'stash-downloader-add-url',  // Same as browser extension
   QUEUE_UPDATED: 'stash-downloader:queue-updated',
 } as const;
 
