@@ -199,44 +199,63 @@ def get_post(source: str, post_id: int, proxy_url: str | None = None) -> dict:
 
 
 def autocomplete_tags(source: str, query: str, limit: int = 10,
-                       proxy_url: str | None = None) -> dict:
+                       proxy_url: str | None = None,
+                       api_key: str | None = None,
+                       user_id: str | None = None) -> dict:
     """Get tag autocomplete suggestions."""
     if source not in BOORU_APIS:
         raise Exception(f"Unknown source: {source}")
 
     api = BOORU_APIS[source]
     base_url = api['base_url']
+    requires_auth = api.get('requires_auth', False)
+
+    # Check if auth is required but not provided
+    if requires_auth and (not api_key or not user_id):
+        # Return empty results silently - autocomplete is optional
+        log(f"Skipping autocomplete for {source} - no API credentials")
+        return {
+            'source': source,
+            'query': query,
+            'tags': [],
+        }
 
     if source == 'danbooru':
-        # Danbooru tag autocomplete API
+        # Danbooru tag autocomplete API (no auth required)
         params = {
             'search[name_matches]': f'*{query}*',
             'search[order]': 'count',
             'limit': limit,
         }
         url = f"{base_url}/tags.json?{urllib.parse.urlencode(params)}"
-    elif source == 'gelbooru':
-        # Gelbooru autocomplete API
-        params = {
-            'page': 'autocomplete2',
-            'term': query,
-            'type': 'tag_query',
-            'limit': limit,
-        }
-        url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
     else:
-        # Rule34 autocomplete API
+        # Rule34/Gelbooru tag API with authentication
         params = {
-            'page': 'autocomplete2',
-            'term': query,
-            'type': 'tag_query',
+            'page': 'dapi',
+            's': 'tag',
+            'q': 'index',
+            'name_pattern': f'%{query}%',
+            'json': '1',
             'limit': limit,
+            'orderby': 'count',
         }
+        # Add auth if available
+        if api_key and user_id:
+            params['api_key'] = api_key
+            params['user_id'] = user_id
         url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
 
     log(f"Tag autocomplete: {url}")
 
-    result = fetch_url(url, proxy_url)
+    try:
+        result = fetch_url(url, proxy_url)
+    except Exception as e:
+        log(f"Autocomplete fetch failed: {e}")
+        return {
+            'source': source,
+            'query': query,
+            'tags': [],
+        }
 
     # Normalize response based on source
     tags = []
@@ -250,15 +269,13 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
                     'category': tag.get('category', 0),
                 })
     else:
-        # Rule34/Gelbooru autocomplete2 returns [{label, value, category, type, post_count}, ...]
-        # or sometimes just [{label, value}, ...]
-        tag_list = result if isinstance(result, list) else []
+        # Rule34/Gelbooru tag API returns [{name, count, type}, ...] or {tag: [...]}
+        tag_list = result if isinstance(result, list) else result.get('tag', []) if isinstance(result, dict) else []
         for tag in tag_list:
             if isinstance(tag, dict):
-                # Handle various response formats
-                name = tag.get('value', tag.get('label', tag.get('name', tag.get('tag', ''))))
-                count = tag.get('post_count', tag.get('count', 0))
-                category = tag.get('category', tag.get('type', 0))
+                name = tag.get('name', tag.get('tag', ''))
+                count = tag.get('count', tag.get('post_count', 0))
+                category = tag.get('type', tag.get('category', 0))
                 if name:
                     tags.append({
                         'name': name,
@@ -266,7 +283,6 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
                         'category': int(category) if category else 0,
                     })
             elif isinstance(tag, str):
-                # Simple string format
                 tags.append({
                     'name': tag,
                     'count': 0,
@@ -305,7 +321,7 @@ def handle_request(args: dict) -> dict:
         source = args.get('source', 'rule34')
         query = args.get('query', '')
         limit = int(args.get('limit', 10))
-        return autocomplete_tags(source, query, limit, proxy_url)
+        return autocomplete_tags(source, query, limit, proxy_url, api_key, user_id)
 
     elif mode == 'fetch':
         # Generic URL fetch

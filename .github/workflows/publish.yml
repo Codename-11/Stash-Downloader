@@ -4,8 +4,8 @@ on:
   push:
     branches: [dev]
     tags:
-      - 'v*'           # Stash Downloader releases
-      - 'browser-v*'   # Stash Browser releases
+      - 'downloader-v*'  # Stash Downloader releases
+      - 'browser-v*'     # Stash Browser releases
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -223,12 +223,12 @@ jobs:
       - uses: actions/deploy-pages@v4
 
   # ============================================================================
-  # DEPLOY DOWNLOADER STABLE - Only on v* tags
+  # DEPLOY DOWNLOADER STABLE - Only on downloader-v* tags
   # ============================================================================
   deploy-downloader-stable:
     needs: test
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/browser-v')
+    if: startsWith(github.ref, 'refs/tags/downloader-v')
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -448,7 +448,7 @@ jobs:
   release-downloader:
     needs: deploy-downloader-stable
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/browser-v')
+    if: startsWith(github.ref, 'refs/tags/downloader-v')
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -266,11 +266,17 @@ export async function autocompleteTags(
   console.log(`[BooruService] Autocomplete for "${query}" on ${source}`);
 
   try {
+    // Fetch settings and get credentials for this source
+    const settings = await getPluginSettings();
+    const credentials = getCredentialsForSource(settings, source);
+
     const result = await runPluginOperation({
       mode: 'autocomplete',
       source,
       query,
       limit,
+      ...credentials, // api_key and user_id (if available)
+      ...(settings.httpProxy ? { proxy: settings.httpProxy } : {}),
     });
 
     if (!result || result.error) {

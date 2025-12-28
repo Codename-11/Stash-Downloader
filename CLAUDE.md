@@ -2,7 +2,7 @@
 
 A monorepo for Stash plugins including:
 - **Stash Downloader** - Download images and videos with automatic metadata extraction
-- **Rule34 Viewer** - Browse and search booru content (coming soon)
+- **Stash Browser** - Browse and preview content from external sources
 
 ## Documentation
 
@@ -23,7 +23,7 @@ A monorepo for Stash plugins including:
 |----------------------------|-----------------------------------|
 | `npm run build`            | Build all plugins                 |
 | `npm run build:downloader` | Build Stash Downloader only       |
-| `npm run build:viewer`     | Build Rule34 Viewer only          |
+| `npm run build:browser`    | Build Stash Browser only          |
 | `npm run test`             | Run tests for all plugins         |
 | `npm run type-check`       | TypeScript check all plugins      |
 | `npm run lint`             | ESLint all plugins                |
@@ -57,30 +57,35 @@ A monorepo for Stash plugins including:
 5. WAIT for workflow to complete before syncing dev
 ```
 
-### Two Independent Versions
-| Component         | Version Location                              | Release Trigger                     |
-|-------------------|-----------------------------------------------|-------------------------------------|
-| **Stash Plugin**  | `plugins/stash-downloader/package.json`       | Git tags (`vX.Y.Z`) on main         |
-| **Browser Extension** | `browser-extension/manifest.json`         | Manual upload to AMO         |
+### Plugin Versions (Independent)
+| Plugin              | Version Location                        | Release Trigger              |
+|---------------------|-----------------------------------------|------------------------------|
+| **Stash Downloader**| `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag      |
+| **Stash Browser**   | `plugins/stash-browser/package.json`    | `browser-vX.Y.Z` tag         |
+| **Firefox Extension**| `browser-extension/manifest.json`      | Manual upload to AMO         |
 
 ### Stable vs Dev Builds
-| Build      | Trigger             | Plugin ID            | Version Format    |
-|------------|---------------------|----------------------|-------------------|
-| **Stable** | Git tag `vX.Y.Z`    | `stash-downloader`   | `X.Y.Z`           |
-| **Dev**    | Push to `dev`       | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` |
+| Plugin           | Stable Tag          | Dev Trigger    | Plugin IDs                          |
+|------------------|---------------------|----------------|-------------------------------------|
+| **Downloader**   | `downloader-vX.Y.Z` | Push to `dev`  | `stash-downloader` / `stash-downloader-dev` |
+| **Browser**      | `browser-vX.Y.Z`    | Push to `dev`  | `stash-browser` / `stash-browser-dev` |
 
 Both can be installed simultaneously in Stash (different plugin IDs via YAML filename).  
 Both are served from the same `index.yml` - each deploy preserves the other's entry.
 
 ### Release Process
 ```bash
-# On dev branch, ready to release:
-git checkout main
-git merge dev
-# Bump version in plugins/stash-downloader/package.json
-git add plugins/stash-downloader/package.json && git commit -m "🔖 chore: release vX.Y.Z"
-git tag vX.Y.Z && git push origin main --tags
-git checkout dev
+# Release Stash Downloader:
+git checkout main && git merge dev
+cd plugins/stash-downloader && npm version patch  # or minor/major
+git add . && git commit -m "🔖 chore: release downloader-vX.Y.Z"
+git tag downloader-vX.Y.Z && git push origin main --tags
+
+# Release Stash Browser:
+git checkout main && git merge dev
+cd plugins/stash-browser && npm version patch
+git add . && git commit -m "🔖 chore: release browser-vX.Y.Z"
+git tag browser-vX.Y.Z && git push origin main --tags
 ```
 
 Or use `/release` skill for guided release.
