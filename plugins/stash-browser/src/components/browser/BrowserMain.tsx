@@ -231,6 +231,7 @@ export const BrowserMain: React.FC = () => {
             onSelectPost={handleSelectPost}
             onAddToQueue={handleAddToQueue}
             onViewDetail={handleViewDetail}
+            showThumbnails={settings.showThumbnails}
           />
 
           {totalPages > 1 && (

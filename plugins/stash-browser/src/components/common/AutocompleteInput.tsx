@@ -27,6 +27,12 @@ const CATEGORY_COLORS: Record<number, string> = {
   5: '#f8c471', // Meta (orange)
 };
 
+// Debounce delay in ms - longer to reduce API calls
+const DEBOUNCE_DELAY = 350;
+
+// Minimum characters before searching
+const MIN_SEARCH_LENGTH = 2;
+
 function formatCount(count: number): string {
   if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
   if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
@@ -49,40 +55,87 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastQueryRef = useRef<string>('');
+  const requestIdRef = useRef<number>(0);
 
-  // Fetch suggestions when typing
+  // Clear suggestions when source changes
   useEffect(() => {
+    setSuggestions([]);
+    setIsOpen(false);
+    lastQueryRef.current = '';
+  }, [source]);
+
+  // Fetch suggestions when typing (with proper debouncing)
+  useEffect(() => {
+    // Clear any pending debounce
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
+      debounceRef.current = null;
     }
 
-    if (inputValue.length < 2) {
+    const query = inputValue.trim().toLowerCase();
+
+    // Clear suggestions if query too short
+    if (query.length < MIN_SEARCH_LENGTH) {
       setSuggestions([]);
       setIsOpen(false);
+      setIsLoading(false);
+      lastQueryRef.current = '';
       return;
     }
 
+    // Skip if same query as last successful fetch
+    if (query === lastQueryRef.current) {
+      return;
+    }
+
+    // Set loading state after a brief delay to avoid flicker
+    const loadingTimeout = setTimeout(() => setIsLoading(true), 100);
+
+    // Debounce the actual API call
     debounceRef.current = setTimeout(async () => {
-      setIsLoading(true);
+      // Increment request ID to track this request
+      const currentRequestId = ++requestIdRef.current;
+
       try {
-        const results = await autocompleteTags(source, inputValue, 10);
+        const results = await autocompleteTags(source, query, 10);
+
+        // Ignore stale responses (user kept typing)
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
         // Filter out already selected tags
         const filtered = results.filter(tag => !value.includes(tag.name));
+
+        // Update state
         setSuggestions(filtered);
         setIsOpen(filtered.length > 0);
         setSelectedIndex(-1);
+        lastQueryRef.current = query;
       } catch (error) {
+        // Ignore errors from stale requests
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
         console.error('[AutocompleteInput] Error:', error);
         setSuggestions([]);
+        setIsOpen(false);
       } finally {
-        setIsLoading(false);
+        // Only clear loading if this is still the current request
+        if (currentRequestId === requestIdRef.current) {
+          clearTimeout(loadingTimeout);
+          setIsLoading(false);
+        }
       }
-    }, 200);
+    }, DEBOUNCE_DELAY);
 
     return () => {
+      clearTimeout(loadingTimeout);
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
     };
   }, [inputValue, source, value]);
