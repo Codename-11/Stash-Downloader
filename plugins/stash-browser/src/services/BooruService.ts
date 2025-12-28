@@ -65,10 +65,14 @@ async function runPluginOperation(
   `;
 
   try {
+    console.log(`[BooruService] Calling runPluginOperation for plugin: ${PLUGIN_ID}`, args);
+
     const result = await gqlRequest<{ runPluginOperation: PluginOperationResult }>(mutation, {
       plugin_id: PLUGIN_ID,
       args,
     });
+
+    console.log('[BooruService] Raw GraphQL response:', JSON.stringify(result));
 
     if (result.errors && result.errors.length > 0) {
       console.error('[BooruService] GraphQL errors:', result.errors);
@@ -76,7 +80,10 @@ async function runPluginOperation(
       throw new Error(firstError?.message || 'Unknown GraphQL error');
     }
 
-    return result.data?.runPluginOperation || null;
+    const opResult = result.data?.runPluginOperation;
+    console.log('[BooruService] Operation result:', opResult);
+
+    return opResult || null;
   } catch (error) {
     console.error('[BooruService] runPluginOperation failed:', error);
     throw error;
