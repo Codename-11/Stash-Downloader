@@ -49,6 +49,8 @@ settings:
     type: STRING
 
 ui:
+  requires:
+    - stash-downloader
   javascript:
     - dist/stash-browser.js
 
