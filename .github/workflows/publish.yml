@@ -168,8 +168,10 @@ jobs:
           # Downloader Stable (if exists)
           if [[ -f _site/stash-downloader.zip ]]; then
             HASH=$(sha256sum _site/stash-downloader.zip | awk '{print $1}')
-            VERSION=$(grep -A1 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${{ steps.versions.outputs.downloader_base }}")
-            DATE=$(grep -A3 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+            VERSION=$(grep -A1 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+            DATE=$(grep -A3 "id: stash-downloader$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+            [[ -z "$VERSION" ]] && VERSION="${{ steps.versions.outputs.downloader_base }}"
+            [[ -z "$DATE" ]] && DATE="${CURRENT_DATETIME}"
             cat >> _site/index.yml << EOF
           - id: stash-downloader
             name: Stash Downloader
@@ -198,8 +200,10 @@ jobs:
           # Browser Stable (if exists)
           if [[ -f _site/stash-browser.zip ]]; then
             HASH=$(sha256sum _site/stash-browser.zip | awk '{print $1}')
-            VERSION=$(grep -A1 "id: stash-browser$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | awk '{print $2}' || echo "${{ steps.versions.outputs.browser_base }}")
-            DATE=$(grep -A3 "id: stash-browser$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: //' || echo "${CURRENT_DATETIME}")
+            VERSION=$(grep -A1 "id: stash-browser$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+            DATE=$(grep -A3 "id: stash-browser$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+            [[ -z "$VERSION" ]] && VERSION="${{ steps.versions.outputs.browser_base }}"
+            [[ -z "$DATE" ]] && DATE="${CURRENT_DATETIME}"
             cat >> _site/index.yml << EOF
           - id: stash-browser
             name: Stash Browser
