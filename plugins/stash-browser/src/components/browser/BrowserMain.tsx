@@ -3,7 +3,6 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { stashColors } from '@stash-plugins/shared';
 import { PLUGIN_NAME, APP_VERSION, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
 import type { IBooruPost, ISearchParams } from '@/types';
 import { searchPosts, getPostUrl } from '@/services/BooruService';
@@ -194,18 +193,13 @@ export const BrowserMain: React.FC = () => {
       />
 
       {/* Search Bar */}
-      <div
-        className="card mb-4"
-        style={{ backgroundColor: stashColors.cardBg }}
-      >
-        <div className="card-body">
-          <SearchBar
-            source={searchParams.source}
-            onSourceChange={handleSourceChange}
-            onSearch={(tags) => handleSearch({ ...searchParams, tags, page: 0 })}
-            isLoading={isLoading}
-          />
-        </div>
+      <div className="search-card">
+        <SearchBar
+          source={searchParams.source}
+          onSourceChange={handleSourceChange}
+          onSearch={(tags) => handleSearch({ ...searchParams, tags, page: 0 })}
+          isLoading={isLoading}
+        />
       </div>
 
       {/* Error */}

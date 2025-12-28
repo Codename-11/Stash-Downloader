@@ -270,22 +270,138 @@
 }
 
 /* ==========================================================================
-   Autocomplete Dropdown
+   Autocomplete Multi-Select Input
    ========================================================================== */
 
+.stash-browser .autocomplete-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.stash-browser .autocomplete-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 42px;
+  padding: 0.375rem 0.5rem;
+  background-color: var(--stash-input-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
+  cursor: text;
+  transition:
+    border-color var(--transition-fast) ease,
+    box-shadow var(--transition-fast) ease;
+}
+
+.stash-browser .autocomplete-input-container:focus-within {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
+}
+
+.stash-browser .autocomplete-input {
+  flex: 1;
+  min-width: 100px;
+  height: 26px;
+  padding: 0 0.25rem;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--stash-text);
+  font-size: 0.9rem;
+}
+
+.stash-browser .autocomplete-input::placeholder {
+  color: var(--stash-muted);
+  opacity: 0.7;
+}
+
+.stash-browser .autocomplete-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.25rem 0.2rem 0.5rem;
+  background-color: var(--stash-hover-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  color: var(--stash-text);
+  animation: fade-in-scale var(--transition-fast) ease-out;
+  white-space: nowrap;
+}
+
+.stash-browser .autocomplete-chip-text {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stash-browser .autocomplete-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--stash-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast) ease,
+    color var(--transition-fast) ease;
+}
+
+.stash-browser .autocomplete-chip-remove:hover {
+  background-color: rgba(220, 53, 69, 0.3);
+  color: #ea868f;
+}
+
+.stash-browser .autocomplete-loading {
+  display: flex;
+  align-items: center;
+  padding: 0 0.25rem;
+  color: var(--stash-muted);
+}
+
 .stash-browser .autocomplete-dropdown {
-  animation: fade-in-up var(--transition-fast) ease-out;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 1000;
+  animation: fade-in-up var(--transition-fast) ease-out;
 }
 
 .stash-browser .autocomplete-item {
-  transition: background-color var(--transition-fast) ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
   cursor: pointer;
+  transition: background-color var(--transition-fast) ease;
 }
 
 .stash-browser .autocomplete-item:hover,
 .stash-browser .autocomplete-item.selected {
   background-color: var(--stash-hover-bg);
+}
+
+.stash-browser .autocomplete-item-name {
+  font-size: 0.9rem;
+}
+
+.stash-browser .autocomplete-item-count {
+  font-size: 0.75rem;
+  color: var(--stash-muted);
 }
 
 /* ==========================================================================
@@ -347,6 +463,49 @@
 
 .stash-browser .pagination .page-item.active .page-link {
   box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4);
+}
+
+/* ==========================================================================
+   Search Card
+   ========================================================================== */
+
+.stash-browser .search-card {
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ==========================================================================
+   Search Bar
+   ========================================================================== */
+
+.stash-browser .search-bar {
+  padding: 0;
+}
+
+.stash-browser .search-bar-source {
+  min-width: 130px;
+}
+
+.stash-browser .search-bar-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 0.5rem 1rem;
+}
+
+.stash-browser .search-bar kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  background-color: var(--stash-header-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.25rem;
+  color: var(--stash-muted);
 }
 
 /* ==========================================================================
@@ -519,6 +678,20 @@
   background-color: rgba(13, 110, 253, 0.15);
   border-color: rgba(13, 110, 253, 0.3);
   color: #6ea8fe;
+}
+
+/* ==========================================================================
+   Results Grid
+   ========================================================================== */
+
+.stash-browser .results-grid {
+  /* Ensure proper gap between all cards */
+  row-gap: 1rem !important;
+}
+
+.stash-browser .results-grid > [class*="col-"] {
+  /* Ensure columns have proper bottom margin for card spacing */
+  margin-bottom: 0;
 }
 
 /* ==========================================================================

@@ -1,11 +1,12 @@
 /**
  * Search Bar Component
+ *
+ * Modern search bar with multi-select tag input and source selector.
  */
 
 import React, { useState, useCallback, type FormEvent } from 'react';
-import { stashColors } from '@stash-plugins/shared';
 import { SOURCES, type SourceType } from '@/constants';
-import { TagAutocomplete } from './TagAutocomplete';
+import { AutocompleteInput } from '@/components/common';
 
 interface SearchBarProps {
   source: SourceType;
@@ -20,29 +21,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   isLoading,
 }) => {
-  const [tags, setTags] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
 
   const handleSubmit = useCallback((e?: FormEvent) => {
     e?.preventDefault();
-    if (tags.trim()) {
-      onSearch(tags.trim());
+    if (tags.length > 0) {
+      onSearch(tags.join(' '));
     }
   }, [tags, onSearch]);
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="row g-3 align-items-end">
+    <form onSubmit={handleSubmit} className="search-bar">
+      {/* Search row */}
+      <div className="d-flex gap-3 align-items-stretch">
         {/* Source Selector */}
-        <div className="col-auto">
-          <label className="form-label small text-muted">Source</label>
+        <div className="search-bar-source">
           <select
-            className="form-select text-light"
-            style={{
-              backgroundColor: stashColors.inputBg,
-              borderColor: stashColors.border,
-            }}
+            className="form-select h-100"
             value={source}
             onChange={(e) => onSourceChange(e.target.value as SourceType)}
+            disabled={isLoading}
           >
             <option value={SOURCES.RULE34}>Rule34</option>
             <option value={SOURCES.GELBOORU}>Gelbooru</option>
@@ -51,41 +49,37 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
 
         {/* Tags Input with Autocomplete */}
-        <div className="col">
-          <label className="form-label small text-muted">Tags</label>
-          <TagAutocomplete
+        <div className="flex-grow-1">
+          <AutocompleteInput
             source={source}
             value={tags}
             onChange={setTags}
             onSubmit={handleSubmit}
             disabled={isLoading}
-            placeholder="Enter tags (space separated)"
+            placeholder="Type tags and press Enter..."
           />
         </div>
 
         {/* Search Button */}
-        <div className="col-auto">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isLoading || !tags.trim()}
-          >
-            {isLoading ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" />
-                Searching...
-              </>
-            ) : (
-              'Search'
-            )}
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="btn btn-primary search-bar-button"
+          disabled={isLoading || tags.length === 0}
+        >
+          {isLoading ? (
+            <span className="spinner-border spinner-border-sm" role="status" />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Tag hints */}
       <div className="mt-2">
         <small className="text-muted">
-          Examples: <code>1girl solo</code> | <code>blue_hair -male</code> | <code>rating:safe</code>
+          Type to search tags. Press <kbd>Enter</kbd> or <kbd>Space</kbd> to add. Use <kbd>-tag</kbd> to exclude.
         </small>
       </div>
     </form>

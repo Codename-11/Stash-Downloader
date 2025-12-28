@@ -208,23 +208,29 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
     base_url = api['base_url']
 
     if source == 'danbooru':
-        # Danbooru tag autocomplete
+        # Danbooru tag autocomplete API
         params = {
             'search[name_matches]': f'*{query}*',
             'search[order]': 'count',
             'limit': limit,
         }
         url = f"{base_url}/tags.json?{urllib.parse.urlencode(params)}"
-    else:
-        # Rule34/Gelbooru tag autocomplete
+    elif source == 'gelbooru':
+        # Gelbooru autocomplete API
         params = {
-            'page': 'dapi',
-            's': 'tag',
-            'q': 'index',
-            'name_pattern': f'%{query}%',
-            'json': '1',
+            'page': 'autocomplete2',
+            'term': query,
+            'type': 'tag_query',
             'limit': limit,
-            'orderby': 'count',
+        }
+        url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
+    else:
+        # Rule34 autocomplete API
+        params = {
+            'page': 'autocomplete2',
+            'term': query,
+            'type': 'tag_query',
+            'limit': limit,
         }
         url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
 
@@ -232,25 +238,40 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
 
     result = fetch_url(url, proxy_url)
 
-    # Normalize response
+    # Normalize response based on source
     tags = []
     if source == 'danbooru':
         # Danbooru returns [{name, post_count, category}, ...]
         for tag in (result if isinstance(result, list) else []):
-            tags.append({
-                'name': tag.get('name', ''),
-                'count': tag.get('post_count', 0),
-                'category': tag.get('category', 0),
-            })
+            if isinstance(tag, dict):
+                tags.append({
+                    'name': tag.get('name', ''),
+                    'count': tag.get('post_count', 0),
+                    'category': tag.get('category', 0),
+                })
     else:
-        # Rule34/Gelbooru return [{tag, count, type}, ...] or {tag: [...]}
-        tag_list = result if isinstance(result, list) else result.get('tag', [])
+        # Rule34/Gelbooru autocomplete2 returns [{label, value, category, type, post_count}, ...]
+        # or sometimes just [{label, value}, ...]
+        tag_list = result if isinstance(result, list) else []
         for tag in tag_list:
-            tags.append({
-                'name': tag.get('name', tag.get('tag', '')),
-                'count': tag.get('count', 0),
-                'category': tag.get('type', 0),
-            })
+            if isinstance(tag, dict):
+                # Handle various response formats
+                name = tag.get('value', tag.get('label', tag.get('name', tag.get('tag', ''))))
+                count = tag.get('post_count', tag.get('count', 0))
+                category = tag.get('category', tag.get('type', 0))
+                if name:
+                    tags.append({
+                        'name': name,
+                        'count': int(count) if count else 0,
+                        'category': int(category) if category else 0,
+                    })
+            elif isinstance(tag, str):
+                # Simple string format
+                tags.append({
+                    'name': tag,
+                    'count': 0,
+                    'category': 0,
+                })
 
     return {
         'source': source,
