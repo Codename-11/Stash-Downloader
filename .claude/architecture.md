@@ -515,6 +515,9 @@ build: {
 ```
 
 ### Plugin Manifest (stash-downloader.yml)
+
+> **Official Docs**: [Stash Plugin Configuration File Format](https://docs.stashapp.cc/in-app-manual/plugins/#plugin-configuration-file-format)
+
 ```yaml
 name: Stash Downloader
 description: Download and import content with metadata

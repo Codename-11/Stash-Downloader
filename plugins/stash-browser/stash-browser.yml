@@ -3,6 +3,10 @@ description: Browse and preview content from external sources (booru sites, etc.
 version: 0.1.0
 url: https://github.com/Codename-11/Stash-Downloader
 
+# Requires Stash Downloader for queue integration
+requires:
+  - stash-downloader
+
 # Python backend for CORS proxy
 exec:
   - python

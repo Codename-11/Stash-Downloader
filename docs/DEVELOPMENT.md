@@ -307,6 +307,8 @@ build: {
 
 ### Plugin Manifest
 
+> **Official Docs**: [Stash Plugin Configuration File Format](https://docs.stashapp.cc/in-app-manual/plugins/#plugin-configuration-file-format)
+
 ```yaml
 name: Plugin Name
 description: Plugin description
@@ -367,3 +369,17 @@ npm test -- --watch
 ```
 
 Tests use Vitest with React Testing Library for component tests.
+
+---
+
+## Resources
+
+### Official Stash Documentation
+- [Plugin Configuration File Format](https://docs.stashapp.cc/in-app-manual/plugins/#plugin-configuration-file-format)
+- [Stash Plugin Development](https://docs.stashapp.cc/in-app-manual/plugins/)
+- [Stash GraphQL API](https://docs.stashapp.cc/in-app-manual/api/)
+- [Stash Documentation](https://docs.stashapp.cc/)
+
+### Community Examples
+- [Stash Community Plugins](https://github.com/stashapp/CommunityScripts)
+- [Serechops Stash Plugins](https://github.com/Serechops/Serechops-Stash)
