@@ -4,11 +4,13 @@
 
 - Stash v0.20 or later
 - Internet connection for downloading content
-- Python 3.7+ with yt-dlp for server-side video downloads
+- Python 3.7+ with yt-dlp for server-side video downloads (Stash Downloader)
+
+---
 
 ## Recommended: Install from Custom Plugin Source
 
-The easiest way to install and keep the plugin updated:
+The easiest way to install and keep plugins updated:
 
 ### 1. Add Custom Plugin Source
 
@@ -18,22 +20,74 @@ The easiest way to install and keep the plugin updated:
 4. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
 5. Click **"Add"**
 
-### 2. Install the Plugin
+### 2. Install Plugins
 
-1. Find "Stash Downloader" in the Available Plugins list
-2. Click **"Install"**
-3. Wait for installation to complete
-4. Click **"Reload Plugins"** if needed
+From the Available Plugins list, you can install:
 
-### 3. Configure Settings (Optional)
+| Plugin | Description |
+|--------|-------------|
+| **Stash Downloader** | Download videos/images with metadata extraction |
+| **Stash Browser** | Browse booru sites and add to download queue |
 
-1. Go to Settings → Plugins → Stash Downloader
-2. Set your preferred download path, quality, proxy, etc.
-3. Click "Save"
+Click **"Install"** on the plugin(s) you want, then **"Reload Plugins"** if needed.
 
-### 4. Access the Plugin
+### 3. Access the Plugins
 
-Navigate to `http://localhost:9999/plugin/stash-downloader` or click the **Downloader** button in the Stash navbar.
+- **Stash Downloader**: `/plugin/stash-downloader` or click **Downloader** in navbar
+- **Stash Browser**: `/plugin/stash-browser` or click **Browser** in navbar
+
+---
+
+## Plugin-Specific Setup
+
+### Stash Downloader
+
+#### Requirements
+- Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+
+#### Configuration
+Go to **Settings** → **Plugins** → **Stash Downloader**:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Server Download Path | Where to save downloaded files | `/data/StashDownloader` |
+| HTTP Proxy | Proxy URL for geo-restricted content | (none) |
+| Concurrent Downloads | Max simultaneous downloads | 3 |
+| Download Quality | Preferred video quality | Best |
+
+### Stash Browser
+
+#### Requirements
+- Stash Downloader plugin (for queue integration)
+- API credentials for Rule34/Gelbooru (free)
+
+#### Getting API Credentials
+
+**Rule34:**
+1. Create account at [rule34.xxx](https://rule34.xxx/)
+2. Go to My Account → Options
+3. Copy your API Key and User ID
+
+**Gelbooru:**
+1. Create account at [gelbooru.com](https://gelbooru.com/)
+2. Go to My Account → Options → API Access
+3. Copy your API Key and User ID
+
+**Danbooru:**
+- Works without authentication (rate limited)
+
+#### Configuration
+Go to **Settings** → **Plugins** → **Stash Browser**:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Default Source | Which booru to search by default | Rule34 |
+| Results Per Page | Number of results to show | 40 |
+| Safe Mode | Only show safe-rated content | Off |
+| Rule34 API Key | Your Rule34 API key | (required) |
+| Rule34 User ID | Your Rule34 user ID | (required) |
+| Gelbooru API Key | Your Gelbooru API key | (optional) |
+| Gelbooru User ID | Your Gelbooru user ID | (optional) |
 
 ---
 
@@ -43,9 +97,22 @@ Navigate to `http://localhost:9999/plugin/stash-downloader` or click the **Downl
 
 1. Download the latest release from [Releases](https://github.com/Codename-11/Stash-Downloader/releases)
 2. Extract to your Stash plugins directory:
-   - **Linux/macOS**: `~/.stash/plugins/stash-downloader/`
-   - **Windows**: `%USERPROFILE%\.stash\plugins\stash-downloader\`
-   - **Docker**: `/root/.stash/plugins/stash-downloader/`
+   - **Linux/macOS**: `~/.stash/plugins/`
+   - **Windows**: `%USERPROFILE%\.stash\plugins\`
+   - **Docker**: `/root/.stash/plugins/`
+
+Each plugin goes in its own folder:
+```
+~/.stash/plugins/
+├── stash-downloader/
+│   ├── stash-downloader.yml
+│   ├── dist/
+│   └── scripts/
+└── stash-browser/
+    ├── stash-browser.yml
+    ├── dist/
+    └── scripts/
+```
 
 ### Option B: Build from Source
 
@@ -54,26 +121,27 @@ Navigate to `http://localhost:9999/plugin/stash-downloader` or click the **Downl
 git clone https://github.com/Codename-11/Stash-Downloader.git
 cd Stash-Downloader
 
-# Install dependencies and build
+# Install dependencies and build all plugins
 npm install
 npm run build
 
-# Copy to Stash plugins directory (Linux/macOS)
-cp -r . ~/.stash/plugins/stash-downloader/
+# Or build specific plugin
+npm run build:downloader
+npm run build:browser
 ```
 
-### Enable the Plugin
+### Enable the Plugins
 
 1. Open Stash web interface
 2. Go to **Settings** → **Plugins**
-3. Find "Stash Downloader" and ensure it's enabled
+3. Find plugins and ensure they're enabled
 4. Click "Reload Plugins" if not visible
 
 ---
 
 ## Installing yt-dlp
 
-yt-dlp is required for server-side video downloads and metadata extraction.
+yt-dlp is required for Stash Downloader's server-side video downloads and metadata extraction.
 
 ### Standard Installation
 
@@ -123,7 +191,29 @@ docker exec -it stash pip install -U yt-dlp --break-system-packages
 
 After installation:
 
-1. Navigate to the Downloader page
+### Stash Downloader
+1. Navigate to `/plugin/stash-downloader`
 2. You should see the download queue interface
 3. Try adding a test URL to verify it's working
 4. Check browser console (F12) for any errors
+
+### Stash Browser
+1. Navigate to `/plugin/stash-browser`
+2. You should see the search interface with source selector
+3. Try searching for a tag to verify API connection
+4. If autocomplete doesn't work, check API credentials in settings
+
+---
+
+## Development Builds
+
+Want to test the latest features? Install the dev builds:
+
+Both stable and dev plugins can be installed simultaneously (different plugin IDs):
+
+| Plugin | Stable | Dev |
+|--------|--------|-----|
+| Downloader | `stash-downloader` | `stash-downloader-dev` |
+| Browser | `stash-browser` | `stash-browser-dev` |
+
+Dev builds are automatically deployed when code is pushed to the `dev` branch.

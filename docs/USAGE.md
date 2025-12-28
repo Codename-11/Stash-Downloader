@@ -1,174 +1,211 @@
 # Usage Guide
 
-## Quick Start
+This guide covers both Stash Downloader and Stash Browser plugins.
 
-1. **Access the plugin**: Navigate to your Stash URL + `/plugin/stash-downloader` or click the Downloader navbar button
+---
+
+## Stash Downloader
+
+### Quick Start
+
+1. **Access the plugin**: Navigate to `/plugin/stash-downloader` or click **Downloader** in navbar
 2. **Add a URL**: Paste a video/image URL and click "Add to Queue"
 3. **Edit metadata**: Click "Edit" to review and customize metadata
 4. **Import**: Click "Save & Import to Stash" to download and add to your library
 
----
+### Single URL Import
 
-## Single URL Import
-
-### Step-by-step:
-
-1. **Navigate** to the Downloader page
-
-2. **Enter URL** in the input field
+1. **Enter URL** in the input field
    - Direct file URLs work best: `https://example.com/video.mp4`
-   - Many websites supported with automatic metadata extraction via yt-dlp
+   - Many websites supported via yt-dlp metadata extraction
 
-3. **Select content type** (optional)
+2. **Select content type** (optional)
    - Auto-detect (default)
-   - Video
-   - Image
-   - Gallery
+   - Video / Image / Gallery
 
-4. **Auto-scraping** happens automatically
-   - Plugin extracts title, performers, tags, studio
+3. **Auto-scraping** happens automatically
+   - Extracts title, performers, tags, studio
    - Uses yt-dlp for video sites, Booru scraper for image sites
-   - Metadata appears in the queue item
 
-5. **Review metadata** by clicking "Edit" button
+4. **Review metadata** by clicking "Edit"
 
-6. **Import** by clicking "Save & Import to Stash"
-   - Downloads the file to your server
-   - Creates scene/image/gallery in Stash
-   - Associates all metadata
+5. **Import** by clicking "Save & Import to Stash"
 
-### Supported URL Types:
-- Video sites (via yt-dlp): Most major video platforms
-- Direct file links: `.mp4`, `.mkv`, `.avi`, `.mov`, `.jpg`, `.png`, `.gif`, `.webp`
-- Booru sites: Rule34, Gelbooru, Danbooru (images/galleries)
-
----
-
-## Batch Import from Clipboard
-
-Perfect for importing multiple files at once:
+### Batch Import from Clipboard
 
 1. **Prepare URLs** (one per line):
    ```
    https://example.com/video1.mp4
    https://example.com/video2.mp4
-   https://example.com/image1.jpg
    ```
 
-2. **Copy to clipboard** (Ctrl+C / Cmd+C)
+2. **Copy to clipboard** (Ctrl+C)
 
-3. **Click "Import from Clipboard"** button
+3. **Click "Import from Clipboard"**
 
-4. **Review detected URLs**
-   - Plugin filters invalid URLs automatically
-   - Shows count of valid URLs found
+4. **Review and import** detected URLs
 
-5. **Click "Import X URLs"** to add all to queue
-
-6. **Batch edit** by clicking "Edit & Import"
-   - Review each item one by one
-   - Skip items you don't want
-
-**Tips:**
-- One URL per line
-- Blank lines are ignored
-- Invalid URLs automatically filtered
-
----
-
-## Metadata Editing
-
-After adding items to queue, click "Edit & Import (X items)":
-
-### Available Fields:
+### Metadata Editing
 
 | Field | Description |
 |-------|-------------|
 | **Title** | Required. Auto-filled from scraper |
-| **Description** | Optional description text |
-| **Date** | Release/upload date (YYYY-MM-DD) |
-| **Rating** | 1-5 stars (converted to 20-100 in Stash) |
-| **Performers** | Multi-select with autocomplete. Create new on the fly |
-| **Tags** | Multi-select with autocomplete. Create new on the fly |
+| **Performers** | Multi-select with autocomplete |
+| **Tags** | Multi-select with autocomplete |
 | **Studio** | Single selection with autocomplete |
-| **URL** | Source URL (auto-filled) |
+| **Date** | Release/upload date (YYYY-MM-DD) |
 
-### Entity Colors:
+**Entity Colors:**
 - **Green badge**: New entity (will be created)
 - **Blue badge**: Existing entity in Stash
 
-### Actions:
-- **Save & Import to Stash**: Download and create entry
-- **Skip This Item**: Move to next without importing
-- **Previous**: Go back to edit previous item
-- **Back to Queue**: Return to queue view
+### Queue Management
 
----
-
-## Queue Management
-
-### Queue Statistics:
-- **Total**: All items in queue
-- **Downloading**: Currently downloading
-- **Complete**: Successfully imported
-- **Failed**: Errors occurred
-
-### Item Status:
-| Badge | Status |
-|-------|--------|
+| Status | Description |
+|--------|-------------|
 | Pending (gray) | Ready to edit/import |
 | Downloading (blue) | File downloading |
 | Processing (cyan) | Creating in Stash |
 | Complete (green) | Successfully imported |
 | Failed (red) | Error occurred |
 
-### Item Actions:
+**Item Actions:**
 - **Edit**: Review/edit metadata
-- **Logs**: View operation logs for this item
+- **Logs**: View operation logs
 - **Re-scrape**: Try a different scraper
 - **Retry**: Retry failed items
 - **Remove**: Delete from queue
 
-### Bulk Actions:
-- **Clear Completed**: Remove successful imports
-- **Clear All**: Empty entire queue
-
-### Queue Persistence:
-The queue persists in localStorage - it survives page navigation and refresh.
+**Queue Persistence:** Queue survives page navigation and refresh.
 
 ---
 
-## Activity Log
+## Stash Browser
 
-The Activity Log shows real-time operation logs:
+### Quick Start
 
-- Filter by level (All, Error, Warning, Info, Success)
-- Filter by category (All, Scrape, Download, Import, etc.)
-- Expand entries for full details
-- Clear logs when needed
-- Logs persist between page refreshes
+1. **Access the plugin**: Navigate to `/plugin/stash-browser` or click **Browser** in navbar
+2. **Select source**: Choose Rule34, Gelbooru, or Danbooru
+3. **Search tags**: Type tags and press Enter to add them
+4. **Browse results**: View thumbnails in the grid
+5. **Add to queue**: Click "+" to send to Stash Downloader
 
-### Log Levels:
-- **Debug**: Verbose info (console only)
-- **Info**: Standard operations
-- **Success**: Completed operations
-- **Warning**: Potential issues
-- **Error**: Failures
+### Searching
+
+#### Tag Input
+
+- **Type to search**: Autocomplete suggestions appear
+- **Press Enter or Space**: Add tag to search
+- **Press Backspace**: Remove last tag
+- **Use `-tag`**: Exclude specific tags
+
+#### Autocomplete
+
+Suggestions show:
+- **Category badge**: Gen (General), Art (Artist), Char (Character), Cpy (Copyright), Meta
+- **Post count**: Number of posts with this tag
+- **Color coding**: Category-specific colors
+
+#### Sort Options
+
+| Sort | Description |
+|------|-------------|
+| 🔥 Popular | Sort by score (most liked) |
+| 🆕 Newest | Sort by post ID (most recent) |
+| 🔄 Updated | Sort by update date |
+
+#### Rating Filter
+
+| Filter | Description |
+|--------|-------------|
+| **All** | Show all content |
+| **S** (Safe) | Safe-rated only |
+| **Q** (Questionable) | Questionable-rated only |
+| **E** (Explicit) | Explicit-rated only |
+
+### Browsing Results
+
+#### Grid View
+
+- **Thumbnail**: Post preview image
+- **Checkbox**: Select for batch operations
+- **Rating badge**: S/Q/E indicator
+- **Video badge**: Shows for video posts
+- **ID**: Post number
+
+#### Interactions
+
+- **Click**: Select/deselect post
+- **Double-click**: Open detail modal
+- **"+" button**: Add to Stash Downloader queue
+- **View button**: Open detail modal
+
+#### Selection Actions
+
+When posts are selected:
+- **Add to Queue**: Send all selected to Stash Downloader
+- **Clear**: Deselect all
+
+### Post Details Modal
+
+- **Full image/video**: View full-resolution content
+- **Tags**: Click to search for that tag
+- **Metadata**: ID, score, rating, dimensions
+- **Add to Queue**: Send to Stash Downloader
+
+### Settings
+
+| Setting | Description |
+|---------|-------------|
+| **Default Source** | Which booru to search by default |
+| **Results Per Page** | 20-100 results per page |
+| **Safe Mode** | Force safe-only content (overrides rating filter) |
+| **Show Thumbnails** | Toggle thumbnail visibility |
+
+### Workflow: Browser → Downloader
+
+1. **Search** in Stash Browser for content
+2. **Select** posts you want (click or checkbox)
+3. **Add to Queue** - posts are sent to Stash Downloader
+4. **Switch** to Stash Downloader
+5. **Edit & Import** - review metadata and import
+
+The queue is shared - items added from Browser appear in Downloader automatically.
+
+---
+
+## Browser Extension
+
+Send URLs directly from any webpage to your Stash Downloader queue.
+
+### Usage
+
+- **Right-click a link** → "Send to Stash Downloader" → "As Video/Image/Gallery"
+- **Highlight a URL** → Right-click → "Send to Stash Downloader"
+- **Click extension icon** → Send current page URL
+
+### Features
+
+- Real-time updates (no page refresh needed)
+- Content type selection
+- Connection status indicator
 
 ---
 
 ## Tips & Best Practices
 
-1. **Use direct file URLs** when possible for better reliability
+1. **Use Stash Browser** for discovering content on booru sites
 
-2. **Review metadata before importing** - auto-scraping isn't perfect
+2. **Configure API credentials** for Rule34/Gelbooru autocomplete
 
-3. **Organize as you import** - add tags and ratings during import
+3. **Use batch operations** - select multiple posts, add all at once
 
-4. **Use batch import** for efficiency - collect URLs, import in one session
+4. **Review metadata before importing** - auto-scraping isn't perfect
 
-5. **Check existing entities** - use autocomplete to avoid duplicates
+5. **Keep yt-dlp updated** - site extractors break frequently
 
 6. **Monitor the Activity Log** for errors and warnings
 
-7. **Keep yt-dlp updated** - site extractors break frequently
+7. **Use the rating filter** to find appropriate content
+
+8. **Try different sources** - each booru has different content

@@ -2,29 +2,43 @@
 
 ## Project Structure
 
+This is a monorepo containing multiple Stash plugins:
+
 ```
 Stash-Downloader/
-├── src/                    # Frontend source
-│   ├── components/         # React components
-│   │   ├── common/        # Reusable UI components
-│   │   └── downloader/    # Download queue components
-│   ├── services/          # Business logic
-│   │   ├── stash/        # Stash GraphQL service
-│   │   ├── download/     # Download manager
-│   │   └── metadata/     # Metadata scrapers
-│   ├── hooks/            # Custom React hooks
-│   ├── contexts/         # React contexts
-│   ├── types/            # TypeScript definitions
-│   ├── utils/            # Utilities
-│   ├── constants/        # Constants
-│   └── index.tsx         # Plugin entry point
-├── scripts/               # Python backend
-│   └── download.py       # yt-dlp wrapper
-├── browser-extension/     # Firefox extension
-├── dist/                  # Built output
-├── docs/                  # Documentation
-└── stash-downloader.yml  # Plugin manifest
+├── plugins/
+│   ├── stash-downloader/       # Stash Downloader plugin
+│   │   ├── src/                # TypeScript source
+│   │   │   ├── components/     # React components
+│   │   │   ├── services/       # Business logic
+│   │   │   ├── hooks/          # Custom React hooks
+│   │   │   ├── contexts/       # React contexts
+│   │   │   ├── types/          # TypeScript definitions
+│   │   │   └── index.tsx       # Plugin entry point
+│   │   ├── scripts/            # Python backend (download.py)
+│   │   ├── tests/              # Vitest tests
+│   │   ├── dist/               # Built output
+│   │   ├── package.json        # Plugin version
+│   │   ├── vite.config.ts      # Build config
+│   │   └── stash-downloader.yml # Plugin manifest
+│   │
+│   └── stash-browser/          # Stash Browser plugin
+│       ├── src/                # TypeScript source
+│       ├── scripts/            # Python backend (proxy.py)
+│       ├── dist/               # Built output
+│       ├── package.json        # Plugin version
+│       ├── vite.config.ts      # Build config
+│       └── stash-browser.yml   # Plugin manifest
+│
+├── browser-extension/          # Firefox browser extension
+├── shared/                     # Shared utilities (planned)
+├── docs/                       # Documentation
+├── package.json                # Root workspace config
+├── eslint.config.js            # Shared ESLint config
+└── .github/workflows/          # CI/CD
 ```
+
+---
 
 ## Development Setup
 
@@ -33,17 +47,15 @@ Stash-Downloader/
 git clone https://github.com/Codename-11/Stash-Downloader.git
 cd Stash-Downloader
 
-# Install dependencies
+# Install dependencies (all workspaces)
 npm install
 
-# Development build with watch
-npm run dev
-
-# Production build
+# Build all plugins
 npm run build
 
-# Build for Stash (creates stash-plugin/ folder)
-npm run build:stash
+# Build specific plugin
+npm run build:downloader
+npm run build:browser
 
 # Type checking
 npm run type-check
@@ -52,20 +64,34 @@ npm run type-check
 npm run lint
 
 # Tests
-npm run test
+npm test
 ```
+
+### Working on a Specific Plugin
+
+```bash
+# Development mode with watch
+cd plugins/stash-downloader
+npm run dev
+
+# Or for Stash Browser
+cd plugins/stash-browser
+npm run dev
+```
+
+---
 
 ## Architecture
 
 ### Plugin Integration
 
-The plugin uses Stash's `PluginApi` for integration:
+Both plugins use Stash's `PluginApi` for integration:
 
-- **Routes**: Registered at `/plugin/stash-downloader` via `PluginApi.register.route()`
-- **Navigation**: Navbar button injected via MutationObserver (`.navbar-buttons` selector)
+- **Routes**: Registered via `PluginApi.register.route()`
+- **Navigation**: Navbar button injected via MutationObserver
 - **Dependencies**: React, ReactDOM, Bootstrap provided by Stash (NOT bundled)
 - **GraphQL**: Direct fetch to `/graphql` endpoint
-- **Styling**: Bootstrap utilities + Stash theme colors via inline styles
+- **Styling**: Bootstrap utilities + Stash theme colors
 
 ### Libraries from PluginApi
 
@@ -85,35 +111,58 @@ Borders:          #394b59
 Muted text:       #8b9fad
 ```
 
-### Data Flow
+---
 
+## Plugin Details
+
+### Stash Downloader
+
+**Purpose**: Download videos/images with automatic metadata extraction
+
+**Data Flow**:
 ```
 User Input → Metadata Scraper → Download Service → Stash GraphQL → Scene Created
 ```
 
-### State Management
+**Python Backend** (`scripts/download.py`):
+- Server-side downloads via yt-dlp
+- Metadata extraction
+- Cover image fetching
+- Invoked via `runPluginTask` / `runPluginOperation`
 
-- **Local State**: React hooks (`useState`, `useReducer`)
-- **Context**: Download queue, settings, logs
-- **Apollo Cache**: Stash data (performers, tags, studios)
-- **localStorage**: User preferences, queue persistence, logs
+### Stash Browser
+
+**Purpose**: Browse booru sites and send content to download queue
+
+**Data Flow**:
+```
+User Search → Python Proxy → Booru API → Results Display → Add to Queue Event
+```
+
+**Python Backend** (`scripts/proxy.py`):
+- CORS proxy for booru APIs
+- Autocomplete endpoint access
+- Search and post fetching
+
+**Event Communication**:
+- Browser dispatches `CustomEvent` with post data
+- Downloader listens for `DOWNLOADER_EVENTS.ADD_TO_QUEUE`
+- Queue is shared via event system
 
 ---
 
-## Adding New Scrapers
+## Adding New Features
 
-To add support for a new website:
-
-### 1. Create Scraper Class
+### Adding a Scraper (Stash Downloader)
 
 ```typescript
-// src/services/metadata/MyScraper.ts
+// plugins/stash-downloader/src/services/metadata/MyScraper.ts
 import { IMetadataScraper, IScrapedMetadata, ContentType } from '@/types';
 
 export class MyScraper implements IMetadataScraper {
   name = 'MySite';
-  supportedDomains = ['mysite.com', 'www.mysite.com'];
-  contentTypes = [ContentType.Video]; // Supported content types
+  supportedDomains = ['mysite.com'];
+  contentTypes = [ContentType.Video];
 
   canHandle(url: string): boolean {
     return this.supportedDomains.some(d => url.includes(d));
@@ -121,34 +170,32 @@ export class MyScraper implements IMetadataScraper {
 
   async scrape(url: string): Promise<IScrapedMetadata> {
     // Implement scraping logic
-    return {
-      url,
-      title: 'Scraped Title',
-      contentType: ContentType.Video,
-      performers: ['Performer 1'],
-      tags: ['Tag 1', 'Tag 2'],
-      // ... other fields
-    };
+    return { url, title: '...', contentType: ContentType.Video };
   }
 }
-```
 
-### 2. Register the Scraper
-
-```typescript
-// In src/services/metadata/ScraperRegistry.ts
-import { MyScraper } from './MyScraper';
-
-// Add to constructor
+// Register in ScraperRegistry.ts
 this.register(new MyScraper());
 ```
 
-### Scraper Priority
+### Adding a Booru Source (Stash Browser)
 
-1. **YtDlpScraper** - Primary for video sites (server-side yt-dlp)
-2. **BooruScraper** - Primary for booru image sites
-3. **StashScraper** - Fallback using Stash's built-in scraper
-4. **GenericScraper** - Last resort, URL parsing only
+1. Add API config in `scripts/proxy.py`:
+```python
+BOORU_APIS = {
+    'newbooru': {
+        'base_url': 'https://newbooru.com',
+        'search_path': '/index.php',
+        'search_params': {...},
+    },
+}
+```
+
+2. Add autocomplete handler in `autocomplete_tags()`
+
+3. Add source option in `constants/index.ts`
+
+4. Update `SearchBar.tsx` dropdown
 
 ---
 
@@ -156,17 +203,16 @@ this.register(new MyScraper());
 
 ### Versioning
 
-This project uses [Semantic Versioning](https://semver.org/):
+Each plugin has independent versioning:
 
-- **MAJOR** (X.0.0): Breaking changes
-- **MINOR** (0.X.0): New features, backwards compatible
-- **PATCH** (0.0.X): Bug fixes, backwards compatible
-
-Version is managed in `package.json`.
+| Plugin | Version File | Release Tag |
+|--------|--------------|-------------|
+| Stash Downloader | `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` |
+| Stash Browser | `plugins/stash-browser/package.json` | `browser-vX.Y.Z` |
 
 ### Commit Messages
 
-We use [Conventional Commits](https://www.conventionalcommits.org/) with emoji:
+[Conventional Commits](https://www.conventionalcommits.org/) with emoji:
 
 | Type | Emoji | Description |
 |------|-------|-------------|
@@ -175,24 +221,21 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) with emoji:
 | `docs:` | 📝 | Documentation |
 | `refactor:` | ♻️ | Code refactoring |
 | `chore:` | 🔧 | Build/tooling |
-| `perf:` | ⚡️ | Performance |
-| `test:` | ✅ | Tests |
 
-**Examples:**
+Include plugin scope when relevant:
 ```
-✨ feat: add batch import from clipboard
-🐛 fix: resolve memory leak in download queue
-📝 docs: update installation instructions
-♻️ refactor: simplify metadata scraper logic
+✨ feat(browser): add tag autocomplete
+🐛 fix(downloader): resolve queue persistence issue
 ```
 
-### Pull Request Process
+### Branch Strategy
 
-1. Fork the repository
-2. Create a feature branch (`feature/description` or `fix/description`)
-3. Make changes following conventions in `.claude/conventions.md`
-4. Test thoroughly
-5. Submit a pull request
+| Branch | Purpose |
+|--------|---------|
+| `main` | Stable releases only |
+| `dev` | Active development |
+
+**Always develop on `dev` branch.** Merge to `main` only for releases.
 
 ---
 
@@ -200,63 +243,51 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) with emoji:
 
 ### Release Process
 
-This project uses **tag-based releases**. When you push a tag, GitHub Actions automatically:
-1. Runs tests, lint, and type-check
-2. Builds the plugin
-3. Deploys to GitHub Pages (updates Stash plugin index)
-4. Creates a GitHub Release with the ZIP attached
-
-### How to Create a Release
-
 ```bash
-# 1. Update version in package.json
-#    Edit package.json: "version": "0.1.0" → "0.2.0"
+# 1. Merge dev to main
+git checkout main && git merge dev
 
-# 2. Commit the version bump
-git add package.json
-git commit -m "🔖 chore: release v0.2.0"
+# 2. Bump version in the plugin's package.json
+cd plugins/stash-downloader
+npm version patch  # or minor/major
 
-# 3. Create and push the tag
-git tag v0.2.0
+# 3. Commit and tag
+git add .
+git commit -m "🔖 chore: release downloader-v0.2.0"
+git tag downloader-v0.2.0
 git push origin main --tags
+
+# 4. WAIT for workflow to complete before syncing dev
+# Check: https://github.com/Codename-11/Stash-Downloader/actions
+git checkout dev && git merge main && git push
 ```
-
-### Version Bump Guidelines
-
-| Change Type | Version Bump | Example |
-|-------------|--------------|---------|
-| Breaking changes | MAJOR | 0.1.0 → 1.0.0 |
-| New features | MINOR | 0.1.0 → 0.2.0 |
-| Bug fixes | PATCH | 0.1.0 → 0.1.1 |
 
 ### What Happens on Release
 
-1. **CI runs**: Type-check, lint, tests must pass
-2. **Build**: Plugin is compiled and packaged
-3. **GitHub Pages**: `index.yml` updated with new version
-4. **GitHub Release**: Created with:
-   - Release notes (auto-generated)
-   - `stash-downloader.zip` attached
-   - Installation instructions
+1. **CI**: Type-check, lint, tests
+2. **Build**: Plugin compiled and packaged
+3. **GitHub Pages**: `index.yml` updated with both plugins
+4. **GitHub Release**: Created with ZIP attached
 
-### Verifying a Release
+### Dev Builds
 
-After pushing a tag:
-1. Check [Actions](https://github.com/Codename-11/Stash-Downloader/actions) for build status
-2. Verify [Releases](https://github.com/Codename-11/Stash-Downloader/releases) page
-3. Test installation via Stash plugin manager
+Push to `dev` automatically deploys dev builds:
+- `stash-downloader-dev`
+- `stash-browser-dev`
+
+Both stable and dev can be installed simultaneously.
 
 ---
 
 ## Build Configuration
 
-### Vite Config
+### Vite Config (per plugin)
 
 ```typescript
 build: {
   lib: {
     entry: 'src/index.tsx',
-    name: 'StashDownloader',
+    name: 'StashDownloader',  // or 'StashBrowser'
     formats: ['iife'],
     fileName: () => 'stash-downloader.js',
   },
@@ -274,20 +305,20 @@ build: {
 }
 ```
 
-### Plugin Manifest (stash-downloader.yml)
+### Plugin Manifest
 
 ```yaml
-name: Stash Downloader
-description: Download and import content with metadata
+name: Plugin Name
+description: Plugin description
 version: 0.1.0
 
 exec:
   - python
-  - "{pluginDir}/scripts/download.py"
+  - "{pluginDir}/scripts/script.py"
 
 ui:
   javascript:
-    - dist/stash-downloader.js
+    - dist/plugin-name.js
 
 interface: raw  # Required for Python subprocess
 ```
@@ -296,21 +327,43 @@ interface: raw  # Required for Python subprocess
 
 ## Debugging
 
-### Enable Verbose Python Logging
-
-```bash
-STASH_DOWNLOADER_DEBUG=1
-```
-
 ### Browser Console
 
-Press F12 to open DevTools. Check Console tab for:
-- JavaScript errors
-- Network requests to `/graphql`
-- Plugin log messages
+Press F12 for DevTools:
+- Console: JavaScript errors, log messages
+- Network: GraphQL requests, API calls
 
 ### Stash Logs
 
-Check Stash logs for plugin errors:
-- Docker: `docker logs stash`
-- Direct: Check `~/.stash/stash.log`
+```bash
+# Docker
+docker logs stash
+
+# Direct installation
+cat ~/.stash/stash.log
+```
+
+### Python Script Testing
+
+```bash
+# Test script directly
+cd plugins/stash-browser/scripts
+echo '{"args": {"mode": "search", "source": "rule34", "tags": "test"}}' | python proxy.py
+```
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run plugin-specific tests
+npm test -w @stash-plugins/stash-downloader
+
+# Watch mode
+npm test -- --watch
+```
+
+Tests use Vitest with React Testing Library for component tests.

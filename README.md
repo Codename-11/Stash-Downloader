@@ -1,19 +1,45 @@
 <div align="center">
-  <img src="plugins/stash-downloader/src/assets/logo.svg" alt="Stash Downloader Logo" width="128" height="128" />
-  <h1>Stash Downloader</h1>
-  <p>Download videos and images directly to your Stash library with automatic metadata extraction</p>
+  <h1>Stash Plugins</h1>
+  <p>A collection of plugins for <a href="https://github.com/stashapp/stash">Stash</a> - the self-hosted media organizer</p>
 
   [![License](https://img.shields.io/github/license/Codename-11/Stash-Downloader)](LICENSE)
   [![GitHub Release](https://img.shields.io/github/v/release/Codename-11/Stash-Downloader)](https://github.com/Codename-11/Stash-Downloader/releases)
   [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/publish.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
   [![Stash](https://img.shields.io/badge/Stash-v0.20%2B-blue)](https://github.com/stashapp/stash)
-  [![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-  [![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
 
   [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/codename_11)
 </div>
 
-## Features
+---
+
+## Plugins
+
+| Plugin | Description | Status |
+|--------|-------------|--------|
+| [**Stash Downloader**](#stash-downloader) | Download videos/images with automatic metadata extraction | Stable |
+| [**Stash Browser**](#stash-browser) | Browse and search booru sites, add to download queue | Beta |
+
+### Quick Install
+
+1. In Stash: **Settings** → **Plugins** → **Available Plugins**
+2. Click **"Add Source"**
+3. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
+4. Find your desired plugin and click **"Install"**
+
+---
+
+## Stash Downloader
+
+<div align="center">
+  <img src="plugins/stash-downloader/src/assets/logo.svg" alt="Stash Downloader Logo" width="80" height="80" />
+</div>
+
+Download videos and images directly to your Stash library with automatic metadata extraction.
+
+[![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+[![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
+
+### Features
 
 - **URL-based Downloads** - Paste URLs to download videos and images
 - **Automatic Metadata** - Extracts titles, thumbnails, performers, tags, studio via yt-dlp
@@ -21,21 +47,88 @@
 - **Cover Images** - Scraped thumbnails automatically set as scene covers
 - **Browser Extension** - Right-click any link to send directly to your queue
 - **Batch Import** - Import multiple URLs from clipboard
-- **Post-Import Actions** - Choose how Stash handles metadata after import:
-  - **Identify** - Match via StashDB fingerprints + installed scrapers
-  - **Scrape URL** - Use Stash's scrapers for the source URL
-  - **None** - Just import, edit metadata in Stash later
-- **Auto-Create** - Missing performers/tags/studios automatically created in Stash
-- **Queue Management** - Track downloads with progress indicators
+- **Post-Import Actions** - Identify via StashDB, Scrape URL, or None
+- **Auto-Create** - Missing performers/tags/studios automatically created
 - **Persistent Queue** - Queue survives page refresh and navigation
 
 ![Stash Downloader Main Interface](screenshots/stash_downloader_main_layout.png)
+
+### Requirements
+
+- Stash v0.20+
+- Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+
+### Quick Start
+
+1. Navigate to `http://your-stash-url/plugin/stash-downloader`
+2. Paste a URL and click "Add to Queue"
+3. Click "Edit" to review metadata
+4. Click "Save & Import to Stash"
+
+### Configuration
+
+Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
+
+| Setting | Description |
+|---------|-------------|
+| **Server Download Path** | Where to save files (default: `/data/StashDownloader`) |
+| **HTTP Proxy** | Proxy for geo-restricted content (`http://`, `socks5://`) |
+| **Concurrent Downloads** | Max simultaneous downloads (default: 3) |
+| **Download Quality** | Preferred video quality |
+
+---
+
+## Stash Browser
+
+<div align="center">
+  <p><em>Browse booru sites and add content directly to your Stash Downloader queue</em></p>
+</div>
+
+### Features
+
+- **Multi-Source Search** - Browse Rule34, Gelbooru, and Danbooru
+- **Tag Autocomplete** - Real autocomplete matching the actual sites
+- **Category Labels** - Color-coded tag categories (Artist, Character, Copyright, etc.)
+- **Sort & Filter** - Sort by Popular/Newest/Updated, filter by rating (S/Q/E)
+- **Thumbnail Grid** - Responsive grid with hover effects
+- **Quick Add** - Send posts directly to Stash Downloader queue
+- **Post Details** - View full images/videos, tags, and metadata
+- **Safe Mode** - Optional safe-only content filtering
+
+### Requirements
+
+- Stash v0.20+
+- **Stash Downloader plugin** (for queue integration)
+- API credentials for Rule34/Gelbooru (free, get from site settings)
+
+### Quick Start
+
+1. Navigate to `http://your-stash-url/plugin/stash-browser`
+2. Select a source (Rule34, Gelbooru, or Danbooru)
+3. Type tags and press Enter to search
+4. Click "+" to add posts to your Stash Downloader queue
+
+### Configuration
+
+Configure in Stash at **Settings** → **Plugins** → **Stash Browser**:
+
+| Setting | Description |
+|---------|-------------|
+| **Default Source** | Which booru to search by default |
+| **Results Per Page** | Number of results to show (20-100) |
+| **Safe Mode** | Only show safe-rated content |
+| **Rule34 API Key/User ID** | Required for Rule34 search and autocomplete |
+| **Gelbooru API Key/User ID** | Required for Gelbooru search and autocomplete |
+
+> **Getting API Credentials**: Sign up on the respective site and find your API key in your account/options page.
 
 ---
 
 ## Browser Extension
 
 Send URLs directly to your Stash Downloader queue from any webpage.
+
+[![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 
 ![Browser Extension](screenshots/stash_downloader_extension_layout.png)
 
@@ -48,21 +141,7 @@ Send URLs directly to your Stash Downloader queue from any webpage.
 
 ### Installation
 
-**Install from Firefox Add-ons (Recommended)**
-
-[![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-
-[**Install from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-
-**Manual Installation (Development/Testing)**
-
-For development or testing unreleased versions:
-
-1. Open Firefox and navigate to `about:debugging`
-2. Click "This Firefox" → "Load Temporary Add-on"
-3. Select `browser-extension/manifest.json`
-
-Note: Temporary add-ons are removed when Firefox closes.
+[**Install from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/) (Recommended)
 
 ### Setup
 
@@ -77,62 +156,43 @@ Note: Temporary add-ons are removed when Firefox closes.
 - **Highlight a URL** → Right-click → "Send to Stash Downloader"
 - **Click extension icon** → Send current page URL
 
-The URL is added to your Stash Downloader queue automatically.
-
 ---
 
-## Plugin Installation
+## Development
 
-### Quick Install (Recommended)
+This is a monorepo containing multiple plugins:
 
-1. In Stash: **Settings** → **Plugins** → **Available Plugins**
-2. Click **"Add Source"**
-3. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
-4. Find "Stash Downloader" and click **"Install"**
+```
+stash-downloader/
+├── plugins/
+│   ├── stash-downloader/    # Stash Downloader plugin
+│   └── stash-browser/       # Stash Browser plugin
+├── browser-extension/       # Firefox browser extension
+└── shared/                  # Shared utilities
+```
 
-### Requirements
+### Commands
 
-- Stash v0.20+
-- Python 3.7+ with yt-dlp (`pip install yt-dlp`)
+```bash
+# Install dependencies
+npm install
 
-See [Installation Guide](docs/INSTALLATION.md) for manual installation and Docker setup.
+# Build all plugins
+npm run build
 
----
+# Build specific plugin
+npm run build:downloader
+npm run build:browser
 
-## Quick Start
+# Development mode
+cd plugins/stash-downloader && npm run dev
+cd plugins/stash-browser && npm run dev
 
-1. Navigate to `http://your-stash-url/plugin/stash-downloader`
-2. Paste a URL and click "Add to Queue"
-3. Click "Edit" to review metadata
-4. Click "Save & Import to Stash"
+# Run tests
+npm test
+```
 
-See [Usage Guide](docs/USAGE.md) for detailed workflows.
-
----
-
-## Configuration
-
-Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
-
-| Setting | Description |
-|---------|-------------|
-| **Server Download Path** | Where to save files (default: `/data/StashDownloader`) |
-| **HTTP Proxy** | Proxy for geo-restricted content (`http://`, `socks5://`) |
-| **Concurrent Downloads** | Max simultaneous downloads (default: 3) |
-| **Auto-Create** | Automatically create performers/tags/studios |
-| **Download Quality** | Preferred video quality |
-
-> **Note**: Video downloads support SOCKS proxies via yt-dlp. Cover image fetching will fall back to direct connection if PySocks isn't installed (image CDNs typically don't require proxies).
-
----
-## Feedback & Support
-
-Have questions, ideas, or need help?  
-- **Stash Forums**: Join the discussion and get support  
-  [![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/Codename-11/Stash-Downloader/issues)
-
-We welcome all feedback—thanks for helping improve Stash Downloader! 
+See [Development Guide](docs/DEVELOPMENT.md) for architecture details.
 
 ---
 
@@ -148,35 +208,27 @@ pip install -U yt-dlp  # Update to latest
 docker exec -it stash pip install -U yt-dlp --break-system-packages
 ```
 
+**Autocomplete not showing results?**
+- Rule34/Gelbooru require API credentials - configure in plugin settings
+- Danbooru works without authentication
+
 See [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for more solutions.
 
 ---
 
-## Development
+## Feedback & Support
 
-```bash
-npm install              # Install all workspace dependencies
-npm run build            # Build all plugins
-npm run build:downloader # Build Stash Downloader only
-
-# Or work directly in a plugin:
-cd plugins/stash-downloader
-npm run dev              # Build with watch mode
-npm run build            # Production build
-```
-
-See [Development Guide](docs/DEVELOPMENT.md) for architecture and contribution guidelines.
+- **Stash Forums**: [Join the discussion](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Codename-11/Stash-Downloader/issues)
 
 ---
 
-## Links
+## Documentation
 
 - [Installation Guide](docs/INSTALLATION.md)
 - [Usage Guide](docs/USAGE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Development](docs/DEVELOPMENT.md)
-- [GitHub Issues](https://github.com/Codename-11/Stash-Downloader/issues)
-- [Stash Forums](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
 
 ---
 
