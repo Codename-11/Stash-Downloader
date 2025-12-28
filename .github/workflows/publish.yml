@@ -460,12 +460,102 @@ jobs:
         with:
           name: downloader-stable-zip
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV_TAG=$(git tag -l 'downloader-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            # First release or only one tag - get all commits
+            echo "range=HEAD" >> $GITHUB_OUTPUT
+          else
+            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
+          fi
+          echo "Previous tag: $PREV_TAG"
+
+      - name: Get changelog
+        id: changelog
+        run: |
+          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- plugins/stash-downloader/ shared/ 2>/dev/null || git log --pretty=format:"- %s" -20)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate AI release notes
+        id: ai_notes
+        if: ${{ vars.GOOGLE_API_KEY != '' || secrets.GOOGLE_API_KEY != '' }}
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          VERSION="${{ needs.deploy-downloader-stable.outputs.version }}"
+          COMMITS="${{ steps.changelog.outputs.commits }}"
+
+          PROMPT="Generate release notes for Stash Downloader v${VERSION}. This is a Stash plugin for downloading videos/images with metadata extraction.
+
+          Recent commits:
+          ${COMMITS}
+
+          Format the response EXACTLY like this (use these exact headers and emoji):
+          ## 🚀 Stash Downloader v${VERSION}
+
+          ### ✨ What's New
+
+          **Feature Name** — Description of what it does and why it matters.
+
+          [repeat for each significant feature/fix]
+
+          [Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/PREV_TAG...downloader-v${VERSION})
+
+          ### 📝 All Changes
+
+          - ✨ feat: description
+          - 🐛 fix: description
+          - ♻️ refactor: description
+          [list all commits with appropriate emoji]
+
+          ---
+
+          ### 📦 Installation
+
+          **Via Stash Plugin Manager (Recommended):**
+          1. Settings → Plugins → Available Plugins → Add Source
+          2. Enter: \`https://codename-11.github.io/Stash-Downloader/index.yml\`
+          3. Find \"Stash Downloader\" and click Install
+
+          **Manual Installation:**
+          1. Download \`stash-downloader.zip\` below
+          2. Extract to \`~/.stash/plugins/stash-downloader/\`
+          3. Reload plugins in Stash
+
+          ### 📋 Requirements
+          - Stash v0.20+
+          - Python 3.7+ with yt-dlp (\`pip install yt-dlp\`)
+
+          Rules:
+          - Be concise but informative
+          - Focus on user-facing changes
+          - Use bold for feature names
+          - Skip internal/minor changes in What's New section"
+
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+
+          if [ -n "$NOTES" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$NOTES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Stash Downloader v${{ needs.deploy-downloader-stable.outputs.version }}"
+          body: ${{ steps.ai_notes.outputs.notes }}
           files: stash-downloader.zip
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
 
   # ============================================================================
   # RELEASE BROWSER - Creates GitHub Release for Browser
@@ -485,9 +575,100 @@ jobs:
         with:
           name: browser-stable-zip
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV_TAG=$(git tag -l 'browser-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            # First release or only one tag - get all commits
+            echo "range=HEAD" >> $GITHUB_OUTPUT
+          else
+            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
+          fi
+          echo "Previous tag: $PREV_TAG"
+
+      - name: Get changelog
+        id: changelog
+        run: |
+          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- plugins/stash-browser/ shared/ 2>/dev/null || git log --pretty=format:"- %s" -20)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate AI release notes
+        id: ai_notes
+        if: ${{ vars.GOOGLE_API_KEY != '' || secrets.GOOGLE_API_KEY != '' }}
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          VERSION="${{ needs.deploy-browser-stable.outputs.version }}"
+          COMMITS="${{ steps.changelog.outputs.commits }}"
+
+          PROMPT="Generate release notes for Stash Browser v${VERSION}. This is a Stash plugin for browsing booru sites (Rule34, Gelbooru, Danbooru) and adding content to the Stash Downloader queue.
+
+          Recent commits:
+          ${COMMITS}
+
+          Format the response EXACTLY like this (use these exact headers and emoji):
+          ## 🔍 Stash Browser v${VERSION}
+
+          ### ✨ What's New
+
+          **Feature Name** — Description of what it does and why it matters.
+
+          [repeat for each significant feature/fix]
+
+          [Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/PREV_TAG...browser-v${VERSION})
+
+          ### 📝 All Changes
+
+          - ✨ feat: description
+          - 🐛 fix: description
+          - ♻️ refactor: description
+          [list all commits with appropriate emoji]
+
+          ---
+
+          ### 📦 Installation
+
+          **Via Stash Plugin Manager (Recommended):**
+          1. Settings → Plugins → Available Plugins → Add Source
+          2. Enter: \`https://codename-11.github.io/Stash-Downloader/index.yml\`
+          3. Find \"Stash Browser\" and click Install
+
+          **Manual Installation:**
+          1. Download \`stash-browser.zip\` below
+          2. Extract to \`~/.stash/plugins/stash-browser/\`
+          3. Reload plugins in Stash
+
+          ### 📋 Requirements
+          - Stash v0.20+
+          - **Stash Downloader plugin** (for queue integration)
+          - API credentials for Rule34/Gelbooru (free, get from site settings)
+
+          Rules:
+          - Be concise but informative
+          - Focus on user-facing changes
+          - Use bold for feature names
+          - Skip internal/minor changes in What's New section"
+
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+
+          if [ -n "$NOTES" ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$NOTES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Stash Browser v${{ needs.deploy-browser-stable.outputs.version }}"
+          body: ${{ steps.ai_notes.outputs.notes }}
           files: stash-browser.zip
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
