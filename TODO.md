@@ -3,10 +3,10 @@
 ## Backlog
 
 ### CI/CD
-- [ ] **Automated browser store uploads**: Upload extension to Firefox Add-ons / Chrome Web Store when `browser-extension/manifest.json` version changes
+- [ ] **Automated browser store uploads**: Auto-submit extension updates to Firefox Add-ons when `browser-extension/manifest.json` version changes
+  - Extension is live on AMO: https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/
   - Detect version changes with `git diff HEAD^ HEAD -- browser-extension/manifest.json | grep '"version"'`
   - Use `web-ext sign` for AMO with API credentials
-  - Use Chrome Web Store API for Chrome uploads
   - Status: Manual uploads currently (automated in future)
   - See: https://extensionworkshop.com/documentation/develop/web-ext-command-reference/#web-ext-sign
 
@@ -24,6 +24,7 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
+- [x] Firefox extension published on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 - [x] Proper job cancellation via Stash jobQueue (cancels all queued + running jobs)
 - [x] Remove concurrency setting (Stash processes jobs sequentially anyway)
 - [x] In-modal download progress with auto-advance to next item (no close/reopen cycle)

@@ -48,11 +48,15 @@ Send URLs directly to your Stash Downloader queue from any webpage.
 
 ### Installation
 
-**Firefox Add-ons (Coming Soon)**
+**Install from Firefox Add-ons (Recommended)**
 
-The extension is currently pending review on [Firefox Add-ons](https://addons.mozilla.org/). Once approved, you'll be able to install it directly from the store.
+[![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 
-**Manual Installation (Temporary)**
+[**Install from Firefox Add-ons**](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+
+**Manual Installation (Development/Testing)**
+
+For development or testing unreleased versions:
 
 1. Open Firefox and navigate to `about:debugging`
 2. Click "This Firefox" → "Load Temporary Add-on"

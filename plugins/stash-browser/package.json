@@ -1,0 +1,31 @@
+{
+  "name": "@stash-plugins/stash-browser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browse and preview external content for Stash",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc && vite build",
+    "build:stash": "npm run build && node scripts/build-stash.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@stash-plugins/shared": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3.0",
+    "vite": "^6.0.0",
+    "vitest": "^1.6.0",
+    "happy-dom": "^12.10.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

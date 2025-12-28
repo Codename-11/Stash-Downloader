@@ -79,11 +79,12 @@ JavaScript Extension / Web-UI Plugin for Stash
 
 8. **Browser Extension**
    - Firefox extension for sending URLs to queue from any page
+   - Available on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
    - Context menu integration (right-click any link)
    - Real-time queue updates (no page refresh needed)
    - Auto-detects content type based on URL patterns
    - Connection status indicator
-   - Located in `browser-extension/` directory
+   - Source located in `browser-extension/` directory
 
 ## External Dependencies (NOT Bundled)
 These are provided by Stash via PluginApi and marked as external in build config:

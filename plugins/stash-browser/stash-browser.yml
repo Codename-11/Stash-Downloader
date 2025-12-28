@@ -1,0 +1,39 @@
+name: Stash Browser
+description: Browse and preview content from external sources (booru sites, etc.)
+version: 0.1.0
+url: https://github.com/Codename-11/Stash-Downloader
+
+# Python backend for CORS proxy
+exec:
+  - python
+  - "{pluginDir}/scripts/proxy.py"
+
+tasks:
+  - name: Fetch Content
+    description: Fetch content from external API (CORS proxy)
+    defaultArgs:
+      mode: fetch
+
+settings:
+  - name: defaultSource
+    displayName: Default Source
+    description: Default booru source to browse (rule34, gelbooru, danbooru)
+    type: STRING
+  - name: resultsPerPage
+    displayName: Results Per Page
+    description: Number of results to show per page (default 40)
+    type: NUMBER
+  - name: safeMode
+    displayName: Safe Mode
+    description: Filter explicit content (where supported)
+    type: BOOLEAN
+  - name: httpProxy
+    displayName: HTTP Proxy
+    description: Proxy for API requests (http://, socks5://)
+    type: STRING
+
+ui:
+  javascript:
+    - dist/stash-browser.js
+
+interface: raw
