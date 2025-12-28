@@ -2,13 +2,12 @@
  * Stash Browser - Main Component
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { PLUGIN_NAME, APP_VERSION, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
 import type { IBooruPost, ISearchParams, SortOption, RatingFilter } from '@/types';
 import { searchPosts, getPostUrl } from '@/services/BooruService';
 import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
-import { Pagination } from './Pagination';
 import { SettingsPanel } from './SettingsPanel';
 import { loadSettings, saveSettings, type BrowserSettings } from '@/utils';
 import { PostDetailModal } from './PostDetailModal';
@@ -40,8 +39,10 @@ export const BrowserMain: React.FC = () => {
   const [posts, setPosts] = useState<IBooruPost[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -49,9 +50,21 @@ export const BrowserMain: React.FC = () => {
   // Detail modal state
   const [detailPost, setDetailPost] = useState<IBooruPost | null>(null);
 
-  const handleSearch = useCallback(async (params: ISearchParams) => {
+  // Infinite scroll ref
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const handleSearch = useCallback(async (params: ISearchParams, append = false) => {
     setSearchParams(params);
-    setIsLoading(true);
+
+    // If this is a new search (page 0), show full loading state
+    // If appending, show "loading more" state
+    if (append) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+      setPosts([]); // Clear posts for new search
+      setHasMore(true);
+    }
     setError(null);
     setHasSearched(true);
 
@@ -79,7 +92,7 @@ export const BrowserMain: React.FC = () => {
     }
 
     try {
-      console.log('[StashBrowser] Searching:', { ...params, tags: searchTags });
+      console.log('[StashBrowser] Searching:', { ...params, tags: searchTags, append });
 
       const result = await searchPosts(
         params.source,
@@ -89,27 +102,73 @@ export const BrowserMain: React.FC = () => {
       );
 
       console.log('[StashBrowser] Got results:', result.count, 'posts');
-      setPosts(result.posts);
+
+      if (append) {
+        // Append new posts, filtering out duplicates
+        setPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newPosts = result.posts.filter(p => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
+      } else {
+        setPosts(result.posts);
+      }
+
       setTotalCount(result.count);
+
+      // Check if there are more results
+      const totalLoaded = append ? posts.length + result.posts.length : result.posts.length;
+      setHasMore(result.posts.length >= params.limit && totalLoaded < result.count);
     } catch (err) {
       console.error('[StashBrowser] Search error:', err);
       setError(err instanceof Error ? err.message : 'Search failed');
-      setPosts([]);
-      setTotalCount(0);
+      if (!append) {
+        setPosts([]);
+        setTotalCount(0);
+      }
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [settings.safeMode]);
+  }, [settings.safeMode, posts.length]);
 
   const handleSourceChange = useCallback((source: SourceType) => {
     const newParams = { ...searchParams, source, page: 0 };
     setSearchParams(newParams);
   }, [searchParams]);
 
-  const handlePageChange = useCallback((page: number) => {
-    const newParams = { ...searchParams, page };
-    handleSearch(newParams);
-  }, [searchParams, handleSearch]);
+  // Load more for infinite scroll
+  const handleLoadMore = useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMore || !hasSearched) return;
+
+    const nextPage = searchParams.page + 1;
+    const newParams = { ...searchParams, page: nextPage };
+    handleSearch(newParams, true); // true = append mode
+  }, [searchParams, handleSearch, isLoading, isLoadingMore, hasMore, hasSearched]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first?.isIntersecting && hasMore && !isLoading && !isLoadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [handleLoadMore, hasMore, isLoading, isLoadingMore]);
 
   const handleSelectPost = useCallback((postId: number) => {
     setSelectedIds(prev => {
@@ -126,22 +185,50 @@ export const BrowserMain: React.FC = () => {
   const handleAddToQueue = useCallback((post: IBooruPost) => {
     // Get the source page URL for this post
     const sourceUrl = getPostUrl(post);
+    const contentType = post.fileType === 'video' ? 'Video' : 'Image';
 
-    // Dispatch event for Stash Downloader to pick up
-    // Uses same event format as browser extension for compatibility
-    const event = new CustomEvent(DOWNLOADER_EVENTS.ADD_TO_QUEUE, {
-      detail: {
+    // Use localStorage to communicate with Stash Downloader (works cross-page)
+    // This is the same mechanism the browser extension uses
+    const EXTERNAL_QUEUE_KEY = 'stash-downloader-external-queue';
+
+    try {
+      // Get existing queue or create new one
+      const existingQueue = localStorage.getItem(EXTERNAL_QUEUE_KEY);
+      const queue = existingQueue ? JSON.parse(existingQueue) : [];
+
+      // Add new item
+      queue.push({
         url: post.fileUrl,
-        contentType: post.fileType === 'video' ? 'Video' : 'Image',
+        contentType,
         options: {
           title: `${post.source}_${post.id}`,
           tags: post.tags,
           source: sourceUrl,
         },
-      },
-    });
-    window.dispatchEvent(event);
-    console.log('[StashBrowser] Added to queue:', post.id, post.fileUrl);
+        timestamp: Date.now(),
+      });
+
+      // Save back to localStorage
+      localStorage.setItem(EXTERNAL_QUEUE_KEY, JSON.stringify(queue));
+
+      // Also dispatch CustomEvent for same-page updates (if Downloader tab is open)
+      const event = new CustomEvent(DOWNLOADER_EVENTS.ADD_TO_QUEUE, {
+        detail: {
+          url: post.fileUrl,
+          contentType,
+          options: {
+            title: `${post.source}_${post.id}`,
+            tags: post.tags,
+            source: sourceUrl,
+          },
+        },
+      });
+      window.dispatchEvent(event);
+
+      console.log('[StashBrowser] Added to queue via localStorage:', post.id, post.fileUrl);
+    } catch (e) {
+      console.error('[StashBrowser] Failed to add to queue:', e);
+    }
   }, []);
 
   const handleViewDetail = useCallback((post: IBooruPost) => {
@@ -161,8 +248,6 @@ export const BrowserMain: React.FC = () => {
     setSettings(newSettings);
     saveSettings(newSettings);
   }, [settings]);
-
-  const totalPages = Math.ceil(totalCount / searchParams.limit);
 
   return (
     <div className="stash-browser container-fluid px-3 py-3">
@@ -293,7 +378,7 @@ export const BrowserMain: React.FC = () => {
             <>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <small className="text-muted">
-                  Found {totalCount > 0 ? `${totalCount}+` : posts.length} posts
+                  Showing {posts.length} of {totalCount > 0 ? `${totalCount}+` : posts.length} posts
                 </small>
               </div>
 
@@ -306,13 +391,29 @@ export const BrowserMain: React.FC = () => {
                 showThumbnails={settings.showThumbnails}
               />
 
-              {totalPages > 1 && (
-                <Pagination
-                  currentPage={searchParams.page}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              )}
+              {/* Infinite scroll trigger and loading indicator */}
+              <div ref={loadMoreRef} className="py-4">
+                {isLoadingMore ? (
+                  <div className="text-center">
+                    <div className="d-flex align-items-center justify-content-center gap-3 mb-3">
+                      <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                      <span className="text-muted" style={{ fontSize: '0.85rem' }}>Loading more...</span>
+                      <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                    </div>
+                    <SkeletonGrid count={Math.min(6, settings.resultsPerPage)} />
+                  </div>
+                ) : hasMore ? (
+                  <div className="text-center text-muted" style={{ fontSize: '0.85rem' }}>
+                    <span>Scroll for more</span>
+                  </div>
+                ) : (
+                  <div className="d-flex align-items-center justify-content-center gap-3">
+                    <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                    <span className="text-muted" style={{ fontSize: '0.85rem' }}>End of results</span>
+                    <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                  </div>
+                )}
+              </div>
             </>
           ) : hasSearched ? (
             <div className="text-center py-5">

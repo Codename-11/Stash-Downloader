@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#30404d"/>
+      <stop offset="1" stop-color="#24323c"/>
+    </linearGradient>
+
+    <linearGradient id="tealGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d6efd"/>
+      <stop offset="1" stop-color="#22c1c3"/>
+    </linearGradient>
+
+    <radialGradient id="lensGrad" cx="35%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#3a5566"/>
+      <stop offset="1" stop-color="#1e2a33"/>
+    </radialGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="8"/>
+      <feColorMatrix type="matrix"
+        values="0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 .35 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="iconClip">
+      <rect x="64" y="64" width="896" height="896" rx="180"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#iconClip)">
+    <!-- Background -->
+    <rect x="64" y="64" width="896" height="896" rx="180" fill="url(#bgGrad)"/>
+
+    <!-- Gallery grid -->
+    <g opacity="0.85">
+      <rect x="180" y="220" width="500" height="500" rx="44" fill="#263741"/>
+      <g>
+        <rect x="220" y="260" width="110" height="110" rx="20" fill="#2a3c47"/>
+        <rect x="350" y="260" width="110" height="110" rx="20" fill="#2e4450"/>
+        <rect x="480" y="260" width="110" height="110" rx="20" fill="#2a3c47"/>
+
+        <rect x="220" y="390" width="110" height="110" rx="20" fill="#2e4450"/>
+        <rect x="350" y="390" width="110" height="110" rx="20" fill="#2a3c47"/>
+        <rect x="480" y="390" width="110" height="110" rx="20" fill="#2e4450"/>
+
+        <rect x="220" y="520" width="110" height="110" rx="20" fill="#2a3c47"/>
+        <rect x="350" y="520" width="110" height="110" rx="20" fill="#2e4450"/>
+        <rect x="480" y="520" width="110" height="110" rx="20" fill="#2a3c47"/>
+      </g>
+    </g>
+
+    <!-- Magnifying glass -->
+    <g filter="url(#softShadow)">
+      <!-- Lens -->
+      <circle cx="600" cy="560" r="200" fill="#1c2730"/>
+      <circle cx="600" cy="560" r="184" fill="url(#tealGrad)" opacity="0.85"/>
+      <circle cx="600" cy="560" r="165" fill="url(#lensGrad)"/>
+
+      <!-- Lens highlight -->
+      <path d="M520 470
+               C560 440 650 440 690 480
+               C640 450 560 455 535 505
+               Z"
+            fill="#ffffff" opacity="0.12"/>
+
+      <!-- FIXED HANDLE -->
+      <g>
+        <!-- handle body -->
+        <rect x="720" y="710"
+              width="210" height="56"
+              rx="28"
+              transform="rotate(45 720 710)"
+              fill="#22313a"/>
+
+        <!-- handle glass highlight -->
+        <rect x="726" y="716"
+              width="198" height="18"
+              rx="9"
+              transform="rotate(45 726 716)"
+              fill="url(#tealGrad)"
+              opacity="0.35"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Outer stroke -->
+  <rect x="64" y="64" width="896" height="896" rx="180"
+        fill="none" stroke="#182129" stroke-width="14"/>
+</svg>
