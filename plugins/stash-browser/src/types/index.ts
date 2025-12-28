@@ -5,6 +5,57 @@
 import type { SourceType } from '@/constants';
 
 /**
+ * Raw booru post from API (before normalization)
+ * Different APIs have different field names - this covers common fields
+ */
+export interface BooruPost {
+  id: number;
+  source?: SourceType;
+
+  // File URLs (different APIs use different names)
+  file_url?: string;
+  sample_url?: string;
+  preview_url?: string;
+  large_file_url?: string;      // Danbooru
+  preview_file_url?: string;    // Danbooru
+
+  // Dimensions
+  width?: number;
+  height?: number;
+  image_width?: number;         // Danbooru
+  image_height?: number;        // Danbooru
+
+  // Tags (string or array depending on API)
+  tags?: string | string[];
+  tag_string?: string;          // Danbooru
+
+  // Rating
+  rating?: string;
+
+  // Stats
+  score?: number;
+
+  // Raw data preserved
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _raw?: any;
+
+  // Allow additional properties from API
+  [key: string]: unknown;
+}
+
+/**
+ * Search result from API
+ */
+export interface SearchResult {
+  source: string;
+  tags: string;
+  page: number;
+  limit: number;
+  count: number;
+  posts: BooruPost[];
+}
+
+/**
  * Booru post interface (normalized across sources)
  */
 export interface IBooruPost {

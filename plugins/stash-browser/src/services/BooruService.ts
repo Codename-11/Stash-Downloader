@@ -1,0 +1,281 @@
+/**
+ * Booru Service
+ * Handles communication with the Python CORS proxy backend via Stash's plugin system.
+ */
+
+import { PLUGIN_ID, SOURCES, type SourceType } from '@/constants';
+import type { IBooruPost, ISearchResult } from '@/types';
+
+// GraphQL response types
+interface GqlResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string }>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RawPost = Record<string, any>;
+
+interface PluginOperationResult {
+  error?: string;
+  source?: string;
+  tags?: string;
+  page?: number;
+  limit?: number;
+  count?: number;
+  posts?: RawPost[];
+  post?: RawPost;
+}
+
+/**
+ * Make a GraphQL request to Stash
+ */
+async function gqlRequest<T>(
+  query: string,
+  variables?: Record<string, unknown>
+): Promise<GqlResponse<T>> {
+  // Get API key from localStorage if available
+  const apiKey = localStorage.getItem('apiKey');
+
+  const response = await fetch('/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Run a plugin operation (calls Python backend)
+ */
+async function runPluginOperation(
+  args: Record<string, unknown>
+): Promise<PluginOperationResult | null> {
+  const mutation = `
+    mutation RunPluginOperation($plugin_id: ID!, $args: Map) {
+      runPluginOperation(plugin_id: $plugin_id, args: $args)
+    }
+  `;
+
+  try {
+    const result = await gqlRequest<{ runPluginOperation: PluginOperationResult }>(mutation, {
+      plugin_id: PLUGIN_ID,
+      args,
+    });
+
+    if (result.errors && result.errors.length > 0) {
+      console.error('[BooruService] GraphQL errors:', result.errors);
+      const firstError = result.errors[0];
+      throw new Error(firstError?.message || 'Unknown GraphQL error');
+    }
+
+    return result.data?.runPluginOperation || null;
+  } catch (error) {
+    console.error('[BooruService] runPluginOperation failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search for posts on a booru source
+ */
+export async function searchPosts(
+  source: SourceType,
+  tags: string,
+  page: number = 0,
+  limit: number = 40
+): Promise<ISearchResult> {
+  console.log(`[BooruService] Searching ${source} for "${tags}" (page ${page})`);
+
+  const result = await runPluginOperation({
+    mode: 'search',
+    source,
+    tags,
+    page,
+    limit,
+  });
+
+  if (!result) {
+    throw new Error('No response from plugin');
+  }
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
+
+  const posts = normalizePostsForSource(result.posts || [], source);
+
+  return {
+    source,
+    tags: result.tags || tags,
+    page: result.page ?? page,
+    limit: result.limit ?? limit,
+    count: result.count ?? 0,
+    posts,
+    hasMore: posts.length === limit,
+  };
+}
+
+/**
+ * Get a single post by ID
+ */
+export async function getPost(source: SourceType, postId: number): Promise<IBooruPost> {
+  console.log(`[BooruService] Getting post ${postId} from ${source}`);
+
+  const result = await runPluginOperation({
+    mode: 'post',
+    source,
+    id: postId,
+  });
+
+  if (!result) {
+    throw new Error('No response from plugin');
+  }
+
+  if (result.error) {
+    throw new Error(result.error);
+  }
+
+  if (!result.post) {
+    throw new Error(`Post ${postId} not found`);
+  }
+
+  const normalizedPosts = normalizePostsForSource([result.post], source);
+  const normalized = normalizedPosts[0];
+  if (!normalized) {
+    throw new Error(`Failed to normalize post ${postId}`);
+  }
+  return normalized;
+}
+
+/**
+ * Normalize posts from different booru APIs to a common format
+ */
+function normalizePostsForSource(posts: RawPost[], source: SourceType): IBooruPost[] {
+  return posts.map((post) => normalizePost(post, source));
+}
+
+/**
+ * Normalize a single post to common format
+ */
+function normalizePost(post: RawPost, source: SourceType): IBooruPost {
+  // Different boorus have different field names
+  // Rule34/Gelbooru: file_url, sample_url, preview_url, tags (space-separated string)
+  // Danbooru: file_url, large_file_url, preview_file_url, tag_string
+
+  const fileUrl = post.file_url || post.large_file_url || '';
+  const fileType = getFileType(fileUrl);
+
+  const normalized: IBooruPost = {
+    id: post.id,
+    source,
+    // URLs - use IBooruPost field names (camelCase)
+    fileUrl,
+    sampleUrl: post.sample_url || post.large_file_url || fileUrl,
+    previewUrl: post.preview_url || post.preview_file_url || post.sample_url || '',
+    // Dimensions
+    width: post.width || post.image_width || 0,
+    height: post.height || post.image_height || 0,
+    // Tags - normalize to array
+    tags: normalizeTagArray(post),
+    // File type
+    fileType,
+    // Rating
+    rating: normalizeRating(post.rating),
+    // Score
+    score: post.score ?? 0,
+  };
+
+  return normalized;
+}
+
+/**
+ * Determine file type from URL
+ */
+function getFileType(url: string): 'image' | 'video' | 'gif' {
+  const lower = url.toLowerCase();
+  if (lower.endsWith('.mp4') || lower.endsWith('.webm')) {
+    return 'video';
+  }
+  if (lower.endsWith('.gif')) {
+    return 'gif';
+  }
+  return 'image';
+}
+
+/**
+ * Extract tags as an array
+ */
+function normalizeTagArray(post: RawPost): string[] {
+  // Danbooru uses tag_string (space-separated)
+  if (typeof post.tag_string === 'string') {
+    return post.tag_string.split(' ').filter(Boolean);
+  }
+  // Rule34/Gelbooru use tags (space-separated string)
+  if (typeof post.tags === 'string') {
+    return post.tags.split(' ').filter(Boolean);
+  }
+  // Some APIs return tags as array
+  if (Array.isArray(post.tags)) {
+    return post.tags;
+  }
+  return [];
+}
+
+/**
+ * Normalize rating to consistent format
+ */
+function normalizeRating(rating: string | undefined): 'safe' | 'questionable' | 'explicit' {
+  if (!rating) return 'explicit';
+
+  const r = rating.toLowerCase();
+  if (r === 's' || r === 'safe' || r === 'general' || r === 'g') {
+    return 'safe';
+  }
+  if (r === 'q' || r === 'questionable' || r === 'sensitive') {
+    return 'questionable';
+  }
+  return 'explicit';
+}
+
+/**
+ * Get the display URL for a post (for opening in browser)
+ */
+export function getPostUrl(post: IBooruPost): string {
+  const id = post.id;
+  const source = post.source;
+
+  switch (source) {
+    case SOURCES.RULE34:
+      return `https://rule34.xxx/index.php?page=post&s=view&id=${id}`;
+    case SOURCES.GELBOORU:
+      return `https://gelbooru.com/index.php?page=post&s=view&id=${id}`;
+    case SOURCES.DANBOORU:
+      return `https://danbooru.donmai.us/posts/${id}`;
+    default:
+      return '';
+  }
+}
+
+/**
+ * Check if a post is a video
+ */
+export function isVideoPost(post: IBooruPost): boolean {
+  return post.fileType === 'video';
+}
+
+/**
+ * Get file extension from post
+ */
+export function getFileExtension(post: IBooruPost): string {
+  const url = post.fileUrl || '';
+  const match = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+  return match?.[1]?.toLowerCase() ?? '';
+}

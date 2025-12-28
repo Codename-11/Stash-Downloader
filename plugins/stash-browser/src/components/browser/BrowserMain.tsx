@@ -4,8 +4,9 @@
 
 import { useState, useCallback } from 'react';
 import { stashColors } from '@stash-plugins/shared';
-import { PLUGIN_NAME, APP_VERSION, SOURCES, type SourceType } from '@/constants';
+import { PLUGIN_NAME, APP_VERSION, SOURCES, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
 import type { IBooruPost, ISearchParams } from '@/types';
+import { searchPosts, getPostUrl } from '@/services/BooruService';
 import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
 import { Pagination } from './Pagination';
@@ -24,6 +25,7 @@ export const BrowserMain: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -32,18 +34,26 @@ export const BrowserMain: React.FC = () => {
     setSearchParams(params);
     setIsLoading(true);
     setError(null);
-    setPosts([]);
+    setHasSearched(true);
 
     try {
-      // TODO: Implement actual API call via Python backend
-      // For now, just show placeholder
-      console.log('[StashBrowser] Search:', params);
+      console.log('[StashBrowser] Searching:', params);
 
-      // Placeholder - will be replaced with actual API call
+      const result = await searchPosts(
+        params.source,
+        params.tags,
+        params.page,
+        params.limit
+      );
+
+      console.log('[StashBrowser] Got results:', result.count, 'posts');
+      setPosts(result.posts);
+      setTotalCount(result.count);
+    } catch (err) {
+      console.error('[StashBrowser] Search error:', err);
+      setError(err instanceof Error ? err.message : 'Search failed');
       setPosts([]);
       setTotalCount(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
       setIsLoading(false);
     }
@@ -72,20 +82,23 @@ export const BrowserMain: React.FC = () => {
   }, []);
 
   const handleAddToQueue = useCallback((post: IBooruPost) => {
+    // Get the source page URL for this post
+    const sourceUrl = getPostUrl(post);
+
     // Dispatch event for Stash Downloader to pick up
-    const event = new CustomEvent('stash-downloader:add-to-queue', {
+    const event = new CustomEvent(DOWNLOADER_EVENTS.ADD_TO_QUEUE, {
       detail: {
         url: post.fileUrl,
         contentType: post.fileType === 'video' ? 'Video' : 'Image',
         metadata: {
           title: `${post.source}_${post.id}`,
           tags: post.tags,
-          source: post.sourceUrl,
+          source: sourceUrl,
         },
       },
     });
     window.dispatchEvent(event);
-    console.log('[StashBrowser] Added to queue:', post.id);
+    console.log('[StashBrowser] Added to queue:', post.id, post.fileUrl);
   }, []);
 
   const totalPages = Math.ceil(totalCount / searchParams.limit);
@@ -154,6 +167,12 @@ export const BrowserMain: React.FC = () => {
         </div>
       ) : posts.length > 0 ? (
         <>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <small className="text-muted">
+              Found {totalCount > 0 ? `${totalCount}+` : posts.length} posts
+            </small>
+          </div>
+
           <ResultsGrid
             posts={posts}
             selectedIds={selectedIds}
@@ -169,9 +188,10 @@ export const BrowserMain: React.FC = () => {
             />
           )}
         </>
-      ) : searchParams.tags ? (
+      ) : hasSearched ? (
         <div className="text-center py-5">
           <p className="text-muted">No results found for "{searchParams.tags}"</p>
+          <small className="text-muted">Try different tags or another source</small>
         </div>
       ) : (
         <div className="text-center py-5">
