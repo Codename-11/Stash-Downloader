@@ -13,25 +13,28 @@ import ssl
 import os
 
 # Booru API endpoints
-# Rule34 and Gelbooru use proxy APIs (original APIs now require auth)
+# Rule34 and Gelbooru require API keys (as of 2024)
+# Danbooru works without authentication
 BOORU_APIS = {
     'rule34': {
-        'base_url': 'https://r34-json.herokuapp.com',
-        'search_path': '/posts',
-        'search_params': {},
-        'use_proxy_api': True,
+        'base_url': 'https://api.rule34.xxx',
+        'search_path': '/index.php',
+        'search_params': {'page': 'dapi', 's': 'post', 'q': 'index', 'json': '1'},
+        'requires_auth': True,
+        'auth_params': ['api_key', 'user_id'],
     },
     'gelbooru': {
         'base_url': 'https://gelbooru.com',
         'search_path': '/index.php',
         'search_params': {'page': 'dapi', 's': 'post', 'q': 'index', 'json': '1'},
-        'use_proxy_api': False,
+        'requires_auth': True,
+        'auth_params': ['api_key', 'user_id'],
     },
     'danbooru': {
         'base_url': 'https://danbooru.donmai.us',
         'search_path': '/posts.json',
         'search_params': {},
-        'use_proxy_api': False,
+        'requires_auth': False,
     },
 }
 
@@ -86,7 +89,9 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
         raise Exception(f"JSON decode error: {e}")
 
 
-def search_booru(source: str, tags: str, page: int = 0, limit: int = 40, proxy_url: str | None = None) -> dict:
+def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
+                  proxy_url: str | None = None, api_key: str | None = None,
+                  user_id: str | None = None) -> dict:
     """Search a booru source for posts."""
     if source not in BOORU_APIS:
         raise Exception(f"Unknown source: {source}. Supported: {list(BOORU_APIS.keys())}")
@@ -95,20 +100,25 @@ def search_booru(source: str, tags: str, page: int = 0, limit: int = 40, proxy_u
     base_url = api['base_url']
     path = api['search_path']
     params = dict(api['search_params'])
-    use_proxy_api = api.get('use_proxy_api', False)
+    requires_auth = api.get('requires_auth', False)
+
+    # Check if auth is required but not provided
+    if requires_auth and (not api_key or not user_id):
+        source_name = source.capitalize()
+        raise Exception(f"{source_name} requires API credentials. Go to Stash Settings > Plugins > Stash Browser to configure your {source_name} API key and user ID.")
+
+    # Add auth parameters if required
+    if requires_auth and api_key and user_id:
+        params['api_key'] = api_key
+        params['user_id'] = user_id
 
     # Add search parameters based on API type
     if source == 'danbooru':
         params['tags'] = tags
         params['page'] = page + 1  # Danbooru uses 1-indexed pages
         params['limit'] = limit
-    elif use_proxy_api:
-        # r34-json proxy API format
-        params['tags'] = tags
-        params['pid'] = page
-        params['limit'] = min(limit, 100)  # Proxy API max is 100
     else:
-        # Original Gelbooru API format
+        # Rule34 and Gelbooru use similar API
         params['tags'] = tags
         params['pid'] = page
         params['limit'] = limit
@@ -125,16 +135,8 @@ def search_booru(source: str, tags: str, page: int = 0, limit: int = 40, proxy_u
         # Danbooru returns array directly
         posts = result if isinstance(result, list) else []
         count = len(posts)
-    elif use_proxy_api:
-        # r34-json proxy returns {count: N, posts: [...]}
-        if isinstance(result, dict):
-            posts = result.get('posts', [])
-            count = result.get('count', len(posts))
-        else:
-            posts = []
-            count = 0
     else:
-        # Original Gelbooru format - array or {post: [...]}
+        # Rule34/Gelbooru return array or {post: [...]}
         if isinstance(result, list):
             posts = result
         elif isinstance(result, dict):
@@ -201,12 +203,16 @@ def handle_request(args: dict) -> dict:
     mode = args.get('mode', 'search')
     proxy_url = args.get('proxy')
 
+    # Get API credentials for authenticated sources
+    api_key = args.get('api_key')
+    user_id = args.get('user_id')
+
     if mode == 'search':
         source = args.get('source', 'rule34')
         tags = args.get('tags', '')
         page = int(args.get('page', 0))
         limit = int(args.get('limit', 40))
-        return search_booru(source, tags, page, limit, proxy_url)
+        return search_booru(source, tags, page, limit, proxy_url, api_key, user_id)
 
     elif mode == 'post':
         source = args.get('source', 'rule34')

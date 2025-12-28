@@ -31,6 +31,22 @@ settings:
     displayName: HTTP Proxy
     description: Proxy for API requests (http://, socks5://)
     type: STRING
+  rule34ApiKey:
+    displayName: Rule34 API Key
+    description: API key from rule34.xxx account settings (required for Rule34 searches)
+    type: STRING
+  rule34UserId:
+    displayName: Rule34 User ID
+    description: Your Rule34 user ID (required for Rule34 searches)
+    type: STRING
+  gelbooruApiKey:
+    displayName: Gelbooru API Key
+    description: API key from gelbooru.com account (required for Gelbooru searches)
+    type: STRING
+  gelbooruUserId:
+    displayName: Gelbooru User ID
+    description: Your Gelbooru user ID (required for Gelbooru searches)
+    type: STRING
 
 ui:
   javascript:

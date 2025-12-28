@@ -26,6 +26,69 @@ interface PluginOperationResult {
   post?: RawPost;
 }
 
+// Plugin settings
+interface PluginSettings {
+  rule34ApiKey?: string;
+  rule34UserId?: string;
+  gelbooruApiKey?: string;
+  gelbooruUserId?: string;
+  httpProxy?: string;
+}
+
+// Cached settings
+let cachedSettings: PluginSettings | null = null;
+
+/**
+ * Fetch plugin settings from Stash
+ */
+async function getPluginSettings(): Promise<PluginSettings> {
+  if (cachedSettings) {
+    return cachedSettings;
+  }
+
+  const query = `
+    query GetPluginSettings($include: [ID!]) {
+      configuration {
+        plugins(include: $include)
+      }
+    }
+  `;
+
+  try {
+    const result = await gqlRequest<{ configuration: { plugins: Record<string, PluginSettings> } }>(
+      query,
+      { include: [PLUGIN_ID] }
+    );
+
+    const settings = result.data?.configuration?.plugins?.[PLUGIN_ID] || {};
+    cachedSettings = settings;
+    return settings;
+  } catch (error) {
+    console.warn('[BooruService] Failed to fetch settings:', error);
+    return {};
+  }
+}
+
+/**
+ * Get API credentials for a source
+ */
+function getCredentialsForSource(settings: PluginSettings, source: SourceType): { api_key?: string; user_id?: string } {
+  switch (source) {
+    case SOURCES.RULE34:
+      return {
+        api_key: settings.rule34ApiKey,
+        user_id: settings.rule34UserId,
+      };
+    case SOURCES.GELBOORU:
+      return {
+        api_key: settings.gelbooruApiKey,
+        user_id: settings.gelbooruUserId,
+      };
+    default:
+      return {};
+  }
+}
+
 /**
  * Make a GraphQL request to Stash
  */
@@ -101,12 +164,24 @@ export async function searchPosts(
 ): Promise<ISearchResult> {
   console.log(`[BooruService] Searching ${source} for "${tags}" (page ${page})`);
 
+  // Fetch settings and get credentials for this source
+  const settings = await getPluginSettings();
+  const credentials = getCredentialsForSource(settings, source);
+
+  console.log(`[BooruService] Using credentials for ${source}:`, {
+    hasApiKey: !!credentials.api_key,
+    hasUserId: !!credentials.user_id,
+    hasProxy: !!settings.httpProxy,
+  });
+
   const result = await runPluginOperation({
     mode: 'search',
     source,
     tags,
     page,
     limit,
+    ...credentials, // api_key and user_id (if available)
+    ...(settings.httpProxy ? { proxy: settings.httpProxy } : {}),
   });
 
   if (!result) {
