@@ -5,6 +5,7 @@
 import React, { useState, useCallback, type FormEvent } from 'react';
 import { stashColors } from '@stash-plugins/shared';
 import { SOURCES, type SourceType } from '@/constants';
+import { TagAutocomplete } from './TagAutocomplete';
 
 interface SearchBarProps {
   source: SourceType;
@@ -21,8 +22,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [tags, setTags] = useState('');
 
-  const handleSubmit = useCallback((e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback((e?: FormEvent) => {
+    e?.preventDefault();
     if (tags.trim()) {
       onSearch(tags.trim());
     }
@@ -49,20 +50,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           </select>
         </div>
 
-        {/* Tags Input */}
+        {/* Tags Input with Autocomplete */}
         <div className="col">
           <label className="form-label small text-muted">Tags</label>
-          <input
-            type="text"
-            className="form-control text-light"
-            style={{
-              backgroundColor: stashColors.inputBg,
-              borderColor: stashColors.border,
-            }}
-            placeholder="Enter tags (space separated)"
+          <TagAutocomplete
+            source={source}
             value={tags}
-            onChange={(e) => setTags(e.target.value)}
+            onChange={setTags}
+            onSubmit={handleSubmit}
             disabled={isLoading}
+            placeholder="Enter tags (space separated)"
           />
         </div>
 

@@ -18,12 +18,26 @@ type RawPost = Record<string, any>;
 interface PluginOperationResult {
   error?: string;
   source?: string;
-  tags?: string;
+  tags?: string | TagSuggestion[];  // string for search, TagSuggestion[] for autocomplete
+  query?: string;
   page?: number;
   limit?: number;
   count?: number;
   posts?: RawPost[];
   post?: RawPost;
+}
+
+// Helper to safely get tags as string
+function getTagsAsString(result: PluginOperationResult, fallback: string): string {
+  if (typeof result.tags === 'string') return result.tags;
+  return fallback;
+}
+
+// Tag autocomplete result
+export interface TagSuggestion {
+  name: string;
+  count: number;
+  category: number;
 }
 
 // Plugin settings
@@ -196,7 +210,7 @@ export async function searchPosts(
 
   return {
     source,
-    tags: result.tags || tags,
+    tags: getTagsAsString(result, tags),
     page: result.page ?? page,
     limit: result.limit ?? limit,
     count: result.count ?? 0,
@@ -235,6 +249,42 @@ export async function getPost(source: SourceType, postId: number): Promise<IBoor
     throw new Error(`Failed to normalize post ${postId}`);
   }
   return normalized;
+}
+
+/**
+ * Get tag autocomplete suggestions
+ */
+export async function autocompleteTags(
+  source: SourceType,
+  query: string,
+  limit: number = 10
+): Promise<TagSuggestion[]> {
+  if (!query || query.length < 2) {
+    return [];
+  }
+
+  console.log(`[BooruService] Autocomplete for "${query}" on ${source}`);
+
+  try {
+    const result = await runPluginOperation({
+      mode: 'autocomplete',
+      source,
+      query,
+      limit,
+    });
+
+    if (!result || result.error) {
+      console.warn('[BooruService] Autocomplete error:', result?.error);
+      return [];
+    }
+
+    // Tags come back as array
+    const tags = result.tags as TagSuggestion[] | undefined;
+    return tags || [];
+  } catch (error) {
+    console.warn('[BooruService] Autocomplete failed:', error);
+    return [];
+  }
 }
 
 /**

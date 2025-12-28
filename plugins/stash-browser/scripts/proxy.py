@@ -198,6 +198,67 @@ def get_post(source: str, post_id: int, proxy_url: str | None = None) -> dict:
     }
 
 
+def autocomplete_tags(source: str, query: str, limit: int = 10,
+                       proxy_url: str | None = None) -> dict:
+    """Get tag autocomplete suggestions."""
+    if source not in BOORU_APIS:
+        raise Exception(f"Unknown source: {source}")
+
+    api = BOORU_APIS[source]
+    base_url = api['base_url']
+
+    if source == 'danbooru':
+        # Danbooru tag autocomplete
+        params = {
+            'search[name_matches]': f'*{query}*',
+            'search[order]': 'count',
+            'limit': limit,
+        }
+        url = f"{base_url}/tags.json?{urllib.parse.urlencode(params)}"
+    else:
+        # Rule34/Gelbooru tag autocomplete
+        params = {
+            'page': 'dapi',
+            's': 'tag',
+            'q': 'index',
+            'name_pattern': f'%{query}%',
+            'json': '1',
+            'limit': limit,
+            'orderby': 'count',
+        }
+        url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
+
+    log(f"Tag autocomplete: {url}")
+
+    result = fetch_url(url, proxy_url)
+
+    # Normalize response
+    tags = []
+    if source == 'danbooru':
+        # Danbooru returns [{name, post_count, category}, ...]
+        for tag in (result if isinstance(result, list) else []):
+            tags.append({
+                'name': tag.get('name', ''),
+                'count': tag.get('post_count', 0),
+                'category': tag.get('category', 0),
+            })
+    else:
+        # Rule34/Gelbooru return [{tag, count, type}, ...] or {tag: [...]}
+        tag_list = result if isinstance(result, list) else result.get('tag', [])
+        for tag in tag_list:
+            tags.append({
+                'name': tag.get('name', tag.get('tag', '')),
+                'count': tag.get('count', 0),
+                'category': tag.get('type', 0),
+            })
+
+    return {
+        'source': source,
+        'query': query,
+        'tags': tags,
+    }
+
+
 def handle_request(args: dict) -> dict:
     """Handle incoming request from Stash."""
     mode = args.get('mode', 'search')
@@ -218,6 +279,12 @@ def handle_request(args: dict) -> dict:
         source = args.get('source', 'rule34')
         post_id = int(args.get('id'))
         return get_post(source, post_id, proxy_url)
+
+    elif mode == 'autocomplete':
+        source = args.get('source', 'rule34')
+        query = args.get('query', '')
+        limit = int(args.get('limit', 10))
+        return autocomplete_tags(source, query, limit, proxy_url)
 
     elif mode == 'fetch':
         # Generic URL fetch
