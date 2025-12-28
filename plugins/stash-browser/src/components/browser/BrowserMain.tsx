@@ -144,6 +144,7 @@ export const BrowserMain: React.FC = () => {
   }, []);
 
   const handleViewDetail = useCallback((post: IBooruPost) => {
+    console.log('[StashBrowser] handleViewDetail called with post:', post.id);
     setDetailPost(post);
   }, []);
 

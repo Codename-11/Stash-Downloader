@@ -45,13 +45,15 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
 
   if (!post) return null;
 
+  console.log('[StashBrowser] PostDetailModal rendering for post:', post.id);
+
   const ratingColor = RATING_COLORS[post.rating] || RATING_COLORS.explicit;
   const isVideo = post.fileType === 'video';
 
   return (
     <div
-      className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 1050 }}
+      className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center modal-overlay"
+      style={{ backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 9999 }}
       onClick={onClose}
       onKeyDown={handleKeyDown}
       tabIndex={0}

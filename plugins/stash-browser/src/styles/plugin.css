@@ -586,77 +586,117 @@
   }
 }
 
-/* Rating chips */
-.stash-browser .rating-chips {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.stash-browser .rating-chip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+/* Rating buttons (vertical list style) */
+.stash-browser .rating-btn {
+  justify-content: flex-start;
   border: 1px solid var(--stash-border);
-  border-radius: 1rem;
   background-color: transparent;
-  color: var(--stash-muted);
-  cursor: pointer;
+  color: var(--stash-text);
   transition:
     background-color var(--transition-fast) ease,
-    border-color var(--transition-fast) ease,
-    color var(--transition-fast) ease,
-    transform var(--transition-fast) ease;
+    border-color var(--transition-fast) ease;
 }
 
-.stash-browser .rating-chip:hover {
-  transform: translateY(-1px);
+.stash-browser .rating-btn:hover {
+  background-color: var(--stash-hover-bg);
 }
 
-/* Rating chip colors */
-.stash-browser .rating-chip.rating-all.active {
+.stash-browser .rating-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--stash-border);
+  flex-shrink: 0;
+}
+
+/* Rating button colors */
+.stash-browser .rating-btn-all.active {
   background-color: var(--stash-hover-bg);
   border-color: var(--stash-muted);
+}
+.stash-browser .rating-btn-all.active .rating-indicator {
+  background-color: var(--stash-muted);
+  border-color: var(--stash-muted);
+}
+
+.stash-browser .rating-btn-safe {
+  --rating-safe-bg: #28a745;
+}
+.stash-browser .rating-btn-safe .rating-indicator {
+  border-color: #28a74580;
+}
+.stash-browser .rating-btn-safe:hover {
+  background-color: #28a74520;
+}
+.stash-browser .rating-btn-safe.active {
+  background-color: #28a74530;
+  border-color: #28a745;
+}
+.stash-browser .rating-btn-safe.active .rating-indicator {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.stash-browser .rating-btn-questionable {
+  --rating-questionable-bg: #ffc107;
+}
+.stash-browser .rating-btn-questionable .rating-indicator {
+  border-color: #ffc10780;
+}
+.stash-browser .rating-btn-questionable:hover {
+  background-color: #ffc10720;
+}
+.stash-browser .rating-btn-questionable.active {
+  background-color: #ffc10730;
+  border-color: #ffc107;
+}
+.stash-browser .rating-btn-questionable.active .rating-indicator {
+  background-color: #ffc107;
+  border-color: #ffc107;
+}
+
+.stash-browser .rating-btn-explicit {
+  --rating-explicit-bg: #dc3545;
+}
+.stash-browser .rating-btn-explicit .rating-indicator {
+  border-color: #dc354580;
+}
+.stash-browser .rating-btn-explicit:hover {
+  background-color: #dc354520;
+}
+.stash-browser .rating-btn-explicit.active {
+  background-color: #dc354530;
+  border-color: #dc3545;
+}
+.stash-browser .rating-btn-explicit.active .rating-indicator {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* Source dropdown styling */
+.stash-browser .form-select {
+  background-color: var(--stash-input-bg);
+  border-color: var(--stash-border);
+  color: var(--stash-text);
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%238b9fad' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 16px 12px;
+}
+
+.stash-browser .form-select:focus {
+  background-color: var(--stash-input-bg);
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem var(--stash-focus-ring);
   color: var(--stash-text);
 }
 
-.stash-browser .rating-chip.rating-safe {
-  border-color: #28a74580;
-}
-.stash-browser .rating-chip.rating-safe:hover {
-  background-color: #28a74520;
-}
-.stash-browser .rating-chip.rating-safe.active {
-  background-color: #28a745;
-  border-color: #28a745;
-  color: #fff;
-}
-
-.stash-browser .rating-chip.rating-questionable {
-  border-color: #ffc10780;
-}
-.stash-browser .rating-chip.rating-questionable:hover {
-  background-color: #ffc10720;
-}
-.stash-browser .rating-chip.rating-questionable.active {
-  background-color: #ffc107;
-  border-color: #ffc107;
-  color: #000;
-}
-
-.stash-browser .rating-chip.rating-explicit {
-  border-color: #dc354580;
-}
-.stash-browser .rating-chip.rating-explicit:hover {
-  background-color: #dc354520;
-}
-.stash-browser .rating-chip.rating-explicit.active {
-  background-color: #dc3545;
-  border-color: #dc3545;
-  color: #fff;
+.stash-browser .form-select option {
+  background-color: var(--stash-card-bg);
+  color: var(--stash-text);
+  padding: 0.5rem;
 }
 
 /* ==========================================================================

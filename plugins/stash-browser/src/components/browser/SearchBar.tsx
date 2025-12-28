@@ -100,36 +100,36 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {/* Filter section */}
       <div className="search-filters">
         {/* Sort */}
-        <div className="mb-2">
-          <small className="filter-label d-block mb-1">Sort</small>
-          <div className="btn-group btn-group-sm w-100" role="group">
+        <div className="mb-3">
+          <small className="filter-label d-block mb-1">Sort By</small>
+          <div className="d-flex flex-column gap-1">
             {SORT_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 type="button"
-                className={`btn ${sort === opt.value ? 'btn-primary' : 'btn-outline-secondary'} sort-btn flex-fill`}
+                className={`btn btn-sm d-flex align-items-center gap-2 ${sort === opt.value ? 'btn-primary' : 'btn-outline-secondary'}`}
                 onClick={() => setSort(opt.value)}
-                title={opt.label}
               >
-                <span className="sort-icon">{opt.icon}</span>
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Rating */}
-        <div className="mb-2">
+        <div className="mb-3">
           <small className="filter-label d-block mb-1">Rating</small>
-          <div className="rating-chips d-flex">
+          <div className="d-flex flex-column gap-1">
             {RATING_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 type="button"
-                className={`rating-chip flex-fill ${rating === opt.value ? 'active' : ''} rating-${opt.value}`}
+                className={`btn btn-sm d-flex align-items-center gap-2 rating-btn ${rating === opt.value ? 'active' : ''} rating-btn-${opt.value}`}
                 onClick={() => setRating(opt.value)}
-                title={opt.label}
               >
-                {opt.short}
+                <span className="rating-indicator" style={{ backgroundColor: rating === opt.value ? `var(--rating-${opt.value}-bg)` : 'transparent' }}></span>
+                <span>{opt.label}</span>
               </button>
             ))}
           </div>
@@ -138,9 +138,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         {/* Thumbnails toggle */}
         <button
           type="button"
-          className={`btn btn-sm w-100 ${showThumbnails ? 'btn-outline-secondary' : 'btn-secondary'} d-flex align-items-center justify-content-center gap-1`}
+          className={`btn btn-sm w-100 d-flex align-items-center justify-content-center gap-2 ${showThumbnails ? 'btn-outline-success' : 'btn-outline-secondary'}`}
           onClick={onToggleThumbnails}
-          title={showThumbnails ? 'Hide thumbnails' : 'Show thumbnails'}
         >
           {showThumbnails ? (
             <>
@@ -148,7 +147,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
                 <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
               </svg>
-              <span>Thumbnails On</span>
+              <span>Thumbnails</span>
             </>
           ) : (
             <>
@@ -157,7 +156,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 <path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829l.822.822zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/>
                 <path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/>
               </svg>
-              <span>Thumbnails Off</span>
+              <span>Hidden</span>
             </>
           )}
         </button>
