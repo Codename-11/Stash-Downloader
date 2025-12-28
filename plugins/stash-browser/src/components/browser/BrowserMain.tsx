@@ -59,8 +59,8 @@ export const BrowserMain: React.FC = () => {
 
     // Apply sort filter
     // Rule34/Gelbooru use sort:field format, Danbooru uses order:field
-    if (params.sort && params.sort !== 'score') {
-      // Default is by score, only add sort for other options
+    // Always add sort parameter - default is NOT by score for most boorus
+    if (params.sort) {
       if (params.source === 'danbooru') {
         // Danbooru uses order: prefix
         searchTags = `${searchTags} order:${params.sort}`.trim();
