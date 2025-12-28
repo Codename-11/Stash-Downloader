@@ -15,19 +15,19 @@ tasks:
       mode: fetch
 
 settings:
-  - name: defaultSource
+  defaultSource:
     displayName: Default Source
     description: Default booru source to browse (rule34, gelbooru, danbooru)
     type: STRING
-  - name: resultsPerPage
+  resultsPerPage:
     displayName: Results Per Page
     description: Number of results to show per page (default 40)
     type: NUMBER
-  - name: safeMode
+  safeMode:
     displayName: Safe Mode
     description: Filter explicit content (where supported)
     type: BOOLEAN
-  - name: httpProxy
+  httpProxy:
     displayName: HTTP Proxy
     description: Proxy for API requests (http://, socks5://)
     type: STRING
