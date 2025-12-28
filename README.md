@@ -100,6 +100,8 @@ Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
 - **Post Details** - View full images/videos, tags, and metadata
 - **Safe Mode** - Optional safe-only content filtering
 
+![Stash Browser Main Interface](screenshots/stash_browser_main_layout.png)
+
 ### Requirements
 
 - Stash v0.20+
