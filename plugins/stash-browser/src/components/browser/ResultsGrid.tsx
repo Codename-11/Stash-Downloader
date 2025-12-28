@@ -2,6 +2,7 @@
  * Results Grid Component
  */
 
+import React from 'react';
 import { stashColors } from '@stash-plugins/shared';
 import { RATING_COLORS } from '@/constants';
 import type { IBooruPost } from '@/types';

@@ -2,7 +2,7 @@
  * Stash Browser - Main Component
  */
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { stashColors } from '@stash-plugins/shared';
 import { PLUGIN_NAME, APP_VERSION, SOURCES, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
 import type { IBooruPost, ISearchParams } from '@/types';

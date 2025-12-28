@@ -2,7 +2,7 @@
  * Search Bar Component
  */
 
-import { useState, useCallback, type FormEvent } from 'react';
+import React, { useState, useCallback, type FormEvent } from 'react';
 import { stashColors } from '@stash-plugins/shared';
 import { SOURCES, type SourceType } from '@/constants';
 
