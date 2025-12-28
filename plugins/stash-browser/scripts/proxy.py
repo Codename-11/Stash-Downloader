@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.error
 import ssl
 import os
+import xml.etree.ElementTree as ET
 
 # Booru API endpoints
 # Rule34 and Gelbooru require API keys (as of 2024)
@@ -87,6 +88,30 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
         raise Exception(f"URL Error: {e.reason}")
     except json.JSONDecodeError as e:
         raise Exception(f"JSON decode error: {e}")
+
+
+def fetch_xml(url: str, proxy_url: str | None = None) -> ET.Element:
+    """Fetch URL and return parsed XML."""
+    opener = create_opener(proxy_url)
+
+    request = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'StashBrowser/1.0 (Stash Plugin)',
+            'Accept': 'application/xml',
+        }
+    )
+
+    try:
+        with opener.open(request, timeout=30) as response:
+            data = response.read().decode('utf-8')
+            return ET.fromstring(data)
+    except urllib.error.HTTPError as e:
+        raise Exception(f"HTTP {e.code}: {e.reason}")
+    except urllib.error.URLError as e:
+        raise Exception(f"URL Error: {e.reason}")
+    except ET.ParseError as e:
+        raise Exception(f"XML parse error: {e}")
 
 
 def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
@@ -220,22 +245,37 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
             'tags': [],
         }
 
+    tags = []
+
     if source == 'danbooru':
-        # Danbooru tag autocomplete API (no auth required)
+        # Danbooru tag autocomplete API (JSON, no auth required)
         params = {
             'search[name_matches]': f'*{query}*',
             'search[order]': 'count',
             'limit': limit,
         }
         url = f"{base_url}/tags.json?{urllib.parse.urlencode(params)}"
+        log(f"Tag autocomplete: {url}")
+
+        try:
+            result = fetch_url(url, proxy_url)
+            # Danbooru returns [{name, post_count, category}, ...]
+            for tag in (result if isinstance(result, list) else []):
+                if isinstance(tag, dict):
+                    tags.append({
+                        'name': tag.get('name', ''),
+                        'count': tag.get('post_count', 0),
+                        'category': tag.get('category', 0),
+                    })
+        except Exception as e:
+            log(f"Autocomplete fetch failed: {e}")
     else:
-        # Rule34/Gelbooru tag API with authentication
+        # Rule34/Gelbooru tag API returns XML (json=1 doesn't work for tags)
         params = {
             'page': 'dapi',
             's': 'tag',
             'q': 'index',
-            'name_pattern': f'%{query}%',
-            'json': '1',
+            'name_pattern': f'{query}%',  # Wildcard at end only for prefix match
             'limit': limit,
             'orderby': 'count',
         }
@@ -244,50 +284,23 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
             params['api_key'] = api_key
             params['user_id'] = user_id
         url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
+        log(f"Tag autocomplete (XML): {url}")
 
-    log(f"Tag autocomplete: {url}")
-
-    try:
-        result = fetch_url(url, proxy_url)
-    except Exception as e:
-        log(f"Autocomplete fetch failed: {e}")
-        return {
-            'source': source,
-            'query': query,
-            'tags': [],
-        }
-
-    # Normalize response based on source
-    tags = []
-    if source == 'danbooru':
-        # Danbooru returns [{name, post_count, category}, ...]
-        for tag in (result if isinstance(result, list) else []):
-            if isinstance(tag, dict):
-                tags.append({
-                    'name': tag.get('name', ''),
-                    'count': tag.get('post_count', 0),
-                    'category': tag.get('category', 0),
-                })
-    else:
-        # Rule34/Gelbooru tag API returns [{name, count, type}, ...] or {tag: [...]}
-        tag_list = result if isinstance(result, list) else result.get('tag', []) if isinstance(result, dict) else []
-        for tag in tag_list:
-            if isinstance(tag, dict):
-                name = tag.get('name', tag.get('tag', ''))
-                count = tag.get('count', tag.get('post_count', 0))
-                category = tag.get('type', tag.get('category', 0))
+        try:
+            root = fetch_xml(url, proxy_url)
+            # Parse XML: <tags><tag type="0" count="123" name="tagname" .../></tags>
+            for tag_elem in root.findall('tag'):
+                name = tag_elem.get('name', '')
+                count_str = tag_elem.get('count', '0')
+                type_str = tag_elem.get('type', '0')
                 if name:
                     tags.append({
                         'name': name,
-                        'count': int(count) if count else 0,
-                        'category': int(category) if category else 0,
+                        'count': int(count_str) if count_str.isdigit() else 0,
+                        'category': int(type_str) if type_str.isdigit() else 0,
                     })
-            elif isinstance(tag, str):
-                tags.append({
-                    'name': tag,
-                    'count': 0,
-                    'category': 0,
-                })
+        except Exception as e:
+            log(f"Autocomplete fetch failed: {e}")
 
     return {
         'source': source,

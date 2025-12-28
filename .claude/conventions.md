@@ -339,26 +339,29 @@ chore: refactor related to #45
 
 ### Releasing (Tag-Based)
 
-This project uses **tag-based releases**:
+This project uses **prefixed tag-based releases** for each plugin:
+
+| Plugin | Tag Format | Example |
+|--------|-----------|---------|
+| Stash Downloader | `downloader-vX.Y.Z` | `downloader-v0.5.2` |
+| Stash Browser | `browser-vX.Y.Z` | `browser-v0.1.0` |
 
 ```bash
-# On dev branch, ready to release:
-git checkout main
-git merge dev
+# Release Stash Downloader:
+git checkout main && git merge dev
+cd plugins/stash-downloader && npm version patch  # or minor/major
+git add . && git commit -m "🔖 chore: release downloader-vX.Y.Z"
+git tag downloader-vX.Y.Z && git push origin main --tags
 
-# Bump version in plugins/stash-downloader/package.json
-git add plugins/stash-downloader/package.json
-git commit -m "🔖 chore: release vX.Y.Z"
+# Release Stash Browser:
+git checkout main && git merge dev
+cd plugins/stash-browser && npm version patch
+git add . && git commit -m "🔖 chore: release browser-vX.Y.Z"
+git tag browser-vX.Y.Z && git push origin main --tags
 
-# Create and push tag
-git tag vX.Y.Z
-git push origin main --tags
-
-# Sync version back to dev (WAIT for main workflow to complete first!)
+# Sync version back to dev (WAIT for workflow to complete first!)
 # Check: https://github.com/Codename-11/Stash-Downloader/actions
-git checkout dev
-git merge main
-git push origin dev
+git checkout dev && git merge main && git push origin dev
 ```
 
 Or use `/release` skill for guided release.
@@ -387,8 +390,8 @@ concurrency:
 
 **If release was cancelled:** Re-push the tag to trigger the workflow again:
 ```bash
-git push origin --delete vX.Y.Z
-git push origin vX.Y.Z
+git push origin --delete downloader-vX.Y.Z  # or browser-vX.Y.Z
+git push origin downloader-vX.Y.Z
 ```
 
 **Version Bump Rules:**
@@ -415,49 +418,54 @@ To enable:
 Without the key, releases still work but skip the "What's New" AI summary.
 
 **Note:** Push to `main` without a tag triggers NOTHING (no test, no deploy). The workflow only triggers on:
-- Push to `dev` branch → deploys dev build
-- Tag push (`v*`) → deploys stable build + creates release
+- Push to `dev` branch → deploys dev builds for ALL plugins
+- Tag push (`downloader-v*`) → deploys Stash Downloader stable + creates release
+- Tag push (`browser-v*`) → deploys Stash Browser stable + creates release
 - Pull requests → test only
 
 **Important:**
-- Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
-- Version in `plugins/stash-downloader/package.json` should match tag (without `v` prefix)
+- Tag format MUST include plugin prefix: `downloader-vX.Y.Z` or `browser-vX.Y.Z`
+- Version in respective `package.json` should match tag version (without prefix)
 
 ### Dev Builds (Automatic)
 
-Every push to `dev` branch auto-deploys a dev build:
-- Plugin ID: `stash-downloader-dev`
-- Version format: `X.Y.Z-dev.{7-char-sha}` (e.g., `0.4.2-dev.2e8a74e`)
-- Navbar: "Downloader-Dev"
-- Can run alongside stable version (different plugin ID via renamed YAML)
+Every push to `dev` branch auto-deploys dev builds for ALL plugins:
 
-**In Stash**, both stable and dev appear in the same source:
+| Plugin | Dev ID | Version Format | Navbar |
+|--------|--------|----------------|--------|
+| Downloader | `stash-downloader-dev` | `X.Y.Z-dev.{sha}` | "Downloader-Dev" |
+| Browser | `stash-browser-dev` | `X.Y.Z-dev.{sha}` | "Browser-Dev" |
+
+Dev builds can run alongside stable versions (different plugin IDs via renamed YAML).
+
+**In Stash**, all plugins (stable + dev) appear in the same source:
 ```
 https://codename-11.github.io/Stash-Downloader/index.yml
 ```
 
-The index.yml contains BOTH plugin entries - each deploy preserves the other's entry.
+The index.yml contains ALL plugin entries - each deploy preserves other plugins' entries.
 
-### Extension vs Plugin Versioning
+### Monorepo Versioning
 
 **Independent Versioning Strategy:**
-- `plugins/stash-downloader/package.json` version = Plugin version (Stash plugin releases)
-- `browser-extension/manifest.json` version = Extension version (Firefox/Chrome store)
-- Versions are **independent** - they don't need to match
+Each component has its own version - they don't need to match:
+
+| Component | Version File | Release Method |
+|-----------|--------------|----------------|
+| Stash Downloader | `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag |
+| Stash Browser | `plugins/stash-browser/package.json` | `browser-vX.Y.Z` tag |
+| Firefox Extension | `browser-extension/manifest.json` | Manual AMO upload |
 
 **Version Bump Rules:**
-- Plugin changes only → Bump `plugins/stash-downloader/package.json` only
-- Extension changes only → Bump `browser-extension/manifest.json` only
-- Both changed → Bump both versions
+- Downloader changes only → Bump Downloader `package.json`, tag with `downloader-v*`
+- Browser changes only → Bump Browser `package.json`, tag with `browser-v*`
+- Extension changes only → Bump `manifest.json`, upload to AMO manually
+- Multiple plugins changed → Release each separately with its own tag
 
-**Release Tags:**
-- Git tags (`vX.Y.Z`) follow the **plugin version** in `plugins/stash-downloader/package.json`
-- GitHub Actions packages both plugin and extension on every release
-
-**Browser Store Uploads:**
-- **Manual uploads only** - Upload to Firefox Add-ons / Chrome Web Store when `browser-extension/manifest.json` version changes
+**Browser Extension Uploads:**
+- **Manual uploads only** - Upload to [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 - Do NOT upload on every plugin release if extension hasn't changed
-- Future TODO: Automate with CI change detection (web-ext sign with AMO API keys)
+- Future TODO: Automate with CI change detection (web-ext sign)
 
 ## Documentation
 - **Code Comments**: Explain "why", not "what"
