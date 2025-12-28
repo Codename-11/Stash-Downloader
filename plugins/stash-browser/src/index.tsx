@@ -19,8 +19,9 @@ const { React } = window.PluginApi;
 // Route Registration
 // =============================================================================
 
-window.PluginApi.register.route(ROUTES.MAIN.replace('/plugin/', ''), () => {
-  return React.createElement(BrowserMain);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- PluginApi route callback receives unknown props
+window.PluginApi.register.route(ROUTES.MAIN, (props?: any) => {
+  return React.createElement(BrowserMain, props);
 });
 
 console.log(`[${PLUGIN_ID}] Route registered: ${ROUTES.MAIN}`);
