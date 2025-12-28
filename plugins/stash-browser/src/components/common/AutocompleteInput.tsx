@@ -19,15 +19,17 @@ interface AutocompleteInputProps {
 }
 
 // Tag category colors and labels (booru convention)
+// Category 0 (General) is excluded - only show badge for specific categories
+// This is because Rule34's autocomplete doesn't return real category info
 const CATEGORY_INFO: Record<number, { color: string; label: string; short: string }> = {
-  0: { color: '#6ea8fe', label: 'General', short: 'Gen' },
   1: { color: '#ea868f', label: 'Artist', short: 'Art' },
   3: { color: '#c39bd3', label: 'Copyright', short: 'Cpy' },
   4: { color: '#7dcea0', label: 'Character', short: 'Char' },
   5: { color: '#f8c471', label: 'Meta', short: 'Meta' },
 };
 
-const DEFAULT_CATEGORY = { color: '#fff', label: '', short: '' };
+// Default styling for General/unknown tags (no badge shown)
+const DEFAULT_CATEGORY = { color: '#6ea8fe', label: '', short: '' };
 
 // Debounce delay in ms - longer to reduce API calls
 const DEBOUNCE_DELAY = 350;

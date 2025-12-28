@@ -949,6 +949,18 @@
   flex-shrink: 0;
 }
 
+.stash-browser .legend-badge {
+  display: inline-block;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 0.2rem;
+  color: #000;
+  min-width: 28px;
+  text-align: center;
+}
+
 /* ==========================================================================
    Selection Actions
    ========================================================================== */

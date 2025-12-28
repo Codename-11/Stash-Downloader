@@ -214,26 +214,25 @@ export const BrowserMain: React.FC = () => {
               <small className="text-muted d-block mb-2">Tag Categories</small>
               <div className="d-flex flex-column gap-1">
                 <div className="d-flex align-items-center gap-2">
-                  <span className="legend-dot" style={{ backgroundColor: '#6ea8fe' }}></span>
-                  <small className="text-light">General</small>
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                  <span className="legend-dot" style={{ backgroundColor: '#ea868f' }}></span>
+                  <span className="legend-badge" style={{ backgroundColor: '#ea868f' }}>Art</span>
                   <small className="text-light">Artist</small>
                 </div>
                 <div className="d-flex align-items-center gap-2">
-                  <span className="legend-dot" style={{ backgroundColor: '#7dcea0' }}></span>
+                  <span className="legend-badge" style={{ backgroundColor: '#7dcea0' }}>Char</span>
                   <small className="text-light">Character</small>
                 </div>
                 <div className="d-flex align-items-center gap-2">
-                  <span className="legend-dot" style={{ backgroundColor: '#c39bd3' }}></span>
+                  <span className="legend-badge" style={{ backgroundColor: '#c39bd3' }}>Cpy</span>
                   <small className="text-light">Copyright</small>
                 </div>
                 <div className="d-flex align-items-center gap-2">
-                  <span className="legend-dot" style={{ backgroundColor: '#f8c471' }}></span>
+                  <span className="legend-badge" style={{ backgroundColor: '#f8c471' }}>Meta</span>
                   <small className="text-light">Meta</small>
                 </div>
               </div>
+              <small className="text-muted d-block mt-2" style={{ fontSize: '0.65rem' }}>
+                Note: Rule34 doesn't provide category info. Try Gelbooru or Danbooru for categories.
+              </small>
             </div>
 
             {/* Selection Actions */}
