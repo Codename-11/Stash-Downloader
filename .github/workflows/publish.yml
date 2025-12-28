@@ -251,11 +251,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Get version
+      - name: Get versions
         id: version
         run: |
           VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
+          BROWSER_VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "browser_version=${BROWSER_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create package
         run: |
@@ -299,6 +301,10 @@ jobs:
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
 
+          # Version fallbacks from current package.json (not 0.0.0)
+          BROWSER_FALLBACK="${{ steps.version.outputs.browser_version }}"
+          DOWNLOADER_FALLBACK="${{ steps.version.outputs.version }}"
+
           # Preserve other entries with proper fallbacks
           for entry in "stash-downloader-dev" "stash-browser" "stash-browser-dev"; do
             ZIP="_site/${entry}.zip"
@@ -311,8 +317,14 @@ jobs:
               NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
               DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
 
-              # Apply fallbacks for empty values
-              [[ -z "$VERSION_ENTRY" ]] && VERSION_ENTRY="0.0.0"
+              # Apply fallbacks - use package.json versions instead of 0.0.0
+              if [[ -z "$VERSION_ENTRY" ]]; then
+                if [[ "$entry" == *"browser"* ]]; then
+                  VERSION_ENTRY="${BROWSER_FALLBACK}"
+                else
+                  VERSION_ENTRY="${DOWNLOADER_FALLBACK}"
+                fi
+              fi
               [[ -z "$DATE_ENTRY" ]] && DATE_ENTRY="${CURRENT_DATETIME}"
               [[ -z "$NAME" ]] && NAME="${entry}"
               [[ -z "$DESC" ]] && DESC="Stash plugin"
@@ -370,11 +382,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Get version
+      - name: Get versions
         id: version
         run: |
           VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
+          DOWNLOADER_VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "downloader_version=${DOWNLOADER_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create package
         run: |
@@ -418,6 +432,10 @@ jobs:
             url: ${{ github.server_url }}/${{ github.repository }}
           EOF
 
+          # Version fallbacks from current package.json (not 0.0.0)
+          BROWSER_FALLBACK="${{ steps.version.outputs.version }}"
+          DOWNLOADER_FALLBACK="${{ steps.version.outputs.downloader_version }}"
+
           # Preserve other entries with proper fallbacks
           for entry in "stash-downloader" "stash-downloader-dev" "stash-browser-dev"; do
             ZIP="_site/${entry}.zip"
@@ -430,8 +448,14 @@ jobs:
               NAME=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
               DESC=$(grep -A5 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
 
-              # Apply fallbacks for empty values
-              [[ -z "$VERSION_ENTRY" ]] && VERSION_ENTRY="0.0.0"
+              # Apply fallbacks - use package.json versions instead of 0.0.0
+              if [[ -z "$VERSION_ENTRY" ]]; then
+                if [[ "$entry" == *"browser"* ]]; then
+                  VERSION_ENTRY="${BROWSER_FALLBACK}"
+                else
+                  VERSION_ENTRY="${DOWNLOADER_FALLBACK}"
+                fi
+              fi
               [[ -z "$DATE_ENTRY" ]] && DATE_ENTRY="${CURRENT_DATETIME}"
               [[ -z "$NAME" ]] && NAME="${entry}"
               [[ -z "$DESC" ]] && DESC="Stash plugin"
@@ -566,13 +590,23 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
+          # Check for API errors
+          ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "::warning::Gemini API error: $ERROR"
+            exit 0
+          fi
+
           NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
 
-          if [ -n "$NOTES" ]; then
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "$NOTES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+          if [ -z "$NOTES" ]; then
+            echo "::warning::Gemini returned empty notes. Response: $(echo "$RESPONSE" | jq -c '.')"
+            exit 0
           fi
+
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -685,13 +719,23 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
+          # Check for API errors
+          ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "::warning::Gemini API error: $ERROR"
+            exit 0
+          fi
+
           NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
 
-          if [ -n "$NOTES" ]; then
-            echo "notes<<EOF" >> $GITHUB_OUTPUT
-            echo "$NOTES" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+          if [ -z "$NOTES" ]; then
+            echo "::warning::Gemini returned empty notes. Response: $(echo "$RESPONSE" | jq -c '.')"
+            exit 0
           fi
+
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
