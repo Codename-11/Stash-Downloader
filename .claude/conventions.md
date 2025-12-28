@@ -21,24 +21,29 @@
 
 ### File Organization
 ```
-plugins/stash-downloader/
-├── src/
-│   ├── components/          # React components
-│   │   ├── common/         # Reusable UI components
-│   │   ├── downloader/     # Feature-specific components
-│   │   └── settings/       # Settings page components
-│   ├── services/           # Business logic and API clients
-│   │   ├── stash/         # Stash GraphQL service
-│   │   ├── download/      # Download manager
-│   │   └── metadata/      # Metadata extraction
-│   ├── hooks/             # Custom React hooks
-│   ├── types/             # TypeScript type definitions
-│   ├── utils/             # Utility functions
-│   ├── constants/         # Application constants
-│   └── index.tsx          # Plugin entry point
-├── scripts/               # Python backend (download.py)
-├── tests/                 # Vitest tests
-└── package.json           # Plugin dependencies
+stash-downloader/                    # Monorepo root
+├── plugins/
+│   ├── stash-downloader/           # Stash Downloader plugin
+│   │   ├── src/
+│   │   │   ├── components/         # React components
+│   │   │   ├── services/           # Business logic and API clients
+│   │   │   ├── hooks/              # Custom React hooks
+│   │   │   ├── types/              # TypeScript type definitions
+│   │   │   ├── utils/              # Utility functions
+│   │   │   ├── constants/          # Application constants
+│   │   │   └── index.tsx           # Plugin entry point
+│   │   ├── scripts/                # Python backend (download.py)
+│   │   ├── tests/                  # Vitest tests
+│   │   └── package.json            # Plugin version & deps
+│   └── stash-browser/              # Stash Browser plugin
+│       ├── src/                    # Same structure as downloader
+│       ├── scripts/                # Python backend
+│       └── package.json            # Plugin version & deps
+├── browser-extension/              # Firefox extension
+├── shared/                         # Shared code between plugins
+├── .github/workflows/              # CI/CD for all plugins
+├── package.json                    # Root workspace config
+└── CLAUDE.md                       # Project documentation
 ```
 
 ## Component Structure

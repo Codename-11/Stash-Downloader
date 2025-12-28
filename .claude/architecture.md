@@ -3,25 +3,31 @@
 ## Monorepo Structure
 
 ```
-stash-plugins/
+stash-downloader/                    # Monorepo root
 ├── plugins/
-│   ├── stash-downloader/    # Stash Downloader plugin
-│   │   ├── src/             # TypeScript source
-│   │   ├── scripts/         # Python backend (download.py)
-│   │   ├── tests/           # Vitest tests
-│   │   ├── dist/            # Build output
-│   │   ├── package.json     # Plugin package (version source of truth)
-│   │   ├── vite.config.ts   # Plugin build config
-│   │   ├── tsconfig.json    # Plugin TypeScript config
-│   │   └── stash-downloader.yml  # Plugin manifest
-│   └── rule34-viewer/       # Rule34 Viewer plugin (future)
-├── shared/                  # Shared code between plugins
-│   ├── types/               # Common TypeScript types
-│   ├── utils/               # Shared utilities
-│   └── package.json         # @stash-plugins/shared
-├── package.json             # Root workspace config
-├── eslint.config.js         # Shared ESLint config
-└── .github/workflows/       # CI/CD for all plugins
+│   ├── stash-downloader/           # Stash Downloader plugin
+│   │   ├── src/                    # TypeScript source
+│   │   ├── scripts/                # Python backend (download.py)
+│   │   ├── tests/                  # Vitest tests
+│   │   ├── dist/                   # Build output
+│   │   ├── package.json            # Plugin version (release: downloader-vX.Y.Z)
+│   │   ├── vite.config.ts          # Plugin build config
+│   │   ├── tsconfig.json           # Plugin TypeScript config
+│   │   └── stash-downloader.yml    # Plugin manifest
+│   └── stash-browser/              # Stash Browser plugin
+│       ├── src/                    # TypeScript source
+│       ├── scripts/                # Python backend
+│       ├── package.json            # Plugin version (release: browser-vX.Y.Z)
+│       └── stash-browser.yml       # Plugin manifest
+├── browser-extension/              # Firefox browser extension
+│   ├── manifest.json               # Extension version (manual AMO upload)
+│   └── popup/                      # Extension popup UI
+├── shared/                         # Shared code between plugins
+│   ├── types/                      # Common TypeScript types
+│   └── utils/                      # Shared utilities
+├── package.json                    # Root workspace config
+├── eslint.config.js                # Shared ESLint config
+└── .github/workflows/              # CI/CD for all plugins
 ```
 
 ## Plugin Architecture
@@ -558,54 +564,53 @@ Single workflow (`.github/workflows/publish.yml`) with conditional stages:
 | Job | Trigger | Purpose |
 |-----|---------|---------|
 | `test` | All pushes + PRs | Runs type-check, lint, tests, build |
-| `deploy` | Tags (`v*`) or `dev` branch | Builds plugin, deploys to GitHub Pages |
-| `release` | Tags only (`v*`) | Creates GitHub Release with ZIP |
+| `deploy-dev` | Push to `dev` branch | Builds ALL plugins as dev, deploys to GitHub Pages |
+| `deploy-downloader-stable` | Tag `downloader-v*` | Builds Downloader stable, deploys |
+| `deploy-browser-stable` | Tag `browser-v*` | Builds Browser stable, deploys |
+| `release-downloader` | Tag `downloader-v*` | Creates GitHub Release for Downloader |
+| `release-browser` | Tag `browser-v*` | Creates GitHub Release for Browser |
 
 **Flow:**
 ```
-PR to main       → test only
-Push to main     → NOTHING (workflow only triggers on dev branch or tags)
-Push to dev      → test → deploy-dev (dev version)
-Tag push (v*)    → test → deploy-stable → release
-Manual dispatch  → test → deploy-dev (if checkbox enabled)
+PR to main              → test only
+Push to main            → NOTHING (no workflow trigger)
+Push to dev             → test → deploy-dev (ALL plugins as dev)
+Tag downloader-v*       → test → deploy-downloader-stable → release-downloader
+Tag browser-v*          → test → deploy-browser-stable → release-browser
+Manual dispatch         → test → deploy-dev (if checkbox enabled)
 ```
 
-**IMPORTANT**: Push to `main` without a tag does NOT trigger any workflow. Only tags trigger stable builds.
+**IMPORTANT**: Push to `main` without a tag does NOT trigger any workflow. Only prefixed tags trigger stable builds.
 
 ### Stable vs Dev Channels
 
-Both channels are served from the same `index.yml`:
+All plugins are served from the same `index.yml`:
 
-| Channel | Plugin ID | Version Format | Trigger |
-|---------|-----------|----------------|---------|
-| Stable | `stash-downloader` | `X.Y.Z` | Tag push (`v*`) |
-| Dev | `stash-downloader-dev` | `X.Y.Z-dev.{7-char-sha}` | Push to `dev` branch |
+| Plugin | Stable ID | Dev ID | Stable Trigger | Dev Trigger |
+|--------|-----------|--------|----------------|-------------|
+| Downloader | `stash-downloader` | `stash-downloader-dev` | `downloader-v*` | Push to `dev` |
+| Browser | `stash-browser` | `stash-browser-dev` | `browser-v*` | Push to `dev` |
 
-**In Stash**, users see both plugins from the same source:
-- "Stash Downloader" - stable releases
-- "Stash Downloader (Dev)" - development builds
+**In Stash**, users see all plugins from the same source:
+- "Stash Downloader" / "Stash Downloader (Dev)"
+- "Stash Browser" / "Stash Browser (Dev)"
 
-**Manual dev deploy**: Use workflow_dispatch with "Deploy as dev build" checkbox.
+### How index.yml Preserves All Entries
 
-This ensures the stable plugin only updates on actual releases, while dev builds can be tested independently.
+When deploying, each job preserves OTHER plugins' entries in index.yml:
 
-### How index.yml Preserves Both Entries
-
-When deploying, each job preserves the OTHER build's entry in index.yml:
-
-**Stable deploy** (`deploy-stable`):
-1. Builds stable ZIP (`stash-downloader.zip`)
-2. Fetches existing dev ZIP from GitHub Pages (if exists)
-3. Fetches existing `index.yml` to get dev version/date metadata
-4. Generates new `index.yml` with BOTH entries (stable = new, dev = preserved)
+**Stable deploy** (e.g., `deploy-downloader-stable`):
+1. Builds stable ZIP for triggered plugin
+2. Fetches ALL existing ZIPs from GitHub Pages
+3. Fetches existing `index.yml` to get other plugins' metadata
+4. Generates new `index.yml` with ALL entries (triggered = new, others = preserved)
 
 **Dev deploy** (`deploy-dev`):
-1. Builds dev ZIP (`stash-downloader-dev.zip`)
-2. Fetches existing stable ZIP from GitHub Pages (if exists)
-3. Fetches existing `index.yml` to get stable version/date metadata
-4. Generates new `index.yml` with BOTH entries (dev = new, stable = preserved)
+1. Builds dev ZIPs for ALL plugins
+2. Fetches existing stable ZIPs from GitHub Pages
+3. Generates new `index.yml` with ALL entries (dev = new, stable = preserved)
 
-This ensures neither deploy overwrites the other channel's plugin.
+This ensures no deploy overwrites other plugins' entries.
 
 ### Plugin ID from YAML Filename
 
