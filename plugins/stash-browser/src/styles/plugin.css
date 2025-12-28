@@ -395,11 +395,34 @@
   background-color: var(--stash-hover-bg);
 }
 
+.stash-browser .autocomplete-item-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.stash-browser .autocomplete-category-badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 0.25rem;
+  color: #000;
+  letter-spacing: 0.02em;
+}
+
 .stash-browser .autocomplete-item-name {
   font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stash-browser .autocomplete-item-count {
+  flex-shrink: 0;
   font-size: 0.75rem;
   color: var(--stash-muted);
 }
@@ -807,13 +830,18 @@
    ========================================================================== */
 
 .stash-browser .results-grid {
-  /* Ensure proper gap between all cards */
+  /* Uniform gap between all cards */
+  --bs-gutter-x: 1rem;
+  --bs-gutter-y: 1rem;
+  gap: 1rem !important;
   row-gap: 1rem !important;
+  column-gap: 1rem !important;
 }
 
 .stash-browser .results-grid > [class*="col-"] {
-  /* Ensure columns have proper bottom margin for card spacing */
-  margin-bottom: 0;
+  /* Reset Bootstrap padding since we use gap */
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* ==========================================================================

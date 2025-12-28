@@ -18,14 +18,16 @@ interface AutocompleteInputProps {
   placeholder?: string;
 }
 
-// Tag category colors (booru convention)
-const CATEGORY_COLORS: Record<number, string> = {
-  0: '#6ea8fe', // General (light blue)
-  1: '#ea868f', // Artist (red)
-  3: '#c39bd3', // Copyright/Series (purple)
-  4: '#7dcea0', // Character (green)
-  5: '#f8c471', // Meta (orange)
+// Tag category colors and labels (booru convention)
+const CATEGORY_INFO: Record<number, { color: string; label: string; short: string }> = {
+  0: { color: '#6ea8fe', label: 'General', short: 'Gen' },
+  1: { color: '#ea868f', label: 'Artist', short: 'Art' },
+  3: { color: '#c39bd3', label: 'Copyright', short: 'Cpy' },
+  4: { color: '#7dcea0', label: 'Character', short: 'Char' },
+  5: { color: '#f8c471', label: 'Meta', short: 'Meta' },
 };
+
+const DEFAULT_CATEGORY = { color: '#fff', label: '', short: '' };
 
 // Debounce delay in ms - longer to reduce API calls
 const DEBOUNCE_DELAY = 350;
@@ -288,26 +290,39 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
               ))}
             </>
           ) : (
-            suggestions.map((tag, index) => (
-              <div
-                key={tag.name}
-                className={`autocomplete-item ${index === selectedIndex ? 'selected' : ''}`}
-                onClick={() => addTag(tag.name)}
-                onMouseEnter={() => setSelectedIndex(index)}
-              >
-                <span
-                  className="autocomplete-item-name"
-                  style={{ color: CATEGORY_COLORS[tag.category] || '#fff' }}
+            suggestions.map((tag, index) => {
+              const catInfo = CATEGORY_INFO[tag.category] || DEFAULT_CATEGORY;
+              return (
+                <div
+                  key={tag.name}
+                  className={`autocomplete-item ${index === selectedIndex ? 'selected' : ''}`}
+                  onClick={() => addTag(tag.name)}
+                  onMouseEnter={() => setSelectedIndex(index)}
                 >
-                  {tag.name.replace(/_/g, ' ')}
-                </span>
-                {tag.count > 0 && (
-                  <span className="autocomplete-item-count">
-                    {formatCount(tag.count)}
-                  </span>
-                )}
-              </div>
-            ))
+                  <div className="autocomplete-item-content">
+                    {catInfo.label && (
+                      <span
+                        className="autocomplete-category-badge"
+                        style={{ backgroundColor: catInfo.color }}
+                      >
+                        {catInfo.short}
+                      </span>
+                    )}
+                    <span
+                      className="autocomplete-item-name"
+                      style={{ color: catInfo.color }}
+                    >
+                      {tag.name.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  {tag.count > 0 && (
+                    <span className="autocomplete-item-count">
+                      {formatCount(tag.count)}
+                    </span>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       ) : null}

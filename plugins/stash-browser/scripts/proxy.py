@@ -223,6 +223,28 @@ def get_post(source: str, post_id: int, proxy_url: str | None = None) -> dict:
     }
 
 
+def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None) -> list:
+    """Fetch autocomplete endpoint that returns JSON array."""
+    opener = create_opener(proxy_url)
+
+    request = urllib.request.Request(
+        url,
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': referer,
+        }
+    )
+
+    try:
+        with opener.open(request, timeout=10) as response:
+            data = response.read().decode('utf-8')
+            return json.loads(data)
+    except Exception as e:
+        log(f"Autocomplete JSON fetch failed: {e}")
+        return []
+
+
 def autocomplete_tags(source: str, query: str, limit: int = 10,
                        proxy_url: str | None = None,
                        api_key: str | None = None,
@@ -231,76 +253,71 @@ def autocomplete_tags(source: str, query: str, limit: int = 10,
     if source not in BOORU_APIS:
         raise Exception(f"Unknown source: {source}")
 
-    api = BOORU_APIS[source]
-    base_url = api['base_url']
-    requires_auth = api.get('requires_auth', False)
-
-    # Check if auth is required but not provided
-    if requires_auth and (not api_key or not user_id):
-        # Return empty results silently - autocomplete is optional
-        log(f"Skipping autocomplete for {source} - no API credentials")
-        return {
-            'source': source,
-            'query': query,
-            'tags': [],
-        }
-
     tags = []
 
     if source == 'danbooru':
-        # Danbooru tag autocomplete API (JSON, no auth required)
-        params = {
-            'search[name_matches]': f'*{query}*',
-            'search[order]': 'count',
-            'limit': limit,
-        }
-        url = f"{base_url}/tags.json?{urllib.parse.urlencode(params)}"
-        log(f"Tag autocomplete: {url}")
+        # Danbooru has a dedicated autocomplete endpoint
+        url = f"https://danbooru.donmai.us/autocomplete.json?search[query]={urllib.parse.quote(query)}&search[type]=tag_query&limit={limit}"
+        log(f"Tag autocomplete (Danbooru): {url}")
 
         try:
-            result = fetch_url(url, proxy_url)
-            # Danbooru returns [{name, post_count, category}, ...]
-            for tag in (result if isinstance(result, list) else []):
-                if isinstance(tag, dict):
+            result = fetch_autocomplete_json(url, 'https://danbooru.donmai.us/', proxy_url)
+            # Danbooru autocomplete returns [{type, label, value, category, post_count}, ...]
+            for item in result[:limit]:
+                if isinstance(item, dict):
                     tags.append({
-                        'name': tag.get('name', ''),
-                        'count': tag.get('post_count', 0),
-                        'category': tag.get('category', 0),
+                        'name': item.get('value', item.get('label', '')),
+                        'count': item.get('post_count', 0),
+                        'category': item.get('category', 0),
                     })
         except Exception as e:
-            log(f"Autocomplete fetch failed: {e}")
-    else:
-        # Rule34/Gelbooru tag API returns XML (json=1 doesn't work for tags)
-        params = {
-            'page': 'dapi',
-            's': 'tag',
-            'q': 'index',
-            'name_pattern': f'{query}%',  # Wildcard at end only for prefix match
-            'limit': limit,
-            'orderby': 'count',
-        }
-        # Add auth if available
-        if api_key and user_id:
-            params['api_key'] = api_key
-            params['user_id'] = user_id
-        url = f"{base_url}/index.php?{urllib.parse.urlencode(params)}"
-        log(f"Tag autocomplete (XML): {url}")
+            log(f"Danbooru autocomplete failed: {e}")
+
+    elif source == 'rule34':
+        # Rule34 uses a dedicated autocomplete subdomain
+        url = f"https://ac.rule34.xxx/autocomplete.php?q={urllib.parse.quote(query)}"
+        log(f"Tag autocomplete (Rule34): {url}")
 
         try:
-            root = fetch_xml(url, proxy_url)
-            # Parse XML: <tags><tag type="0" count="123" name="tagname" .../></tags>
-            for tag_elem in root.findall('tag'):
-                name = tag_elem.get('name', '')
-                count_str = tag_elem.get('count', '0')
-                type_str = tag_elem.get('type', '0')
-                if name:
+            result = fetch_autocomplete_json(url, 'https://rule34.xxx/', proxy_url)
+            # Rule34 autocomplete returns [{label: "tag (count)", value: "tag"}, ...]
+            for item in result[:limit]:
+                if isinstance(item, dict):
+                    label = item.get('label', '')
+                    value = item.get('value', '')
+                    # Parse count from label like "ariel (5452)"
+                    count = 0
+                    if '(' in label and ')' in label:
+                        try:
+                            count_str = label.rsplit('(', 1)[-1].rstrip(')')
+                            count = int(count_str)
+                        except (ValueError, IndexError):
+                            pass
                     tags.append({
-                        'name': name,
-                        'count': int(count_str) if count_str.isdigit() else 0,
-                        'category': int(type_str) if type_str.isdigit() else 0,
+                        'name': value,
+                        'count': count,
+                        'category': 0,  # Rule34 autocomplete doesn't include category
                     })
         except Exception as e:
-            log(f"Autocomplete fetch failed: {e}")
+            log(f"Rule34 autocomplete failed: {e}")
+
+    elif source == 'gelbooru':
+        # Gelbooru uses similar autocomplete endpoint
+        url = f"https://gelbooru.com/index.php?page=autocomplete2&term={urllib.parse.quote(query)}&type=tag_query&limit={limit}"
+        log(f"Tag autocomplete (Gelbooru): {url}")
+
+        try:
+            result = fetch_autocomplete_json(url, 'https://gelbooru.com/', proxy_url)
+            # Gelbooru autocomplete returns [{label, value, category, post_count}, ...]
+            for item in result[:limit]:
+                if isinstance(item, dict):
+                    tags.append({
+                        'name': item.get('value', item.get('label', '')),
+                        'count': item.get('post_count', 0),
+                        'category': item.get('category', 0),
+                    })
+        except Exception as e:
+            log(f"Gelbooru autocomplete failed: {e}")
 
     return {
         'source': source,
