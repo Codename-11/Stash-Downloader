@@ -550,6 +550,12 @@
   border-top: 1px solid var(--stash-border);
 }
 
+/* Sidebar version - no border */
+.stash-browser .sidebar-wrapper .search-filters {
+  padding-top: 0;
+  border-top: none;
+}
+
 .stash-browser .filter-label {
   font-size: 0.8rem;
   color: var(--stash-muted);
@@ -908,4 +914,61 @@
 
 .stash-browser .hover-brighten:hover {
   filter: brightness(1.1);
+}
+
+/* ==========================================================================
+   Two Column Layout
+   ========================================================================== */
+
+.stash-browser .sidebar-wrapper {
+  position: sticky;
+  top: 1rem;
+}
+
+.stash-browser .sidebar-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--stash-border);
+}
+
+/* ==========================================================================
+   Color Legend
+   ========================================================================== */
+
+.stash-browser .color-legend {
+  background-color: var(--stash-card-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+}
+
+.stash-browser .legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Selection Actions
+   ========================================================================== */
+
+.stash-browser .selection-actions {
+  animation: fade-in-up var(--transition-fast) ease-out;
+  border: 1px solid var(--stash-border);
+}
+
+/* ==========================================================================
+   Responsive Two Column Layout
+   ========================================================================== */
+
+@media (max-width: 991.98px) {
+  .stash-browser .sidebar-wrapper {
+    position: static;
+    margin-bottom: 1rem;
+  }
+
+  .stash-browser .color-legend {
+    display: none;  /* Hide on mobile - takes up space */
+  }
 }

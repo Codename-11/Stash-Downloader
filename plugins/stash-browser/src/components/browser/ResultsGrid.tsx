@@ -25,7 +25,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({
   return (
     <div className="row g-3 results-grid">
       {posts.map((post, index) => (
-        <div key={post.id} className="col-6 col-sm-4 col-md-3 col-lg-2">
+        <div key={post.id} className="col-6 col-sm-4 col-md-3 col-xl-2">
           <PostCard
             post={post}
             isSelected={selectedIds.has(post.id)}
