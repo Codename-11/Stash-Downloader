@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Stash Plugins</h1>
+  <h1>Stash Downloader Suite</h1>
   <p>A collection of plugins for <a href="https://github.com/stashapp/stash">Stash</a> - the self-hosted media organizer</p>
 
   [![License](https://img.shields.io/github/license/Codename-11/Stash-Downloader)](LICENSE)
@@ -25,6 +25,10 @@
 2. Click **"Add Source"**
 3. Enter: `https://codename-11.github.io/Stash-Downloader/index.yml`
 4. Find your desired plugin and click **"Install"**
+
+---
+## Product Page & Documentation
+[Product Page](https://codename-11.github.io/Stash-Downloader/index.html) | [Documentation](https://codename-11.github.io/Stash-Downloader/docs.html)
 
 ---
 
