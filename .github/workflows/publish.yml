@@ -588,7 +588,7 @@ jobs:
           - Use bold for feature names
           - Skip internal/minor changes in What's New section"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
@@ -717,7 +717,7 @@ jobs:
           - Use bold for feature names
           - Skip internal/minor changes in What's New section"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
