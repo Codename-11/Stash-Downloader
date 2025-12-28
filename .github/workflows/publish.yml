@@ -46,10 +46,11 @@ jobs:
         run: npm run type-check
 
       - name: Lint
-        run: npx eslint src --max-warnings 60
+        run: npm run lint -- --max-warnings 60
 
       - name: Run tests
         run: npm test -- --run
+        working-directory: plugins/stash-downloader
 
       - name: Build
         run: npm run build
@@ -82,7 +83,7 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Building STABLE version: ${VERSION}"
 
@@ -91,9 +92,9 @@ jobs:
           mkdir -p _site _package
 
           # Copy plugin files to package directory (flat structure)
-          cp -r dist _package/
-          cp -r scripts _package/
-          cp stash-downloader.yml _package/
+          cp -r plugins/stash-downloader/dist _package/
+          cp -r plugins/stash-downloader/scripts _package/
+          cp plugins/stash-downloader/stash-downloader.yml _package/
           cp README.md _package/
           cp LICENSE _package/
 
@@ -215,37 +216,37 @@ jobs:
           echo "=== MODIFYING SOURCE FILES FOR DEV BUILD ==="
 
           echo "Before modification (constants):"
-          grep -n "PLUGIN_ID\|MAIN:" src/constants/index.ts | head -5
+          grep -n "PLUGIN_ID\|MAIN:" plugins/stash-downloader/src/constants/index.ts | head -5
 
           # Update constants - plugin ID, name, routes, storage keys
-          sed -i 's/stash-downloader/stash-downloader-dev/g' src/constants/index.ts
-          sed -i 's/Stash Downloader/Stash Downloader (Dev)/g' src/constants/index.ts
+          sed -i 's/stash-downloader/stash-downloader-dev/g' plugins/stash-downloader/src/constants/index.ts
+          sed -i 's/Stash Downloader/Stash Downloader (Dev)/g' plugins/stash-downloader/src/constants/index.ts
 
           # Update index.tsx - style ID and nav button ID
-          sed -i 's/stash-downloader-styles/stash-downloader-dev-styles/g' src/index.tsx
-          sed -i 's/stash-downloader-nav-button/stash-downloader-dev-nav-button/g' src/index.tsx
+          sed -i 's/stash-downloader-styles/stash-downloader-dev-styles/g' plugins/stash-downloader/src/index.tsx
+          sed -i 's/stash-downloader-nav-button/stash-downloader-dev-nav-button/g' plugins/stash-downloader/src/index.tsx
 
           # Update plugin YAML
-          sed -i 's/name: Stash Downloader$/name: Stash Downloader (Dev)/g' stash-downloader.yml
+          sed -i 's/name: Stash Downloader$/name: Stash Downloader (Dev)/g' plugins/stash-downloader/stash-downloader.yml
 
           echo ""
           echo "After modification (constants):"
-          grep -n "PLUGIN_ID\|MAIN:" src/constants/index.ts | head -5
+          grep -n "PLUGIN_ID\|MAIN:" plugins/stash-downloader/src/constants/index.ts | head -5
 
           echo ""
           echo "After modification (index.tsx):"
-          grep -n "stash-downloader-dev" src/index.tsx | head -3
+          grep -n "stash-downloader-dev" plugins/stash-downloader/src/index.tsx | head -3
 
           echo ""
           echo "After modification (YAML):"
-          grep -n "name:" stash-downloader.yml | head -2
+          grep -n "name:" plugins/stash-downloader/stash-downloader.yml | head -2
 
           echo "=== MODIFICATION COMPLETE ==="
 
       - name: Get version and update package.json
         id: version
         run: |
-          BASE_VERSION=$(node -p "require('./package.json').version")
+          BASE_VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -253,7 +254,7 @@ jobs:
           echo "Building DEV version: ${VERSION} (base: ${BASE_VERSION})"
 
           # Update package.json version so __APP_VERSION__ is correct at build time
-          npm version ${VERSION} --no-git-tag-version --allow-same-version
+          cd plugins/stash-downloader && npm version ${VERSION} --no-git-tag-version --allow-same-version
           echo "Updated package.json version to ${VERSION}"
 
       - name: Build plugin
@@ -264,9 +265,9 @@ jobs:
           mkdir -p _site _package
 
           # Copy plugin files to package directory (flat structure)
-          cp -r dist _package/
-          cp -r scripts _package/
-          cp stash-downloader.yml _package/
+          cp -r plugins/stash-downloader/dist _package/
+          cp -r plugins/stash-downloader/scripts _package/
+          cp plugins/stash-downloader/stash-downloader.yml _package/
           cp README.md _package/
           cp LICENSE _package/
 
@@ -404,9 +405,10 @@ jobs:
           # Get list of changed files by category
           if [ -n "$PREV_TAG" ]; then
             echo "### Changed Files by Area:" > /tmp/changed_areas.txt
-            echo "**Components:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'src/components/*.tsx' 'src/components/**/*.tsx' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
-            echo "**Services:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'src/services/*.ts' 'src/services/**/*.ts' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
-            echo "**Python Backend:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'scripts/*.py' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Components:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'plugins/*/src/components/*.tsx' 'plugins/*/src/components/**/*.tsx' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Services:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'plugins/*/src/services/*.ts' 'plugins/*/src/services/**/*.ts' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Python Backend:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'plugins/*/scripts/*.py' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
+            echo "**Shared:** $(git diff --name-only ${PREV_TAG}..HEAD -- 'shared/**' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
             echo "**Workflow/CI:** $(git diff --name-only ${PREV_TAG}..HEAD -- '.github/**' 2>/dev/null | wc -l) files" >> /tmp/changed_areas.txt
           else
             echo "" > /tmp/changed_areas.txt

@@ -1,5 +1,29 @@
 # Architecture & Design Decisions
 
+## Monorepo Structure
+
+```
+stash-plugins/
+├── plugins/
+│   ├── stash-downloader/    # Stash Downloader plugin
+│   │   ├── src/             # TypeScript source
+│   │   ├── scripts/         # Python backend (download.py)
+│   │   ├── tests/           # Vitest tests
+│   │   ├── dist/            # Build output
+│   │   ├── package.json     # Plugin package (version source of truth)
+│   │   ├── vite.config.ts   # Plugin build config
+│   │   ├── tsconfig.json    # Plugin TypeScript config
+│   │   └── stash-downloader.yml  # Plugin manifest
+│   └── rule34-viewer/       # Rule34 Viewer plugin (future)
+├── shared/                  # Shared code between plugins
+│   ├── types/               # Common TypeScript types
+│   ├── utils/               # Shared utilities
+│   └── package.json         # @stash-plugins/shared
+├── package.json             # Root workspace config
+├── eslint.config.js         # Shared ESLint config
+└── .github/workflows/       # CI/CD for all plugins
+```
+
 ## Plugin Architecture
 
 ### Integration Strategy
@@ -521,7 +545,7 @@ interface: raw
 - `tasks` defines available plugin operations (must match Python task handlers)
 
 ### Version Management
-- Single source of truth in `package.json`
+- Single source of truth in `plugins/stash-downloader/package.json`
 - GitHub Actions reads version and publishes
 - Stash detects updates by comparing versions
 - Format: `MAJOR.MINOR.PATCH` (semver)

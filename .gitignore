@@ -11,11 +11,15 @@ stash-plugin/
 build/
 *.tsbuildinfo
 
-# Generated plugin repository files
-plugins/
+# Generated plugin repository files (build output)
+_package/
 index.yml
 _site/
 *.zip
+
+# Plugin build output (inside each plugin)
+plugins/*/dist/
+plugins/*/stash-plugin/
 
 # Development
 .vite/

@@ -1,11 +1,13 @@
-# Stash Downloader Plugin
+# Stash Plugins Monorepo
 
-A React-based Stash plugin for downloading images and videos with automatic metadata extraction and tagging.
+A monorepo for Stash plugins including:
+- **Stash Downloader** - Download images and videos with automatic metadata extraction
+- **Rule34 Viewer** - Browse and search booru content (coming soon)
 
 ## Documentation
 
-@.claude/project.md  
-@.claude/architecture.md  
+@.claude/project.md
+@.claude/architecture.md
 @.claude/conventions.md
 
 ## Task Tracking
@@ -16,6 +18,17 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 
 ## Quick Reference
 
+### Workspace Commands (from root)
+| Command                    | Description                       |
+|----------------------------|-----------------------------------|
+| `npm run build`            | Build all plugins                 |
+| `npm run build:downloader` | Build Stash Downloader only       |
+| `npm run build:viewer`     | Build Rule34 Viewer only          |
+| `npm run test`             | Run tests for all plugins         |
+| `npm run type-check`       | TypeScript check all plugins      |
+| `npm run lint`             | ESLint all plugins                |
+
+### Plugin-Specific Commands (from plugins/stash-downloader/)
 | Command                | Description                  |
 |------------------------|------------------------------|
 | `npm run dev`          | Build with watch mode        |
@@ -45,10 +58,10 @@ A React-based Stash plugin for downloading images and videos with automatic meta
 ```
 
 ### Two Independent Versions
-| Component         | Version Location                | Release Trigger                     |
-|-------------------|-------------------------------|-------------------------------------|
-| **Stash Plugin**  | `package.json`                | Git tags (`vX.Y.Z`) on main         |
-| **Browser Extension** | `browser-extension/manifest.json` | Manual upload to AMO         |
+| Component         | Version Location                              | Release Trigger                     |
+|-------------------|-----------------------------------------------|-------------------------------------|
+| **Stash Plugin**  | `plugins/stash-downloader/package.json`       | Git tags (`vX.Y.Z`) on main         |
+| **Browser Extension** | `browser-extension/manifest.json`         | Manual upload to AMO         |
 
 ### Stable vs Dev Builds
 | Build      | Trigger             | Plugin ID            | Version Format    |
@@ -64,8 +77,8 @@ Both are served from the same `index.yml` - each deploy preserves the other's en
 # On dev branch, ready to release:
 git checkout main
 git merge dev
-# Bump version in package.json
-git add package.json && git commit -m "🔖 chore: release vX.Y.Z"
+# Bump version in plugins/stash-downloader/package.json
+git add plugins/stash-downloader/package.json && git commit -m "🔖 chore: release vX.Y.Z"
 git tag vX.Y.Z && git push origin main --tags
 git checkout dev
 ```

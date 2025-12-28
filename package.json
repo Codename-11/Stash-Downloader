@@ -1,68 +1,28 @@
 {
-  "name": "stash-downloader-plugin",
-  "version": "0.5.1",
-  "description": "React-based Stash plugin for downloading images and videos with automatic metadata extraction and tagging",
+  "name": "stash-plugins",
+  "version": "0.0.0",
   "type": "module",
-  "main": "dist/stash-downloader.js",
+  "private": true,
+  "description": "Monorepo for Stash plugins",
+  "workspaces": [
+    "plugins/*",
+    "shared"
+  ],
   "scripts": {
-    "dev": "vite build --watch --mode development",
-    "build": "tsc && vite build",
-    "build:stash": "npm run build && node scripts/build-stash.js",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
-    "preview": "vite preview",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json,css,md}\""
+    "build": "npm run build --workspaces --if-present",
+    "build:downloader": "npm run build -w @stash-plugins/stash-downloader",
+    "build:viewer": "npm run build -w @stash-plugins/rule34-viewer",
+    "dev:downloader": "npm run dev -w @stash-plugins/stash-downloader",
+    "dev:viewer": "npm run dev -w @stash-plugins/rule34-viewer",
+    "test": "npm run test --workspaces --if-present",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
   },
   "keywords": [
     "stash",
-    "plugin",
-    "downloader",
-    "metadata",
-    "react"
+    "plugins",
+    "monorepo"
   ],
   "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/bootstrap": "^5.2.10",
-    "@types/node": "^22.10.2",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@typescript-eslint/eslint-plugin": "^8.18.2",
-    "@typescript-eslint/parser": "^8.18.2",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^1.0.4",
-    "@vitest/ui": "^1.0.4",
-    "eslint": "^9.17.0",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.16",
-    "globals": "^16.5.0",
-    "happy-dom": "^12.10.3",
-    "prettier": "^3.4.2",
-    "sharp": "^0.34.5",
-    "terser": "^5.44.1",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^6.0.5",
-    "vitest": "^1.0.4"
-  },
-  "dependencies": {
-    "bootstrap": "^5.3.8",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": false
-    },
-    "react-dom": {
-      "optional": false
-    }
-  }
+  "license": "MIT"
 }

@@ -8,7 +8,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['plugins/*/src/**/*.{ts,tsx}', 'shared/**/*.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -35,6 +35,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.js', '*.config.ts', 'test-app/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '*.config.js', '*.config.ts', 'plugins/*/*.config.ts', 'test-app/**'],
   }
 );

@@ -1,0 +1,28 @@
+{
+  "name": "@stash-plugins/shared",
+  "version": "0.0.1",
+  "description": "Shared utilities and types for Stash plugins",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types/index.ts",
+    "./utils": "./utils/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "stash",
+    "shared",
+    "utilities"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  }
+}

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/logo.svg" alt="Stash Downloader Logo" width="128" height="128" />
+  <img src="plugins/stash-downloader/src/assets/logo.svg" alt="Stash Downloader Logo" width="128" height="128" />
   <h1>Stash Downloader</h1>
   <p>Download videos and images directly to your Stash library with automatic metadata extraction</p>
 
@@ -7,6 +7,7 @@
   [![GitHub Release](https://img.shields.io/github/v/release/Codename-11/Stash-Downloader)](https://github.com/Codename-11/Stash-Downloader/releases)
   [![Build](https://img.shields.io/github/actions/workflow/status/Codename-11/Stash-Downloader/publish.yml?branch=main)](https://github.com/Codename-11/Stash-Downloader/actions)
   [![Stash](https://img.shields.io/badge/Stash-v0.20%2B-blue)](https://github.com/stashapp/stash)
+  [![Firefox Add-ons](https://img.shields.io/amo/v/stash-downloader-extension?logo=firefox&label=Firefox%20Add-on)](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
   [![Stash Forums Post](https://img.shields.io/badge/Stash%20Forums-Post-blue)](https://discourse.stashapp.cc/t/stash-downloader-download-videos-images-with-metadata-extraction)
 
   [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/codename_11)
@@ -150,9 +151,14 @@ See [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for more solutions.
 ## Development
 
 ```bash
-npm install        # Install dependencies
-npm run dev        # Build with watch mode
-npm run build      # Production build
+npm install              # Install all workspace dependencies
+npm run build            # Build all plugins
+npm run build:downloader # Build Stash Downloader only
+
+# Or work directly in a plugin:
+cd plugins/stash-downloader
+npm run dev              # Build with watch mode
+npm run build            # Production build
 ```
 
 See [Development Guide](docs/DEVELOPMENT.md) for architecture and contribution guidelines.

@@ -21,20 +21,24 @@
 
 ### File Organization
 ```
-src/
-├── components/          # React components
-│   ├── common/         # Reusable UI components
-│   ├── downloader/     # Feature-specific components
-│   └── settings/       # Settings page components
-├── services/           # Business logic and API clients
-│   ├── stash/         # Stash GraphQL service
-│   ├── download/      # Download manager
-│   └── metadata/      # Metadata extraction
-├── hooks/             # Custom React hooks
-├── types/             # TypeScript type definitions
-├── utils/             # Utility functions
-├── constants/         # Application constants
-└── index.tsx          # Plugin entry point
+plugins/stash-downloader/
+├── src/
+│   ├── components/          # React components
+│   │   ├── common/         # Reusable UI components
+│   │   ├── downloader/     # Feature-specific components
+│   │   └── settings/       # Settings page components
+│   ├── services/           # Business logic and API clients
+│   │   ├── stash/         # Stash GraphQL service
+│   │   ├── download/      # Download manager
+│   │   └── metadata/      # Metadata extraction
+│   ├── hooks/             # Custom React hooks
+│   ├── types/             # TypeScript type definitions
+│   ├── utils/             # Utility functions
+│   ├── constants/         # Application constants
+│   └── index.tsx          # Plugin entry point
+├── scripts/               # Python backend (download.py)
+├── tests/                 # Vitest tests
+└── package.json           # Plugin dependencies
 ```
 
 ## Component Structure
@@ -208,7 +212,7 @@ MAJOR.MINOR.PATCH (e.g., 1.2.3)
 - **MINOR**: New features (backwards compatible)
 - **PATCH**: Bug fixes (backwards compatible)
 
-Version is the single source of truth in `package.json`. GitHub Actions reads it for releases.
+Version is the single source of truth in `plugins/stash-downloader/package.json`. GitHub Actions reads it for releases.
 
 ### Conventional Commits
 All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) format:
@@ -342,8 +346,8 @@ This project uses **tag-based releases**:
 git checkout main
 git merge dev
 
-# Bump version in package.json
-git add package.json
+# Bump version in plugins/stash-downloader/package.json
+git add plugins/stash-downloader/package.json
 git commit -m "🔖 chore: release vX.Y.Z"
 
 # Create and push tag
@@ -417,7 +421,7 @@ Without the key, releases still work but skip the "What's New" AI summary.
 
 **Important:**
 - Tag format MUST be `vX.Y.Z` (e.g., `v0.2.0`)
-- Version in `package.json` should match tag (without `v` prefix)
+- Version in `plugins/stash-downloader/package.json` should match tag (without `v` prefix)
 
 ### Dev Builds (Automatic)
 
@@ -437,17 +441,17 @@ The index.yml contains BOTH plugin entries - each deploy preserves the other's e
 ### Extension vs Plugin Versioning
 
 **Independent Versioning Strategy:**
-- `package.json` version = Plugin version (Stash plugin releases)
+- `plugins/stash-downloader/package.json` version = Plugin version (Stash plugin releases)
 - `browser-extension/manifest.json` version = Extension version (Firefox/Chrome store)
 - Versions are **independent** - they don't need to match
 
 **Version Bump Rules:**
-- Plugin changes only → Bump `package.json` only
+- Plugin changes only → Bump `plugins/stash-downloader/package.json` only
 - Extension changes only → Bump `browser-extension/manifest.json` only
 - Both changed → Bump both versions
 
 **Release Tags:**
-- Git tags (`vX.Y.Z`) follow the **plugin version** in `package.json`
+- Git tags (`vX.Y.Z`) follow the **plugin version** in `plugins/stash-downloader/package.json`
 - GitHub Actions packages both plugin and extension on every release
 
 **Browser Store Uploads:**

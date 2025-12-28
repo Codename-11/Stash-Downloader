@@ -112,9 +112,9 @@ Stash provides these libraries through `window.PluginApi.libraries`:
 - **NO CSS-in-JS libraries**: MUI/Emotion removed to reduce bundle size and avoid context conflicts
 
 ## Development Workflow
-1. Develop components in `src/`
-2. Build with `npm run build` (outputs to `dist/`)
-3. Plugin YAML points to `dist/stash-downloader.js`
+1. Develop components in `plugins/stash-downloader/src/`
+2. Build with `npm run build:downloader` from root (outputs to `plugins/stash-downloader/dist/`)
+3. Plugin YAML points to `dist/stash-downloader.js` (relative to plugin directory)
 4. Deploy via GitHub Pages for custom source installation
 5. Test in Stash instance at http://localhost:9999
 
