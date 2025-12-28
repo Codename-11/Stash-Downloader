@@ -81,6 +81,7 @@ Configure in Stash at **Settings** → **Plugins** → **Stash Downloader**:
 ## Stash Browser
 
 <div align="center">
+  <img src="plugins/stash-browser/src/assets/logo.svg" alt="Stash Browser Logo" width="80" height="80" />
   <p><em>Browse booru sites and add content directly to your Stash Downloader queue</em></p>
 </div>
 

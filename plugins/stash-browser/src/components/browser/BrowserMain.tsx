@@ -13,6 +13,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { loadSettings, saveSettings, type BrowserSettings } from '@/utils';
 import { PostDetailModal } from './PostDetailModal';
 import { SkeletonGrid } from './SkeletonGrid';
+import logoSvg from '@/assets/logo.svg';
 
 export const BrowserMain: React.FC = () => {
   // Settings
@@ -180,9 +181,16 @@ export const BrowserMain: React.FC = () => {
           <div className="sidebar-wrapper">
             {/* Header */}
             <div className="sidebar-header d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <h5 className="mb-0 text-light">{PLUGIN_NAME}</h5>
-                <small className="text-muted">v{APP_VERSION}</small>
+              <div className="d-flex align-items-center gap-2">
+                <img
+                  src={logoSvg}
+                  alt="Stash Browser Logo"
+                  style={{ width: '32px', height: '32px' }}
+                />
+                <div>
+                  <h5 className="mb-0 text-light" style={{ fontSize: '1rem' }}>{PLUGIN_NAME}</h5>
+                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>v{APP_VERSION}</small>
+                </div>
               </div>
               <button
                 className="btn btn-sm btn-outline-secondary"
