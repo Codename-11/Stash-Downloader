@@ -406,6 +406,8 @@ export function getPostUrl(post: IBooruPost): string {
       return `https://gelbooru.com/index.php?page=post&s=view&id=${id}`;
     case SOURCES.DANBOORU:
       return `https://danbooru.donmai.us/posts/${id}`;
+    case SOURCES.AIBOORU:
+      return `https://aibooru.online/posts/${id}`;
     default:
       return '';
   }

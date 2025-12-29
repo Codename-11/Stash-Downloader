@@ -23,6 +23,7 @@ export const SOURCES = {
   RULE34: 'rule34',
   GELBOORU: 'gelbooru',
   DANBOORU: 'danbooru',
+  AIBOORU: 'aibooru',
 } as const;
 
 export type SourceType = (typeof SOURCES)[keyof typeof SOURCES];
