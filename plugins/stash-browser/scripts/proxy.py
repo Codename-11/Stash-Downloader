@@ -224,15 +224,30 @@ def get_post(source: str, post_id: int, proxy_url: str | None = None) -> dict:
 
 
 def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None) -> list:
-    """Fetch autocomplete endpoint that returns JSON array."""
+    """Fetch autocomplete endpoint that returns JSON array.
+
+    Uses browser-like headers to avoid basic bot detection.
+    Note: Cloudflare-protected sites (like Danbooru) may still block
+    server-side requests. A proxy may help bypass this.
+    """
     opener = create_opener(proxy_url)
 
+    # Full browser-like headers to avoid bot detection
     request = urllib.request.Request(
         url,
         headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Referer': referer,
+            'Origin': referer.rstrip('/'),
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
         }
     )
 
@@ -240,8 +255,14 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
         with opener.open(request, timeout=10) as response:
             data = response.read().decode('utf-8')
             return json.loads(data)
+    except urllib.error.HTTPError as e:
+        if e.code == 403:
+            log(f"Autocomplete blocked (HTTP 403) - site may have Cloudflare protection. Try configuring a proxy.")
+        else:
+            log(f"Autocomplete HTTP error: {e.code} {e.reason}")
+        return []
     except Exception as e:
-        log(f"Autocomplete JSON fetch failed: {e}")
+        log(f"Autocomplete fetch failed: {e}")
         return []
 
 
@@ -257,11 +278,15 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
 
     if source == 'danbooru':
         # Danbooru has a dedicated autocomplete endpoint
+        # Note: Danbooru is behind Cloudflare which often blocks server-side requests.
+        # If autocomplete fails, user can configure a proxy in plugin settings.
         url = f"https://danbooru.donmai.us/autocomplete.json?search[query]={urllib.parse.quote(query)}&search[type]=tag_query&limit={limit}"
         log(f"Tag autocomplete (Danbooru): {url}")
 
         try:
             result = fetch_autocomplete_json(url, 'https://danbooru.donmai.us/', proxy_url)
+            if not result:
+                log("Danbooru autocomplete returned no results (possibly blocked by Cloudflare)")
             # Danbooru autocomplete returns [{type, label, value, category, post_count}, ...]
             for item in result[:limit]:
                 if isinstance(item, dict):

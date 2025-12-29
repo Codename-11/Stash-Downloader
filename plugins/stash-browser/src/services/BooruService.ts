@@ -251,50 +251,11 @@ export async function getPost(source: SourceType, postId: number): Promise<IBoor
   return normalized;
 }
 
-/**
- * Client-side autocomplete for Danbooru (bypasses Cloudflare protection)
- * Danbooru's API is behind Cloudflare which blocks server-side requests,
- * but browser requests work because the user has solved the challenge.
- */
-async function autocompleteDanbooruClientSide(
-  query: string,
-  limit: number
-): Promise<TagSuggestion[]> {
-  const url = `https://danbooru.donmai.us/autocomplete.json?search[query]=${encodeURIComponent(query)}&search[type]=tag_query&limit=${limit}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-      },
-      credentials: 'include', // Include cookies for Cloudflare
-    });
-
-    if (!response.ok) {
-      console.warn(`[BooruService] Danbooru client-side autocomplete failed: ${response.status}`);
-      return [];
-    }
-
-    const data = await response.json();
-
-    // Danbooru returns [{type, label, value, category, post_count}, ...]
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    return data.slice(0, limit).map((item: Record<string, unknown>) => ({
-      name: (item.value as string) || (item.label as string) || '',
-      count: (item.post_count as number) || 0,
-      category: (item.category as number) || 0,
-    }));
-  } catch (error) {
-    console.warn('[BooruService] Danbooru client-side autocomplete error:', error);
-    return [];
-  }
-}
 
 /**
  * Get tag autocomplete suggestions
+ * Note: Danbooru autocomplete may fail due to Cloudflare protection.
+ * Configure an HTTP proxy in plugin settings to potentially bypass this.
  */
 export async function autocompleteTags(
   source: SourceType,
@@ -307,13 +268,9 @@ export async function autocompleteTags(
 
   console.log(`[BooruService] Autocomplete for "${query}" on ${source}`);
 
-  // Danbooru is behind Cloudflare - use client-side fetch which works with browser cookies
-  if (source === 'danbooru') {
-    return autocompleteDanbooruClientSide(query, limit);
-  }
-
   try {
-    // For other sources, use server-side (Python backend)
+    // All sources use server-side (Python backend)
+    // Danbooru may be blocked by Cloudflare - proxy may help
     const settings = await getPluginSettings();
     const credentials = getCredentialsForSource(settings, source);
 
@@ -327,7 +284,12 @@ export async function autocompleteTags(
     });
 
     if (!result || result.error) {
-      console.warn('[BooruService] Autocomplete error:', result?.error);
+      // Danbooru often fails due to Cloudflare - don't spam warnings
+      if (source === 'danbooru') {
+        console.log('[BooruService] Danbooru autocomplete unavailable (Cloudflare protection)');
+      } else {
+        console.warn('[BooruService] Autocomplete error:', result?.error);
+      }
       return [];
     }
 
