@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = {
   resultsPerPage: 40,
   safeMode: false,
   showThumbnails: true,
+  autoLoad: true,
 } as const;
 
 // Grid layout breakpoints

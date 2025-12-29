@@ -12,7 +12,7 @@ export const SkeletonGrid: React.FC<SkeletonGridProps> = ({ count = 12 }) => {
   return (
     <div className="row g-3">
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="col-6 col-sm-4 col-md-3 col-lg-2">
+        <div key={index} className="col-6 col-sm-4 col-md-3 col-xl-2">
           <SkeletonCard />
         </div>
       ))}

@@ -9,6 +9,7 @@ export interface BrowserSettings {
   resultsPerPage: number;
   safeMode: boolean;
   showThumbnails: boolean;
+  autoLoad: boolean;
 }
 
 export function loadSettings(): BrowserSettings {

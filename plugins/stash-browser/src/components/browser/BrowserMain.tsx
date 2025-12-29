@@ -407,20 +407,69 @@ export const BrowserMain: React.FC = () => {
                 showThumbnails={settings.showThumbnails}
               />
 
-              {/* Infinite scroll trigger and loading indicator */}
-              <div ref={loadMoreRef} className="py-4">
+              {/* Load more trigger and loading indicator */}
+              <div ref={settings.autoLoad ? loadMoreRef : undefined} className="py-4">
                 {isLoadingMore ? (
-                  <div className="text-center">
+                  <>
                     <div className="d-flex align-items-center justify-content-center gap-3 mb-3">
                       <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
                       <span className="text-muted" style={{ fontSize: '0.85rem' }}>Loading more...</span>
                       <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
                     </div>
                     <SkeletonGrid count={Math.min(6, settings.resultsPerPage)} />
-                  </div>
+                  </>
                 ) : hasMore ? (
-                  <div className="text-center text-muted" style={{ fontSize: '0.85rem' }}>
-                    <span>Scroll for more</span>
+                  <div className="text-center">
+                    {/* Separator */}
+                    <div className="d-flex align-items-center justify-content-center gap-3 mb-3">
+                      <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                      <span className="text-muted" style={{ fontSize: '0.85rem' }}>
+                        {settings.autoLoad ? 'Scroll for more' : 'More results available'}
+                      </span>
+                      <hr className="flex-grow-1" style={{ borderColor: 'var(--stash-border)' }} />
+                    </div>
+
+                    {/* Load More button (when autoLoad is off) */}
+                    {!settings.autoLoad && (
+                      <button
+                        className="btn btn-outline-primary mb-3"
+                        onClick={handleLoadMore}
+                        disabled={isLoadingMore}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="me-2" viewBox="0 0 16 16">
+                          <path fillRule="evenodd" d="M8 4a.5.5 0 0 1 .5.5v5.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 1 1 .708-.708L7.5 10.293V4.5A.5.5 0 0 1 8 4z"/>
+                        </svg>
+                        Load More
+                      </button>
+                    )}
+
+                    {/* Auto-load toggle */}
+                    <button
+                      className={`btn btn-sm ${settings.autoLoad ? 'btn-outline-success' : 'btn-outline-secondary'}`}
+                      onClick={() => {
+                        const newSettings = { ...settings, autoLoad: !settings.autoLoad };
+                        setSettings(newSettings);
+                        saveSettings(newSettings);
+                      }}
+                      title={settings.autoLoad ? 'Auto-load enabled' : 'Auto-load disabled'}
+                    >
+                      {settings.autoLoad ? (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                            <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+                            <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
+                          </svg>
+                          Auto
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                            <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5zm5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5z"/>
+                          </svg>
+                          Manual
+                        </>
+                      )}
+                    </button>
                   </div>
                 ) : (
                   <div className="d-flex align-items-center justify-content-center gap-3">
