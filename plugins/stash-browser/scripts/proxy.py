@@ -245,7 +245,7 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
         return []
 
 
-def autocomplete_tags(source: str, query: str, limit: int = 10,
+def autocomplete_tags(source: str, query: str, limit: int = 100,
                        proxy_url: str | None = None,
                        api_key: str | None = None,
                        user_id: str | None = None) -> dict:

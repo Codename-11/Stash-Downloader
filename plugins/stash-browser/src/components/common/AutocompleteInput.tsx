@@ -103,7 +103,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       const currentRequestId = ++requestIdRef.current;
 
       try {
-        const results = await autocompleteTags(source, query, 10);
+        const results = await autocompleteTags(source, query, 100);
 
         // Ignore stale responses (user kept typing)
         if (currentRequestId !== requestIdRef.current) {

@@ -252,12 +252,54 @@ export async function getPost(source: SourceType, postId: number): Promise<IBoor
 }
 
 /**
+ * Client-side autocomplete for Danbooru (bypasses Cloudflare protection)
+ * Danbooru's API is behind Cloudflare which blocks server-side requests,
+ * but browser requests work because the user has solved the challenge.
+ */
+async function autocompleteDanbooruClientSide(
+  query: string,
+  limit: number
+): Promise<TagSuggestion[]> {
+  const url = `https://danbooru.donmai.us/autocomplete.json?search[query]=${encodeURIComponent(query)}&search[type]=tag_query&limit=${limit}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+      credentials: 'include', // Include cookies for Cloudflare
+    });
+
+    if (!response.ok) {
+      console.warn(`[BooruService] Danbooru client-side autocomplete failed: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+
+    // Danbooru returns [{type, label, value, category, post_count}, ...]
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    return data.slice(0, limit).map((item: Record<string, unknown>) => ({
+      name: (item.value as string) || (item.label as string) || '',
+      count: (item.post_count as number) || 0,
+      category: (item.category as number) || 0,
+    }));
+  } catch (error) {
+    console.warn('[BooruService] Danbooru client-side autocomplete error:', error);
+    return [];
+  }
+}
+
+/**
  * Get tag autocomplete suggestions
  */
 export async function autocompleteTags(
   source: SourceType,
   query: string,
-  limit: number = 10
+  limit: number = 100
 ): Promise<TagSuggestion[]> {
   if (!query || query.length < 2) {
     return [];
@@ -265,8 +307,13 @@ export async function autocompleteTags(
 
   console.log(`[BooruService] Autocomplete for "${query}" on ${source}`);
 
+  // Danbooru is behind Cloudflare - use client-side fetch which works with browser cookies
+  if (source === 'danbooru') {
+    return autocompleteDanbooruClientSide(query, limit);
+  }
+
   try {
-    // Fetch settings and get credentials for this source
+    // For other sources, use server-side (Python backend)
     const settings = await getPluginSettings();
     const credentials = getCredentialsForSource(settings, source);
 
