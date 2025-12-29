@@ -11,6 +11,8 @@ import urllib.parse
 import urllib.error
 import ssl
 import os
+import subprocess
+import shutil
 import xml.etree.ElementTree as ET
 
 # Booru API endpoints
@@ -48,6 +50,47 @@ BOORU_APIS = {
 def log(message: str) -> None:
     """Log to stderr (visible in Stash logs)."""
     print(f"[stash-browser] {message}", file=sys.stderr)
+
+
+def fetch_with_curl(url: str, proxy_url: str | None = None) -> str | None:
+    """Fetch URL using curl (different TLS fingerprint than Python).
+
+    Returns the response body as string, or None if curl is not available or fails.
+    """
+    curl_path = shutil.which('curl')
+    if not curl_path:
+        log("curl not found in PATH")
+        return None
+
+    cmd = [
+        curl_path,
+        '-s',  # Silent
+        '-L',  # Follow redirects
+        '--max-time', '30',
+        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '-H', 'Accept: application/json, text/plain, */*',
+        '-H', 'Accept-Language: en-US,en;q=0.9',
+    ]
+
+    if proxy_url:
+        cmd.extend(['--proxy', proxy_url, '--insecure'])
+
+    cmd.append(url)
+
+    try:
+        log(f"Trying curl for: {url}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
+        if result.returncode == 0:
+            return result.stdout
+        else:
+            log(f"curl failed with code {result.returncode}: {result.stderr}")
+            return None
+    except subprocess.TimeoutExpired:
+        log("curl request timed out")
+        return None
+    except Exception as e:
+        log(f"curl error: {e}")
+        return None
 
 
 def create_opener(proxy_url: str | None = None):
@@ -97,6 +140,17 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
             data = response.read().decode('utf-8')
             return json.loads(data)
     except urllib.error.HTTPError as e:
+        if e.code == 403:
+            # Try curl fallback (different TLS fingerprint)
+            log(f"HTTP 403 from urllib, trying curl fallback...")
+            curl_result = fetch_with_curl(url, proxy_url)
+            if curl_result:
+                try:
+                    return json.loads(curl_result)
+                except json.JSONDecodeError:
+                    log(f"curl returned non-JSON: {curl_result[:200]}")
+                    raise Exception(f"HTTP {e.code}: {e.reason}")
+            raise Exception(f"HTTP {e.code}: {e.reason}")
         raise Exception(f"HTTP {e.code}: {e.reason}")
     except urllib.error.URLError as e:
         raise Exception(f"URL Error: {e.reason}")
@@ -276,7 +330,17 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
             return parsed
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            log(f"Autocomplete blocked (HTTP 403) - site may have Cloudflare protection. Try configuring a proxy.")
+            # Try curl fallback (different TLS fingerprint)
+            log(f"Autocomplete HTTP 403, trying curl fallback...")
+            curl_result = fetch_with_curl(url, proxy_url)
+            if curl_result:
+                try:
+                    parsed = json.loads(curl_result)
+                    log(f"curl autocomplete parsed: {len(parsed) if isinstance(parsed, list) else type(parsed).__name__}")
+                    return parsed if isinstance(parsed, list) else []
+                except json.JSONDecodeError:
+                    log(f"curl returned non-JSON: {curl_result[:200]}")
+            log(f"Autocomplete blocked (HTTP 403) - curl fallback also failed")
         else:
             log(f"Autocomplete HTTP error: {e.code} {e.reason}")
         return []
