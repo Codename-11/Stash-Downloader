@@ -274,8 +274,8 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
             log(f"Danbooru autocomplete failed: {e}")
 
     elif source == 'rule34':
-        # Rule34 uses a dedicated autocomplete subdomain
-        url = f"https://ac.rule34.xxx/autocomplete.php?q={urllib.parse.quote(query)}"
+        # Rule34 official autocomplete endpoint (api.rule34.xxx, not ac.rule34.xxx)
+        url = f"https://api.rule34.xxx/autocomplete.php?q={urllib.parse.quote(query)}"
         log(f"Tag autocomplete (Rule34): {url}")
 
         try:

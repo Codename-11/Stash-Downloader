@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { PLUGIN_NAME, APP_VERSION, DOWNLOADER_EVENTS, type SourceType } from '@/constants';
-import type { IBooruPost, ISearchParams, SortOption, RatingFilter } from '@/types';
+import type { IBooruPost, ISearchParams, SortOption, RatingFilter, MediaTypeFilter } from '@/types';
 import { searchPosts, getPostUrl } from '@/services/BooruService';
 import { SearchBar } from './SearchBar';
 import { ResultsGrid } from './ResultsGrid';
@@ -103,22 +103,38 @@ export const BrowserMain: React.FC = () => {
 
       console.log('[StashBrowser] Got results:', result.count, 'posts');
 
+      // Filter by media type (client-side since booru APIs don't support this)
+      // 'image' includes both static images and GIFs
+      let filteredPosts = result.posts;
+      if (params.mediaType && params.mediaType !== 'all') {
+        filteredPosts = result.posts.filter(p => {
+          if (params.mediaType === 'video') {
+            return p.fileType === 'video';
+          } else if (params.mediaType === 'image') {
+            return p.fileType === 'image' || p.fileType === 'gif';
+          }
+          return true;
+        });
+        console.log('[StashBrowser] Filtered to', filteredPosts.length, params.mediaType, 'posts');
+      }
+
       if (append) {
         // Append new posts, filtering out duplicates
         setPosts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
-          const newPosts = result.posts.filter(p => !existingIds.has(p.id));
+          const newPosts = filteredPosts.filter(p => !existingIds.has(p.id));
           return [...prev, ...newPosts];
         });
       } else {
-        setPosts(result.posts);
+        setPosts(filteredPosts);
       }
 
-      setTotalCount(result.count);
+      setTotalCount(prev => append ? prev : result.count);
 
       // Check if there are more results
-      const totalLoaded = append ? posts.length + result.posts.length : result.posts.length;
-      setHasMore(result.posts.length >= params.limit && totalLoaded < result.count);
+      // Use the service's hasMore flag (true if we got a full page of results)
+      // When filtering by media type, we may show fewer posts but should still load more
+      setHasMore(result.hasMore);
     } catch (err) {
       console.error('[StashBrowser] Search error:', err);
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -294,8 +310,8 @@ export const BrowserMain: React.FC = () => {
               <SearchBar
                 source={searchParams.source}
                 onSourceChange={handleSourceChange}
-                onSearch={(tags: string, sort: SortOption, rating: RatingFilter) =>
-                  handleSearch({ ...searchParams, tags, page: 0, sort, rating })
+                onSearch={(tags: string, sort: SortOption, rating: RatingFilter, mediaType: MediaTypeFilter) =>
+                  handleSearch({ ...searchParams, tags, page: 0, sort, rating, mediaType })
                 }
                 isLoading={isLoading}
                 showThumbnails={settings.showThumbnails}

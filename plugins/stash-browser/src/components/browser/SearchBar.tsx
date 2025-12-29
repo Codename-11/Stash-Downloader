@@ -8,12 +8,12 @@
 import React, { useState, useCallback, type FormEvent } from 'react';
 import { SOURCES, type SourceType } from '@/constants';
 import { AutocompleteInput } from '@/components/common';
-import type { SortOption, RatingFilter } from '@/types';
+import type { SortOption, RatingFilter, MediaTypeFilter } from '@/types';
 
 interface SearchBarProps {
   source: SourceType;
   onSourceChange: (source: SourceType) => void;
-  onSearch: (tags: string, sort: SortOption, rating: RatingFilter) => void;
+  onSearch: (tags: string, sort: SortOption, rating: RatingFilter, mediaType: MediaTypeFilter) => void;
   isLoading: boolean;
   showThumbnails: boolean;
   onToggleThumbnails: () => void;
@@ -32,6 +32,12 @@ const RATING_OPTIONS: { value: RatingFilter; label: string; short: string; color
   { value: 'explicit', label: 'Explicit', short: 'E', color: 'danger' },
 ];
 
+const MEDIA_TYPE_OPTIONS: { value: MediaTypeFilter; label: string; icon: string }[] = [
+  { value: 'all', label: 'Both', icon: '🎬' },
+  { value: 'image', label: 'Images', icon: '🖼️' },
+  { value: 'video', label: 'Videos', icon: '▶️' },
+];
+
 export const SearchBar: React.FC<SearchBarProps> = ({
   source,
   onSourceChange,
@@ -43,13 +49,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [sort, setSort] = useState<SortOption>('score');
   const [rating, setRating] = useState<RatingFilter>('all');
+  const [mediaType, setMediaType] = useState<MediaTypeFilter>('all');
 
   const handleSubmit = useCallback((e?: FormEvent) => {
     e?.preventDefault();
     if (tags.length > 0) {
-      onSearch(tags.join(' '), sort, rating);
+      onSearch(tags.join(' '), sort, rating, mediaType);
     }
-  }, [tags, sort, rating, onSearch]);
+  }, [tags, sort, rating, mediaType, onSearch]);
 
   return (
     <form onSubmit={handleSubmit} className="search-bar">
@@ -129,6 +136,24 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 onClick={() => setRating(opt.value)}
               >
                 <span className="rating-indicator" style={{ backgroundColor: rating === opt.value ? `var(--rating-${opt.value}-bg)` : 'transparent' }}></span>
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Media Type */}
+        <div className="mb-3">
+          <small className="filter-label d-block mb-1">Media Type</small>
+          <div className="d-flex flex-column gap-1">
+            {MEDIA_TYPE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`btn btn-sm d-flex align-items-center gap-2 ${mediaType === opt.value ? 'btn-primary' : 'btn-outline-secondary'}`}
+                onClick={() => setMediaType(opt.value)}
+              >
+                <span>{opt.icon}</span>
                 <span>{opt.label}</span>
               </button>
             ))}

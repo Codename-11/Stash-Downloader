@@ -96,17 +96,73 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
               }}
             >
               {isVideo ? (
-                <video
-                  src={post.fileUrl}
-                  controls
-                  autoPlay
-                  loop
+                // Video placeholder - can't embed due to CSP restrictions
+                <div
+                  className="position-relative d-flex flex-column align-items-center justify-content-center"
                   style={{
-                    maxWidth: '100%',
-                    maxHeight: '90vh',
-                    objectFit: 'contain',
+                    minWidth: 400,
+                    minHeight: 300,
+                    backgroundColor: '#1a1a1a',
+                    padding: '2rem',
                   }}
-                />
+                >
+                  {/* Preview thumbnail if available */}
+                  {post.previewUrl && (
+                    <img
+                      src={post.previewUrl}
+                      alt={`Preview ${post.id}`}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '50vh',
+                        objectFit: 'contain',
+                        opacity: 0.7,
+                        borderRadius: 4,
+                      }}
+                    />
+                  )}
+
+                  {/* Play button overlay */}
+                  <div
+                    className="position-absolute d-flex flex-column align-items-center justify-content-center"
+                    style={{
+                      inset: 0,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                    }}
+                  >
+                    <a
+                      href={post.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-lg rounded-circle d-flex align-items-center justify-content-center mb-3"
+                      style={{
+                        width: 80,
+                        height: 80,
+                        backgroundColor: 'rgba(255,255,255,0.9)',
+                        color: '#000',
+                      }}
+                      title="Open video in new tab"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/>
+                      </svg>
+                    </a>
+
+                    <div className="text-center">
+                      <span className="badge bg-info mb-2" style={{ fontSize: '1rem' }}>
+                        VIDEO
+                      </span>
+                      <p className="text-light mb-1" style={{ fontSize: '0.9rem' }}>
+                        {post.width} x {post.height}
+                      </p>
+                      <p className="text-muted mb-0" style={{ fontSize: '0.75rem' }}>
+                        Click play to open in new tab
+                      </p>
+                      <p className="text-muted" style={{ fontSize: '0.65rem', opacity: 0.7 }}>
+                        (Video preview blocked by browser security)
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <img
                   src={post.sampleUrl || post.fileUrl}

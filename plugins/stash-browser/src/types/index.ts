@@ -106,6 +106,11 @@ export type SortOption = 'score' | 'id' | 'updated';
 export type RatingFilter = 'all' | 'safe' | 'questionable' | 'explicit';
 
 /**
+ * Media type filter options
+ */
+export type MediaTypeFilter = 'all' | 'image' | 'video';
+
+/**
  * Search parameters
  */
 export interface ISearchParams {
@@ -115,6 +120,7 @@ export interface ISearchParams {
   limit: number;
   sort?: SortOption;
   rating?: RatingFilter;
+  mediaType?: MediaTypeFilter;
 }
 
 /**
