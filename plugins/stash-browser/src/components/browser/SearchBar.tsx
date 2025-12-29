@@ -71,6 +71,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <option value={SOURCES.RULE34}>Rule34</option>
           <option value={SOURCES.GELBOORU}>Gelbooru</option>
           <option value={SOURCES.DANBOORU}>Danbooru</option>
+          <option value={SOURCES.AIBOORU}>AIBooru</option>
         </select>
       </div>
 
