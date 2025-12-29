@@ -161,6 +161,7 @@ def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
     log(f"Fetching: {url}")
 
     result = fetch_url(url, proxy_url)
+    log(f"Search result type: {type(result).__name__}, is_list: {isinstance(result, list)}, len: {len(result) if isinstance(result, list) else 'N/A'}")
 
     # Normalize response format based on source
     if source in ('danbooru', 'aibooru'):
@@ -255,7 +256,10 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
     try:
         with opener.open(request, timeout=10) as response:
             data = response.read().decode('utf-8')
-            return json.loads(data)
+            log(f"Autocomplete response length: {len(data)} chars")
+            parsed = json.loads(data)
+            log(f"Autocomplete parsed: {len(parsed) if isinstance(parsed, list) else type(parsed).__name__}")
+            return parsed
     except urllib.error.HTTPError as e:
         if e.code == 403:
             log(f"Autocomplete blocked (HTTP 403) - site may have Cloudflare protection. Try configuring a proxy.")
@@ -354,6 +358,7 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
 
         try:
             result = fetch_autocomplete_json(url, 'https://aibooru.online/', proxy_url)
+            log(f"AIBooru autocomplete raw result: {len(result) if result else 0} items")
             # AIBooru autocomplete returns [{type, label, value, category, post_count}, ...]
             for item in result[:limit]:
                 if isinstance(item, dict):
