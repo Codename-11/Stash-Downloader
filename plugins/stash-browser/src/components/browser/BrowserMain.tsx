@@ -146,7 +146,7 @@ export const BrowserMain: React.FC = () => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [settings.safeMode, posts.length]);
+  }, [settings.safeMode]);
 
   const handleSourceChange = useCallback((source: SourceType) => {
     const newParams = { ...searchParams, source, page: 0 };
