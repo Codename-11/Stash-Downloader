@@ -274,36 +274,32 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
             log(f"Danbooru autocomplete failed: {e}")
 
     elif source == 'rule34':
-        # Rule34 Tags API supports limit parameter (autocomplete.php doesn't)
-        # Use name_pattern with % wildcard for prefix matching
-        params = {
-            'page': 'dapi',
-            's': 'tag',
-            'q': 'index',
-            'json': '1',
-            'limit': limit,
-            'name_pattern': f"{query}%",  # Prefix match
-            'orderby': 'count',  # Sort by popularity
-        }
-        # Add auth if provided (required for API access)
-        if api_key and user_id:
-            params['api_key'] = api_key
-            params['user_id'] = user_id
-
-        url = f"https://api.rule34.xxx/index.php?{urllib.parse.urlencode(params)}"
-        log(f"Tag autocomplete (Rule34 Tags API): {url}")
+        # Rule34 autocomplete endpoint - returns max 10 results (API limitation)
+        # but results are sorted by popularity which is better for UX
+        # The Tags API supports limit but doesn't sort by popularity
+        url = f"https://api.rule34.xxx/autocomplete.php?q={urllib.parse.quote(query)}"
+        log(f"Tag autocomplete (Rule34): {url}")
 
         try:
             result = fetch_autocomplete_json(url, 'https://rule34.xxx/', proxy_url)
-            # Tags API returns [{id, name, count, type, ambiguous}, ...]
-            if isinstance(result, list):
-                for item in result[:limit]:
-                    if isinstance(item, dict):
-                        tags.append({
-                            'name': item.get('name', ''),
-                            'count': item.get('count', 0),
-                            'category': item.get('type', 0),  # Tag type/category
-                        })
+            # Rule34 autocomplete returns [{label: "tag (count)", value: "tag"}, ...]
+            for item in result[:limit]:
+                if isinstance(item, dict):
+                    label = item.get('label', '')
+                    value = item.get('value', '')
+                    # Parse count from label like "gwen_tennyson (18661)"
+                    count = 0
+                    if '(' in label and ')' in label:
+                        try:
+                            count_str = label.rsplit('(', 1)[-1].rstrip(')')
+                            count = int(count_str)
+                        except (ValueError, IndexError):
+                            pass
+                    tags.append({
+                        'name': value,
+                        'count': count,
+                        'category': 0,  # Rule34 autocomplete doesn't include category
+                    })
         except Exception as e:
             log(f"Rule34 autocomplete failed: {e}")
 
