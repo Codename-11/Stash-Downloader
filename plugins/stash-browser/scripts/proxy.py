@@ -240,22 +240,15 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
     """
     opener = create_opener(proxy_url)
 
-    # Full browser-like headers to avoid bot detection
+    # Browser-like headers (avoid gzip - urllib doesn't auto-decompress)
     request = urllib.request.Request(
         url,
         headers={
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
             'Referer': referer,
-            'Origin': referer.rstrip('/'),
             'Connection': 'keep-alive',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
         }
     )
 
