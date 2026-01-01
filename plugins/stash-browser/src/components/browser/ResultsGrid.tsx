@@ -132,6 +132,23 @@ const PostCard: React.FC<PostCardProps> = ({
 
       {/* Card body */}
       <div className="card-body p-2">
+        {/* Tags preview - show first few tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="post-tags-preview mb-1" style={{ minHeight: '2.4em' }}>
+            {post.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="post-tag-chip"
+                title={tag.replace(/_/g, ' ')}
+              >
+                {tag.replace(/_/g, ' ')}
+              </span>
+            ))}
+            {post.tags.length > 3 && (
+              <span className="post-tag-more">+{post.tags.length - 3}</span>
+            )}
+          </div>
+        )}
         <div className="d-flex justify-content-between align-items-center">
           <small className="text-muted">#{post.id}</small>
           <div className="d-flex gap-1">

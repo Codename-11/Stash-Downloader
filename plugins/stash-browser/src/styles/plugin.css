@@ -467,6 +467,36 @@
 .stash-browser .tag-pill.tag-character { color: #0a0; }
 .stash-browser .tag-pill.tag-meta { color: #f80; }
 
+/* Post card tag preview chips */
+.stash-browser .post-tags-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+
+.stash-browser .post-tag-chip {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+  background-color: var(--stash-header-bg);
+  border: 1px solid var(--stash-border);
+  border-radius: 0.25rem;
+  color: var(--stash-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.stash-browser .post-tag-more {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.6rem;
+  color: var(--stash-muted);
+  font-style: italic;
+}
+
 /* ==========================================================================
    Settings Panel
    ========================================================================== */

@@ -326,7 +326,10 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
             for item in result[:limit]:
                 if isinstance(item, dict):
                     label = item.get('label', '')
-                    value = item.get('value', '')
+                    value = item.get('value', '').strip().replace('\r\n', ' ').replace('\n', ' ')
+                    # Skip entries with multiple tags (contains spaces after cleanup)
+                    if ' ' in value:
+                        continue
                     # Parse count from label like "gwen_tennyson (18661)"
                     count = 0
                     if '(' in label and ')' in label:
