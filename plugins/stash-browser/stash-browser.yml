@@ -1,6 +1,6 @@
 name: Stash Browser
 description: Browse booru sites and add content to Stash Downloader queue. Requires Stash Downloader plugin.
-version: 0.1.0
+version: 0.2.0
 url: https://github.com/Codename-11/Stash-Downloader
 
 # Python backend for CORS proxy
