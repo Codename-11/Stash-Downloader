@@ -130,40 +130,32 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* Card body */}
+      {/* Card body - compact info bar */}
       <div className="card-body p-2">
-        {/* Tags preview - show first few tags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="post-tags-preview mb-1" style={{ minHeight: '2.4em' }}>
-            {post.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="post-tag-chip"
-                title={tag.replace(/_/g, ' ')}
-              >
-                {tag.replace(/_/g, ' ')}
+        <div className="d-flex justify-content-between align-items-center">
+          <div className="post-info">
+            <span className="post-id">#{post.id}</span>
+            {post.score !== undefined && post.score > 0 && (
+              <span className="post-score">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z"/>
+                </svg>
+                {post.score}
               </span>
-            ))}
-            {post.tags.length > 3 && (
-              <span className="post-tag-more">+{post.tags.length - 3}</span>
             )}
           </div>
-        )}
-        <div className="d-flex justify-content-between align-items-center">
-          <small className="text-muted">#{post.id}</small>
           <div className="d-flex gap-1">
             <button
-              className="btn btn-sm btn-outline-light py-0 px-2"
+              className="btn btn-sm btn-outline-secondary py-0 px-2"
               onClick={(e) => {
                 e.stopPropagation();
                 onViewDetail();
               }}
-              title="View details (double-click)"
+              title="View details"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M5.5 3.5a.5.5 0 0 1 0-1h5a.5.5 0 0 1 0 1h-5zM5 4.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm.5 1.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm0 2a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zm-.5 3a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5z"/>
-                <path d="M3 0h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v1H1V2a2 2 0 0 1 2-2z"/>
-                <path d="M1 5v-.5a.5.5 0 0 1 1 0V5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0V8h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1zm0 3v-.5a.5.5 0 0 1 1 0v.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H1z"/>
+                <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
+                <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
               </svg>
             </button>
             <button
@@ -172,17 +164,12 @@ const PostCard: React.FC<PostCardProps> = ({
                 e.stopPropagation();
                 onAddToQueue();
               }}
-              title="Add to Stash Downloader queue"
+              title="Add to queue"
             >
               +
             </button>
           </div>
         </div>
-        {post.score !== undefined && (
-          <small className="text-muted d-block">
-            Score: {post.score}
-          </small>
-        )}
       </div>
     </div>
   );

@@ -467,34 +467,30 @@
 .stash-browser .tag-pill.tag-character { color: #0a0; }
 .stash-browser .tag-pill.tag-meta { color: #f80; }
 
-/* Post card tag preview chips */
-.stash-browser .post-tags-preview {
+/* Post card info bar */
+.stash-browser .post-info {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.stash-browser .post-id {
+  font-size: 0.75rem;
+  color: var(--stash-muted);
+  font-weight: 500;
+}
+
+.stash-browser .post-score {
+  display: inline-flex;
+  align-items: center;
   gap: 0.25rem;
-  overflow: hidden;
+  font-size: 0.7rem;
+  color: #ffc107;
 }
 
-.stash-browser .post-tag-chip {
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.65rem;
-  background-color: var(--stash-header-bg);
-  border: 1px solid var(--stash-border);
-  border-radius: 0.25rem;
-  color: var(--stash-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.stash-browser .post-tag-more {
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.6rem;
-  color: var(--stash-muted);
-  font-style: italic;
+.stash-browser .post-score svg {
+  opacity: 0.8;
 }
 
 /* ==========================================================================
