@@ -11,6 +11,7 @@ interface ResultsGridProps {
   onSelectPost: (postId: number) => void;
   onAddToQueue: (post: IBooruPost) => void;
   onViewDetail: (post: IBooruPost) => void;
+  onTagClick?: (tag: string) => void;
   showThumbnails?: boolean;
 }
 
@@ -20,6 +21,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({
   onSelectPost,
   onAddToQueue,
   onViewDetail,
+  onTagClick,
   showThumbnails = true,
 }) => {
   return (
@@ -32,6 +34,7 @@ export const ResultsGrid: React.FC<ResultsGridProps> = ({
             onSelect={() => onSelectPost(post.id)}
             onAddToQueue={() => onAddToQueue(post)}
             onViewDetail={() => onViewDetail(post)}
+            onTagClick={onTagClick}
             index={index}
             showThumbnail={showThumbnails}
           />
@@ -47,6 +50,7 @@ interface PostCardProps {
   onSelect: () => void;
   onAddToQueue: () => void;
   onViewDetail: () => void;
+  onTagClick?: (tag: string) => void;
   index: number;
   showThumbnail?: boolean;
 }
@@ -57,6 +61,7 @@ const PostCard: React.FC<PostCardProps> = ({
   onSelect,
   onAddToQueue,
   onViewDetail,
+  onTagClick,
   index,
   showThumbnail = true,
 }) => {
@@ -130,8 +135,31 @@ const PostCard: React.FC<PostCardProps> = ({
         )}
       </div>
 
-      {/* Card body - compact info bar */}
+      {/* Card body */}
       <div className="card-body p-2">
+        {/* Clickable tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="post-tags mb-2">
+            {post.tags.slice(0, 4).map((tag) => (
+              <button
+                key={tag}
+                className="post-tag-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTagClick?.(tag);
+                }}
+                title={`Add "${tag.replace(/_/g, ' ')}" to search`}
+              >
+                {tag.replace(/_/g, ' ')}
+              </button>
+            ))}
+            {post.tags.length > 4 && (
+              <span className="post-tag-more">+{post.tags.length - 4}</span>
+            )}
+          </div>
+        )}
+
+        {/* Info bar */}
         <div className="d-flex justify-content-between align-items-center">
           <div className="post-info">
             <span className="post-id">#{post.id}</span>

@@ -467,6 +467,44 @@
 .stash-browser .tag-pill.tag-character { color: #0a0; }
 .stash-browser .tag-pill.tag-meta { color: #f80; }
 
+/* Post card clickable tags */
+.stash-browser .post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  line-height: 1.2;
+}
+
+.stash-browser .post-tag-btn {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
+  background: transparent;
+  border: 1px solid var(--stash-border);
+  border-radius: 0.25rem;
+  color: var(--stash-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  transition: all var(--transition-fast) ease;
+}
+
+.stash-browser .post-tag-btn:hover {
+  background-color: var(--stash-hover-bg);
+  border-color: #6ea8fe;
+  color: #6ea8fe;
+}
+
+.stash-browser .post-tag-more {
+  display: inline-block;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.6rem;
+  color: var(--stash-muted);
+  font-style: italic;
+}
+
 /* Post card info bar */
 .stash-browser .post-info {
   display: flex;

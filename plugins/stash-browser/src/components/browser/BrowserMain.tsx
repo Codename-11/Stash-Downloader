@@ -245,9 +245,14 @@ export const BrowserMain: React.FC = () => {
   }, []);
 
   const handleTagClick = useCallback((tag: string) => {
-    // Close detail modal and search for this tag
+    // Close detail modal and add tag to existing search
     setDetailPost(null);
-    const newParams = { ...searchParams, tags: tag, page: 0 };
+    // Add tag to existing tags if not already present
+    const currentTags = searchParams.tags.split(' ').filter(t => t.trim());
+    if (!currentTags.includes(tag)) {
+      currentTags.push(tag);
+    }
+    const newParams = { ...searchParams, tags: currentTags.join(' '), page: 0 };
     handleSearch(newParams);
   }, [searchParams, handleSearch]);
 
@@ -396,6 +401,7 @@ export const BrowserMain: React.FC = () => {
                 onSelectPost={handleSelectPost}
                 onAddToQueue={handleAddToQueue}
                 onViewDetail={handleViewDetail}
+                onTagClick={handleTagClick}
                 showThumbnails={settings.showThumbnails}
               />
 
