@@ -10,10 +10,16 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import ssl
-import os
-import subprocess
-import shutil
 import xml.etree.ElementTree as ET
+
+# Optional: cloudscraper for bypassing TLS fingerprinting (Cloudflare, etc.)
+# Pre-installed in Stash CI image, or install with: pip install cloudscraper
+try:
+    import cloudscraper
+    CLOUDSCRAPER_AVAILABLE = True
+except ImportError:
+    CLOUDSCRAPER_AVAILABLE = False
+    # Note: Will log at runtime if needed
 
 # Booru API endpoints
 # Rule34 and Gelbooru require API keys (as of 2024)
@@ -52,44 +58,34 @@ def log(message: str) -> None:
     print(f"[stash-browser] {message}", file=sys.stderr)
 
 
-def fetch_with_curl(url: str, proxy_url: str | None = None) -> str | None:
-    """Fetch URL using curl (different TLS fingerprint than Python).
+def fetch_with_cloudscraper(url: str, proxy_url: str | None = None) -> dict | list | None:
+    """Fetch URL using cloudscraper (bypasses TLS fingerprinting).
 
-    Returns the response body as string, or None if curl is not available or fails.
+    Returns parsed JSON, or None if cloudscraper is not available or fails.
     """
-    curl_path = shutil.which('curl')
-    if not curl_path:
-        log("curl not found in PATH")
+    if not CLOUDSCRAPER_AVAILABLE:
+        log("cloudscraper not installed - install with: pip install cloudscraper")
         return None
-
-    cmd = [
-        curl_path,
-        '-s',  # Silent
-        '-L',  # Follow redirects
-        '--max-time', '30',
-        '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        '-H', 'Accept: application/json, text/plain, */*',
-        '-H', 'Accept-Language: en-US,en;q=0.9',
-    ]
-
-    if proxy_url:
-        cmd.extend(['--proxy', proxy_url, '--insecure'])
-
-    cmd.append(url)
 
     try:
-        log(f"Trying curl for: {url}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
-        if result.returncode == 0:
-            return result.stdout
-        else:
-            log(f"curl failed with code {result.returncode}: {result.stderr}")
-            return None
-    except subprocess.TimeoutExpired:
-        log("curl request timed out")
-        return None
+        log(f"Trying cloudscraper for: {url}")
+        scraper = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'desktop': True,
+            }
+        )
+
+        proxies = None
+        if proxy_url:
+            proxies = {'http': proxy_url, 'https': proxy_url}
+
+        response = scraper.get(url, proxies=proxies, timeout=30)
+        response.raise_for_status()
+        return response.json()
     except Exception as e:
-        log(f"curl error: {e}")
+        log(f"cloudscraper failed: {e}")
         return None
 
 
@@ -141,16 +137,11 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
             return json.loads(data)
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            # Try curl fallback (different TLS fingerprint)
-            log(f"HTTP 403 from urllib, trying curl fallback...")
-            curl_result = fetch_with_curl(url, proxy_url)
-            if curl_result:
-                try:
-                    return json.loads(curl_result)
-                except json.JSONDecodeError:
-                    log(f"curl returned non-JSON: {curl_result[:200]}")
-                    raise Exception(f"HTTP {e.code}: {e.reason}")
-            raise Exception(f"HTTP {e.code}: {e.reason}")
+            # Try cloudscraper fallback (bypasses TLS fingerprinting)
+            log(f"HTTP 403 from urllib, trying cloudscraper fallback...")
+            result = fetch_with_cloudscraper(url, proxy_url)
+            if result is not None:
+                return result
         raise Exception(f"HTTP {e.code}: {e.reason}")
     except urllib.error.URLError as e:
         raise Exception(f"URL Error: {e.reason}")
@@ -330,17 +321,15 @@ def fetch_autocomplete_json(url: str, referer: str, proxy_url: str | None = None
             return parsed
     except urllib.error.HTTPError as e:
         if e.code == 403:
-            # Try curl fallback (different TLS fingerprint)
-            log(f"Autocomplete HTTP 403, trying curl fallback...")
-            curl_result = fetch_with_curl(url, proxy_url)
-            if curl_result:
-                try:
-                    parsed = json.loads(curl_result)
-                    log(f"curl autocomplete parsed: {len(parsed) if isinstance(parsed, list) else type(parsed).__name__}")
-                    return parsed if isinstance(parsed, list) else []
-                except json.JSONDecodeError:
-                    log(f"curl returned non-JSON: {curl_result[:200]}")
-            log(f"Autocomplete blocked (HTTP 403) - curl fallback also failed")
+            # Try cloudscraper fallback (bypasses TLS fingerprinting)
+            log(f"Autocomplete HTTP 403, trying cloudscraper fallback...")
+            result = fetch_with_cloudscraper(url, proxy_url)
+            if result is not None:
+                if isinstance(result, list):
+                    log(f"cloudscraper autocomplete success: {len(result)} items")
+                    return result
+                log(f"cloudscraper returned non-list: {type(result).__name__}")
+            log(f"Autocomplete blocked (HTTP 403) - cloudscraper also failed")
         else:
             log(f"Autocomplete HTTP error: {e.code} {e.reason}")
         return []
