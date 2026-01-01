@@ -49,6 +49,9 @@ export const BrowserMain: React.FC = () => {
   // Detail modal state
   const [detailPost, setDetailPost] = useState<IBooruPost | null>(null);
 
+  // Current search tags as array (for SearchBar sync)
+  const [searchTags, setSearchTags] = useState<string[]>([]);
+
   // Infinite scroll ref
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -241,15 +244,17 @@ export const BrowserMain: React.FC = () => {
   }, []);
 
   const handleTagClick = useCallback((tag: string) => {
-    // Close detail modal and add tag to existing search
+    // Add tag to search tags array if not already present
+    setSearchTags(prev => {
+      if (prev.includes(tag)) return prev;
+      const newTags = [...prev, tag];
+      // Trigger search with new tags
+      const newParams = { ...searchParams, tags: newTags.join(' '), page: 0 };
+      handleSearch(newParams);
+      return newTags;
+    });
+    // Close detail modal
     setDetailPost(null);
-    // Add tag to existing tags if not already present
-    const currentTags = searchParams.tags.split(' ').filter(t => t.trim());
-    if (!currentTags.includes(tag)) {
-      currentTags.push(tag);
-    }
-    const newParams = { ...searchParams, tags: currentTags.join(' '), page: 0 };
-    handleSearch(newParams);
   }, [searchParams, handleSearch]);
 
   const handleToggleThumbnails = useCallback(() => {
@@ -303,12 +308,15 @@ export const BrowserMain: React.FC = () => {
               <SearchBar
                 source={searchParams.source}
                 onSourceChange={handleSourceChange}
-                onSearch={(tags: string, sort: SortOption, rating: RatingFilter, mediaType: MediaTypeFilter) =>
-                  handleSearch({ ...searchParams, tags, page: 0, sort, rating, mediaType })
-                }
+                onSearch={(tags: string, sort: SortOption, rating: RatingFilter, mediaType: MediaTypeFilter) => {
+                  setSearchTags(tags.split(' ').filter(t => t.trim()));
+                  handleSearch({ ...searchParams, tags, page: 0, sort, rating, mediaType });
+                }}
                 isLoading={isLoading}
                 showThumbnails={settings.showThumbnails}
                 onToggleThumbnails={handleToggleThumbnails}
+                searchTags={searchTags}
+                onTagsChange={setSearchTags}
               />
             </div>
 
@@ -495,7 +503,11 @@ export const BrowserMain: React.FC = () => {
         post={detailPost}
         onClose={() => setDetailPost(null)}
         onAddToQueue={handleAddToQueue}
-        onTagClick={handleTagClick}
+        currentSearchTags={searchTags}
+        onUpdateSearch={(tags) => {
+          setSearchTags(tags);
+          handleSearch({ ...searchParams, tags: tags.join(' '), page: 0 });
+        }}
       />
     </div>
   );

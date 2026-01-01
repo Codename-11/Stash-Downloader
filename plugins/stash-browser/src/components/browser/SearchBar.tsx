@@ -5,7 +5,7 @@
  * sort options, and rating filters.
  */
 
-import React, { useState, useCallback, type FormEvent } from 'react';
+import React, { useState, useCallback, useEffect, type FormEvent } from 'react';
 import { SOURCES, type SourceType } from '@/constants';
 import { AutocompleteInput } from '@/components/common';
 import type { SortOption, RatingFilter, MediaTypeFilter } from '@/types';
@@ -17,6 +17,9 @@ interface SearchBarProps {
   isLoading: boolean;
   showThumbnails: boolean;
   onToggleThumbnails: () => void;
+  /** Controlled tags - when set externally, updates the input */
+  searchTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string; icon: string }[] = [
@@ -45,11 +48,26 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   isLoading,
   showThumbnails,
   onToggleThumbnails,
+  searchTags,
+  onTagsChange,
 }) => {
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(searchTags || []);
   const [sort, setSort] = useState<SortOption>('score');
   const [rating, setRating] = useState<RatingFilter>('all');
   const [mediaType, setMediaType] = useState<MediaTypeFilter>('all');
+
+  // Sync with external tag changes
+  useEffect(() => {
+    if (searchTags !== undefined) {
+      setTags(searchTags);
+    }
+  }, [searchTags]);
+
+  // Notify parent of tag changes
+  const handleTagsChange = useCallback((newTags: string[]) => {
+    setTags(newTags);
+    onTagsChange?.(newTags);
+  }, [onTagsChange]);
 
   const handleSubmit = useCallback((e?: FormEvent) => {
     e?.preventDefault();
@@ -78,7 +96,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <AutocompleteInput
           source={source}
           value={tags}
-          onChange={setTags}
+          onChange={handleTagsChange}
           onSubmit={handleSubmit}
           disabled={isLoading}
           placeholder="Type tags..."

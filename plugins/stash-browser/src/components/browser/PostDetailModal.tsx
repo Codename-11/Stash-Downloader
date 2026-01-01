@@ -2,7 +2,7 @@
  * Post Detail Modal Component
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { stashColors } from '@stash-plugins/shared';
 import { RATING_COLORS } from '@/constants';
 import type { IBooruPost } from '@/types';
@@ -12,7 +12,10 @@ interface PostDetailModalProps {
   post: IBooruPost | null;
   onClose: () => void;
   onAddToQueue: (post: IBooruPost) => void;
-  onTagClick: (tag: string) => void;
+  /** Current search tags for the tag editor */
+  currentSearchTags?: string[];
+  /** Called when user wants to update search with new tags */
+  onUpdateSearch?: (tags: string[]) => void;
 }
 
 // Tag category colors (booru convention)
@@ -28,8 +31,42 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
   post,
   onClose,
   onAddToQueue,
-  onTagClick,
+  currentSearchTags = [],
+  onUpdateSearch,
 }) => {
+  // Pending tags for the tag editor
+  const [pendingTags, setPendingTags] = useState<string[]>([]);
+
+  // Reset pending tags when modal opens/closes
+  useEffect(() => {
+    if (post) {
+      setPendingTags([...currentSearchTags]);
+    } else {
+      setPendingTags([]);
+    }
+  }, [post, currentSearchTags]);
+
+  const handleAddTag = useCallback((tag: string) => {
+    setPendingTags(prev => {
+      if (prev.includes(tag)) return prev;
+      return [...prev, tag];
+    });
+  }, []);
+
+  const handleRemoveTag = useCallback((tag: string) => {
+    setPendingTags(prev => prev.filter(t => t !== tag));
+  }, []);
+
+  const handleUpdateSearch = useCallback(() => {
+    if (onUpdateSearch) {
+      onUpdateSearch(pendingTags);
+    }
+    onClose();
+  }, [pendingTags, onUpdateSearch, onClose]);
+
+  // Check if pending tags differ from current
+  const hasPendingChanges = JSON.stringify(pendingTags.sort()) !== JSON.stringify([...currentSearchTags].sort());
+
   const handleOpenInBrowser = useCallback(() => {
     if (post) {
       const url = getPostUrl(post);
@@ -241,26 +278,79 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
                   </small>
                 </div>
 
+                {/* Pending Tags Editor */}
+                {pendingTags.length > 0 && (
+                  <div className="mb-3 p-2 rounded" style={{ backgroundColor: stashColors.headerBg, border: `1px solid ${stashColors.border}` }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <small className="text-muted">Search Tags</small>
+                      {hasPendingChanges && (
+                        <span className="badge bg-warning text-dark" style={{ fontSize: '0.65rem' }}>Modified</span>
+                      )}
+                    </div>
+                    <div className="d-flex flex-wrap gap-1 mb-2">
+                      {pendingTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="d-inline-flex align-items-center gap-1 px-2 py-1 rounded"
+                          style={{
+                            backgroundColor: stashColors.cardBg,
+                            border: `1px solid ${stashColors.border}`,
+                            fontSize: '0.75rem',
+                            color: '#6ea8fe',
+                          }}
+                        >
+                          {tag.replace(/_/g, ' ')}
+                          <button
+                            type="button"
+                            className="btn-close btn-close-white p-0 ms-1"
+                            style={{ fontSize: '0.5rem', opacity: 0.7 }}
+                            onClick={() => handleRemoveTag(tag)}
+                            aria-label={`Remove ${tag}`}
+                          />
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      className="btn btn-sm btn-primary w-100"
+                      onClick={handleUpdateSearch}
+                      disabled={!hasPendingChanges && pendingTags.length === currentSearchTags.length}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                      </svg>
+                      Update Search
+                    </button>
+                  </div>
+                )}
+
                 {/* Tags */}
                 <div className="mb-3">
                   <h6 className="text-light mb-2">Tags ({post.tags.length})</h6>
                   <div className="d-flex flex-wrap gap-1" style={{ maxHeight: 200, overflowY: 'auto' }}>
-                    {post.tags.map((tag) => (
-                      <button
-                        key={tag}
-                        className="btn btn-sm py-0 px-2"
-                        style={{
-                          backgroundColor: stashColors.headerBg,
-                          borderColor: stashColors.border,
-                          color: CATEGORY_COLORS[0], // Default to general color
-                          fontSize: '0.75rem',
-                        }}
-                        onClick={() => onTagClick(tag)}
-                        title={`Search for ${tag}`}
-                      >
-                        {tag.replace(/_/g, ' ')}
-                      </button>
-                    ))}
+                    {post.tags.map((tag) => {
+                      const isInSearch = pendingTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          className="btn btn-sm py-0 px-2"
+                          style={{
+                            backgroundColor: isInSearch ? 'rgba(13, 110, 253, 0.2)' : stashColors.headerBg,
+                            borderColor: isInSearch ? '#0d6efd' : stashColors.border,
+                            color: isInSearch ? '#6ea8fe' : CATEGORY_COLORS[0],
+                            fontSize: '0.75rem',
+                          }}
+                          onClick={() => isInSearch ? handleRemoveTag(tag) : handleAddTag(tag)}
+                          title={isInSearch ? `Remove "${tag}" from search` : `Add "${tag}" to search`}
+                        >
+                          {isInSearch && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" className="me-1" viewBox="0 0 16 16">
+                              <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+                            </svg>
+                          )}
+                          {tag.replace(/_/g, ' ')}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

@@ -4,7 +4,8 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(gh pr view:*)"
+      "Bash(gh pr view:*)",
+      "WebFetch(domain:docs.stashapp.cc)"
     ]
   },
   "enableAllProjectMcpServers": true,

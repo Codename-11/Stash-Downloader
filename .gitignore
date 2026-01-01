@@ -52,6 +52,9 @@ yarn-error.log*
 coverage/
 .nyc_output/
 
+# Local files
+*.local.*
+
 # Temporary files
 tmp/
 temp/
