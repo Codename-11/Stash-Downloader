@@ -922,22 +922,21 @@
 }
 
 /* ==========================================================================
-   Results Grid
+   Results Grid (CSS Grid for uniform alignment)
    ========================================================================== */
 
 .stash-browser .results-grid {
-  /* Uniform gap between all cards */
-  --bs-gutter-x: 1rem;
-  --bs-gutter-y: 1rem;
-  gap: 1rem !important;
-  row-gap: 1rem !important;
-  column-gap: 1rem !important;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
 }
 
-.stash-browser .results-grid > [class*="col-"] {
-  /* Reset Bootstrap padding since we use gap */
-  padding-left: 0;
-  padding-right: 0;
+.stash-browser .results-grid-item {
+  display: flex;
+}
+
+.stash-browser .results-grid-item > .post-card {
+  width: 100%;
 }
 
 /* ==========================================================================
@@ -950,6 +949,11 @@
     padding-right: 0.75rem;
   }
 
+  .stash-browser .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+  }
+
   .stash-browser .post-card .card-body {
     padding: 0.375rem;
   }
@@ -960,16 +964,14 @@
 }
 
 @media (min-width: 1400px) {
-  .stash-browser .results-grid .col-lg-2 {
-    flex: 0 0 14.285%;
-    max-width: 14.285%;
+  .stash-browser .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
 }
 
 @media (min-width: 1800px) {
-  .stash-browser .results-grid .col-lg-2 {
-    flex: 0 0 12.5%;
-    max-width: 12.5%;
+  .stash-browser .results-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
 }
 
