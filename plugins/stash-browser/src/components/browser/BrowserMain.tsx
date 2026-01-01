@@ -37,7 +37,6 @@ export const BrowserMain: React.FC = () => {
 
   // Results state
   const [posts, setPosts] = useState<IBooruPost[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,8 +120,6 @@ export const BrowserMain: React.FC = () => {
         setPosts(filteredPosts);
       }
 
-      setTotalCount(prev => append ? prev : result.count);
-
       // Check if there are more results
       // Use the service's hasMore flag (true if we got a full page of results)
       // When filtering by media type, we may show fewer posts but should still load more
@@ -132,7 +129,6 @@ export const BrowserMain: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Search failed');
       if (!append) {
         setPosts([]);
-        setTotalCount(0);
       }
     } finally {
       setIsLoading(false);
@@ -391,7 +387,7 @@ export const BrowserMain: React.FC = () => {
             <>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <small className="text-muted">
-                  Showing {posts.length} of {totalCount > 0 ? `${totalCount}+` : posts.length} posts
+                  Showing {posts.length}{hasMore ? '+' : ''} posts
                 </small>
               </div>
 
