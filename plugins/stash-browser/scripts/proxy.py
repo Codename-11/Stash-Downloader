@@ -121,6 +121,9 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
     try:
         with opener.open(request, timeout=30) as response:
             data = response.read().decode('utf-8')
+            # Handle empty response (no results) - return empty list
+            if not data or not data.strip():
+                return []
             return json.loads(data)
     except urllib.error.HTTPError as e:
         if e.code == 403:
@@ -133,7 +136,9 @@ def fetch_url(url: str, proxy_url: str | None = None) -> dict:
     except urllib.error.URLError as e:
         raise Exception(f"URL Error: {e.reason}")
     except json.JSONDecodeError as e:
-        raise Exception(f"JSON decode error: {e}")
+        # Empty or malformed response - treat as no results
+        log(f"JSON decode error (treating as empty): {e}")
+        return []
 
 
 def fetch_xml(url: str, proxy_url: str | None = None) -> ET.Element:
