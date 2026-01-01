@@ -23,7 +23,6 @@ except ImportError:
 
 # Booru API endpoints
 # Rule34 and Gelbooru require API keys (as of 2024)
-# Danbooru and AIBooru work without authentication
 BOORU_APIS = {
     'rule34': {
         'base_url': 'https://api.rule34.xxx',
@@ -38,18 +37,6 @@ BOORU_APIS = {
         'search_params': {'page': 'dapi', 's': 'post', 'q': 'index', 'json': '1'},
         'requires_auth': True,
         'auth_params': ['api_key', 'user_id'],
-    },
-    'danbooru': {
-        'base_url': 'https://danbooru.donmai.us',
-        'search_path': '/posts.json',
-        'search_params': {},
-        'requires_auth': False,
-    },
-    'aibooru': {
-        'base_url': 'https://aibooru.online',
-        'search_path': '/posts.json',
-        'search_params': {},
-        'requires_auth': False,
     },
 }
 
@@ -196,17 +183,10 @@ def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
         params['api_key'] = api_key
         params['user_id'] = user_id
 
-    # Add search parameters based on API type
-    if source in ('danbooru', 'aibooru'):
-        # Danbooru-style API (also used by AIBooru)
-        params['tags'] = tags
-        params['page'] = page + 1  # Uses 1-indexed pages
-        params['limit'] = limit
-    else:
-        # Rule34 and Gelbooru use similar API
-        params['tags'] = tags
-        params['pid'] = page
-        params['limit'] = limit
+    # Add search parameters (Rule34 and Gelbooru use similar API)
+    params['tags'] = tags
+    params['pid'] = page
+    params['limit'] = limit
 
     query_string = urllib.parse.urlencode(params)
     url = f"{base_url}{path}?{query_string}"
@@ -216,20 +196,14 @@ def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
     result = fetch_url(url, proxy_url)
     log(f"Search result type: {type(result).__name__}, is_list: {isinstance(result, list)}, len: {len(result) if isinstance(result, list) else 'N/A'}")
 
-    # Normalize response format based on source
-    if source in ('danbooru', 'aibooru'):
-        # Danbooru-style API returns array directly
-        posts = result if isinstance(result, list) else []
-        count = len(posts)
+    # Normalize response format (Rule34/Gelbooru return array or {post: [...]})
+    if isinstance(result, list):
+        posts = result
+    elif isinstance(result, dict):
+        posts = result.get('post', result.get('posts', []))
     else:
-        # Rule34/Gelbooru return array or {post: [...]}
-        if isinstance(result, list):
-            posts = result
-        elif isinstance(result, dict):
-            posts = result.get('post', result.get('posts', []))
-        else:
-            posts = []
-        count = len(posts)
+        posts = []
+    count = len(posts)
 
     return {
         'source': source,
@@ -248,33 +222,24 @@ def get_post(source: str, post_id: int, proxy_url: str | None = None) -> dict:
 
     api = BOORU_APIS[source]
     base_url = api['base_url']
-
-    if source in ('danbooru', 'aibooru'):
-        # Danbooru-style API
-        url = f"{base_url}/posts/{post_id}.json"
-    else:
-        # Rule34/Gelbooru
-        path = api['search_path']
-        params = dict(api['search_params'])
-        params['id'] = post_id
-        query_string = urllib.parse.urlencode(params)
-        url = f"{base_url}{path}?{query_string}"
+    path = api['search_path']
+    params = dict(api['search_params'])
+    params['id'] = post_id
+    query_string = urllib.parse.urlencode(params)
+    url = f"{base_url}{path}?{query_string}"
 
     log(f"Fetching post: {url}")
 
     result = fetch_url(url, proxy_url)
 
-    # Normalize response
-    if source in ('danbooru', 'aibooru'):
-        post = result
+    # Normalize response (Rule34/Gelbooru)
+    if isinstance(result, list) and len(result) > 0:
+        post = result[0]
+    elif isinstance(result, dict):
+        posts = result.get('post', result.get('posts', []))
+        post = posts[0] if posts else None
     else:
-        if isinstance(result, list) and len(result) > 0:
-            post = result[0]
-        elif isinstance(result, dict):
-            posts = result.get('post', result.get('posts', []))
-            post = posts[0] if posts else None
-        else:
-            post = None
+        post = None
 
     if not post:
         raise Exception(f"Post {post_id} not found on {source}")
@@ -348,29 +313,7 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
 
     tags = []
 
-    if source == 'danbooru':
-        # Danbooru has a dedicated autocomplete endpoint
-        # Note: Danbooru is behind Cloudflare which often blocks server-side requests.
-        # If autocomplete fails, user can configure a proxy in plugin settings.
-        url = f"https://danbooru.donmai.us/autocomplete.json?search[query]={urllib.parse.quote(query)}&search[type]=tag_query&limit={limit}"
-        log(f"Tag autocomplete (Danbooru): {url}")
-
-        try:
-            result = fetch_autocomplete_json(url, 'https://danbooru.donmai.us/', proxy_url)
-            if not result:
-                log("Danbooru autocomplete returned no results (possibly blocked by Cloudflare)")
-            # Danbooru autocomplete returns [{type, label, value, category, post_count}, ...]
-            for item in result[:limit]:
-                if isinstance(item, dict):
-                    tags.append({
-                        'name': item.get('value', item.get('label', '')),
-                        'count': item.get('post_count', 0),
-                        'category': item.get('category', 0),
-                    })
-        except Exception as e:
-            log(f"Danbooru autocomplete failed: {e}")
-
-    elif source == 'rule34':
+    if source == 'rule34':
         # Rule34 autocomplete endpoint - returns max 10 results (API limitation)
         # but results are sorted by popularity which is better for UX
         # The Tags API supports limit but doesn't sort by popularity
@@ -417,25 +360,6 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
                     })
         except Exception as e:
             log(f"Gelbooru autocomplete failed: {e}")
-
-    elif source == 'aibooru':
-        # AIBooru uses Danbooru-style autocomplete endpoint
-        url = f"https://aibooru.online/autocomplete.json?search[query]={urllib.parse.quote(query)}&search[type]=tag_query&limit={limit}"
-        log(f"Tag autocomplete (AIBooru): {url}")
-
-        try:
-            result = fetch_autocomplete_json(url, 'https://aibooru.online/', proxy_url)
-            log(f"AIBooru autocomplete raw result: {len(result) if result else 0} items")
-            # AIBooru autocomplete returns [{type, label, value, category, post_count}, ...]
-            for item in result[:limit]:
-                if isinstance(item, dict):
-                    tags.append({
-                        'name': item.get('value', item.get('label', '')),
-                        'count': item.get('post_count', 0),
-                        'category': item.get('category', 0),
-                    })
-        except Exception as e:
-            log(f"AIBooru autocomplete failed: {e}")
 
     return {
         'source': source,

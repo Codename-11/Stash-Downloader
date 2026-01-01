@@ -284,12 +284,7 @@ export async function autocompleteTags(
     });
 
     if (!result || result.error) {
-      // Danbooru often fails due to Cloudflare - don't spam warnings
-      if (source === 'danbooru') {
-        console.log('[BooruService] Danbooru autocomplete unavailable (Cloudflare protection)');
-      } else {
-        console.warn('[BooruService] Autocomplete error:', result?.error);
-      }
+      console.warn('[BooruService] Autocomplete error:', result?.error);
       return [];
     }
 
@@ -404,10 +399,6 @@ export function getPostUrl(post: IBooruPost): string {
       return `https://rule34.xxx/index.php?page=post&s=view&id=${id}`;
     case SOURCES.GELBOORU:
       return `https://gelbooru.com/index.php?page=post&s=view&id=${id}`;
-    case SOURCES.DANBOORU:
-      return `https://danbooru.donmai.us/posts/${id}`;
-    case SOURCES.AIBOORU:
-      return `https://aibooru.online/posts/${id}`;
     default:
       return '';
   }

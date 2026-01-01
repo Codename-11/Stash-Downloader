@@ -71,17 +71,9 @@ export const BrowserMain: React.FC = () => {
     // Build search query with filters
     let searchTags = params.tags;
 
-    // Apply sort filter
-    // Rule34/Gelbooru use sort:field format, Danbooru uses order:field
-    // Always add sort parameter - default is NOT by score for most boorus
+    // Apply sort filter (Rule34/Gelbooru use sort:field format)
     if (params.sort) {
-      if (params.source === 'danbooru') {
-        // Danbooru uses order: prefix
-        searchTags = `${searchTags} order:${params.sort}`.trim();
-      } else {
-        // Rule34/Gelbooru use sort: prefix
-        searchTags = `${searchTags} sort:${params.sort}`.trim();
-      }
+      searchTags = `${searchTags} sort:${params.sort}`.trim();
     }
 
     // Apply rating filter (from search bar or settings safe mode)
