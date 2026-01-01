@@ -78,7 +78,8 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       debounceRef.current = null;
     }
 
-    const query = inputValue.trim().toLowerCase();
+    // Convert spaces to underscores for booru tag format (e.g., "violet parr" -> "violet_parr")
+    const query = inputValue.trim().toLowerCase().replace(/\s+/g, '_');
 
     // Clear suggestions if query too short
     if (query.length < MIN_SEARCH_LENGTH) {
@@ -187,13 +188,6 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       } else if (value.length > 0) {
         onSubmit();
       }
-      return;
-    }
-
-    // Handle space to add tag (if suggestions not open)
-    if (e.key === ' ' && inputValue.trim() && !isOpen) {
-      e.preventDefault();
-      addTag(inputValue);
       return;
     }
 
