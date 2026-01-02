@@ -512,22 +512,79 @@ jobs:
       - name: Get previous tag
         id: prev_tag
         run: |
-          PREV_TAG=$(git tag -l 'downloader-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
-          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
-            # First release or only one tag - get all commits
-            echo "range=HEAD" >> $GITHUB_OUTPUT
-          else
-            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
-          fi
-          echo "Previous tag: $PREV_TAG"
+          CURRENT_TAG="${{ github.ref_name }}"
+          # Get all downloader tags sorted by version (newest first)
+          ALL_TAGS=$(git tag -l 'downloader-v*' --sort=-v:refname)
 
-      - name: Get changelog
+          # Find the tag immediately before current
+          PREV_TAG=""
+          FOUND_CURRENT=false
+          for tag in $ALL_TAGS; do
+            if [ "$FOUND_CURRENT" = "true" ]; then
+              PREV_TAG="$tag"
+              break
+            fi
+            if [ "$tag" = "$CURRENT_TAG" ]; then
+              FOUND_CURRENT=true
+            fi
+          done
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "first_release=true" >> $GITHUB_OUTPUT
+            echo "prev_tag=" >> $GITHUB_OUTPUT
+            echo "First release detected"
+          else
+            echo "first_release=false" >> $GITHUB_OUTPUT
+            echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+            echo "Previous tag: $PREV_TAG"
+          fi
+
+      - name: Get changelog and diff analysis
         id: changelog
         run: |
-          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- plugins/stash-downloader/ shared/ 2>/dev/null || git log --pretty=format:"- %s" -20)
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          CURRENT_TAG="${{ github.ref_name }}"
+          PLUGIN_PATHS="plugins/stash-downloader/ shared/"
+
+          if [ "${{ steps.prev_tag.outputs.first_release }}" = "true" ]; then
+            # First release - get recent commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" -30 -- $PLUGIN_PATHS 2>/dev/null || echo "Initial release")
+            DIFF_STAT="Initial release - all files are new"
+            DIFF_SUMMARY=""
+          else
+            # Commits between tags, ONLY for this plugin's paths
+            COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s (%h)" -- $PLUGIN_PATHS 2>/dev/null)
+
+            # If no commits for this plugin, note that
+            if [ -z "$COMMITS" ]; then
+              COMMITS="No direct changes to plugin code (dependency or config updates only)"
+            fi
+
+            # Diff statistics for this plugin only
+            DIFF_STAT=$(git diff ${PREV_TAG}..${CURRENT_TAG} --stat -- $PLUGIN_PATHS 2>/dev/null || echo "")
+
+            # Get summary of actual changes (additions/deletions per file)
+            DIFF_SUMMARY=$(git diff ${PREV_TAG}..${CURRENT_TAG} --numstat -- $PLUGIN_PATHS 2>/dev/null | awk '{added+=$1; deleted+=$2; print $3": +"$1"/-"$2} END {print "\nTotal: +"added"/-"deleted" lines"}' || echo "")
+          fi
+
+          # Output using heredoc (safe for multiline)
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_stat<<DIFFSTAT_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFFSTAT_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_summary<<DIFFSUMMARY_EOF"
+            echo "$DIFF_SUMMARY"
+            echo "DIFFSUMMARY_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Generate AI release notes
         id: ai_notes
@@ -539,31 +596,65 @@ jobs:
             echo "No GOOGLE_API_KEY configured, skipping AI release notes"
             exit 0
           fi
+
           VERSION="${{ needs.deploy-downloader-stable.outputs.version }}"
-          COMMITS="${{ steps.changelog.outputs.commits }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          FIRST_RELEASE="${{ steps.prev_tag.outputs.first_release }}"
 
-          PROMPT="Generate release notes for Stash Downloader v${VERSION}. This is a Stash plugin for downloading videos/images with metadata extraction.
+          # Build context file to avoid shell escaping issues
+          cat > /tmp/release_context.txt << 'CONTEXT_EOF'
+          PLUGIN: Stash Downloader
+          DESCRIPTION: A Stash plugin for downloading videos/images from URLs with automatic metadata extraction using yt-dlp.
 
-          Recent commits:
-          ${COMMITS}
+          COMMITS (changes specific to this plugin only):
+          ${{ steps.changelog.outputs.commits }}
 
-          Format the response EXACTLY like this (use these exact headers and emoji):
+          FILE CHANGES:
+          ${{ steps.changelog.outputs.diff_stat }}
+
+          CHANGE SUMMARY:
+          ${{ steps.changelog.outputs.diff_summary }}
+          CONTEXT_EOF
+
+          # Build the prompt
+          if [ "$FIRST_RELEASE" = "true" ]; then
+            COMPARE_LINK="Initial release"
+            ANALYSIS_INSTRUCTION="This is the first release, so summarize the initial feature set."
+          else
+            COMPARE_LINK="[Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/${PREV_TAG}...${VERSION})"
+            ANALYSIS_INSTRUCTION="Analyze the commits and file changes to determine the NET changes. Look for:
+          - Features added then removed (reversion) - don't mention these
+          - Features that were refactored multiple times - summarize the final state only
+          - Bug fixes that were later reverted - don't mention these
+          Focus on what ACTUALLY changed from the user's perspective between releases."
+          fi
+
+          PROMPT="Generate release notes for Stash Downloader v${VERSION}.
+
+          $(cat /tmp/release_context.txt)
+
+          IMPORTANT ANALYSIS RULES:
+          ${ANALYSIS_INSTRUCTION}
+          - ONLY include changes from the COMMITS section above - these are filtered to this plugin only
+          - Do NOT mention changes to other plugins (stash-browser, browser-extension)
+          - If a feature was added then removed between releases, it's net zero - don't mention it
+
+          Format the response EXACTLY like this:
           ## 🚀 Stash Downloader v${VERSION}
 
           ### ✨ What's New
 
-          **Feature Name** — Description of what it does and why it matters.
+          **Feature Name** — Brief description of what it does.
 
-          [repeat for each significant feature/fix]
+          (repeat for each significant user-facing change)
 
-          [Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/PREV_TAG...downloader-v${VERSION})
+          ${COMPARE_LINK}
 
           ### 📝 All Changes
 
           - ✨ feat: description
           - 🐛 fix: description
           - ♻️ refactor: description
-          [list all commits with appropriate emoji]
 
           ---
 
@@ -584,16 +675,15 @@ jobs:
           - Python 3.7+ with yt-dlp (\`pip install yt-dlp\`)
 
           Rules:
-          - Be concise but informative
-          - Focus on user-facing changes
-          - Use bold for feature names
-          - Skip internal/minor changes in What's New section"
+          - Be concise - one line per feature
+          - Focus on user-facing changes only
+          - Skip internal refactoring from What's New (keep in All Changes)
+          - If no significant changes, say 'Maintenance release with minor improvements'"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
-          # Check for API errors
           ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
           if [ -n "$ERROR" ]; then
             echo "::warning::Gemini API error: $ERROR"
@@ -601,15 +691,16 @@ jobs:
           fi
 
           NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
-
           if [ -z "$NOTES" ]; then
-            echo "::warning::Gemini returned empty notes. Response: $(echo "$RESPONSE" | jq -c '.')"
+            echo "::warning::Empty response from Gemini"
             exit 0
           fi
 
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -640,22 +731,79 @@ jobs:
       - name: Get previous tag
         id: prev_tag
         run: |
-          PREV_TAG=$(git tag -l 'browser-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
-          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
-            # First release or only one tag - get all commits
-            echo "range=HEAD" >> $GITHUB_OUTPUT
-          else
-            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
-          fi
-          echo "Previous tag: $PREV_TAG"
+          CURRENT_TAG="${{ github.ref_name }}"
+          # Get all browser tags sorted by version (newest first)
+          ALL_TAGS=$(git tag -l 'browser-v*' --sort=-v:refname)
 
-      - name: Get changelog
+          # Find the tag immediately before current
+          PREV_TAG=""
+          FOUND_CURRENT=false
+          for tag in $ALL_TAGS; do
+            if [ "$FOUND_CURRENT" = "true" ]; then
+              PREV_TAG="$tag"
+              break
+            fi
+            if [ "$tag" = "$CURRENT_TAG" ]; then
+              FOUND_CURRENT=true
+            fi
+          done
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "first_release=true" >> $GITHUB_OUTPUT
+            echo "prev_tag=" >> $GITHUB_OUTPUT
+            echo "First release detected"
+          else
+            echo "first_release=false" >> $GITHUB_OUTPUT
+            echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+            echo "Previous tag: $PREV_TAG"
+          fi
+
+      - name: Get changelog and diff analysis
         id: changelog
         run: |
-          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- plugins/stash-browser/ shared/ 2>/dev/null || git log --pretty=format:"- %s" -20)
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          CURRENT_TAG="${{ github.ref_name }}"
+          PLUGIN_PATHS="plugins/stash-browser/ shared/"
+
+          if [ "${{ steps.prev_tag.outputs.first_release }}" = "true" ]; then
+            # First release - get recent commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" -30 -- $PLUGIN_PATHS 2>/dev/null || echo "Initial release")
+            DIFF_STAT="Initial release - all files are new"
+            DIFF_SUMMARY=""
+          else
+            # Commits between tags, ONLY for this plugin's paths
+            COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s (%h)" -- $PLUGIN_PATHS 2>/dev/null)
+
+            # If no commits for this plugin, note that
+            if [ -z "$COMMITS" ]; then
+              COMMITS="No direct changes to plugin code (dependency or config updates only)"
+            fi
+
+            # Diff statistics for this plugin only
+            DIFF_STAT=$(git diff ${PREV_TAG}..${CURRENT_TAG} --stat -- $PLUGIN_PATHS 2>/dev/null || echo "")
+
+            # Get summary of actual changes (additions/deletions per file)
+            DIFF_SUMMARY=$(git diff ${PREV_TAG}..${CURRENT_TAG} --numstat -- $PLUGIN_PATHS 2>/dev/null | awk '{added+=$1; deleted+=$2; print $3": +"$1"/-"$2} END {print "\nTotal: +"added"/-"deleted" lines"}' || echo "")
+          fi
+
+          # Output using heredoc (safe for multiline)
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_stat<<DIFFSTAT_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFFSTAT_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_summary<<DIFFSUMMARY_EOF"
+            echo "$DIFF_SUMMARY"
+            echo "DIFFSUMMARY_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Generate AI release notes
         id: ai_notes
@@ -667,31 +815,65 @@ jobs:
             echo "No GOOGLE_API_KEY configured, skipping AI release notes"
             exit 0
           fi
+
           VERSION="${{ needs.deploy-browser-stable.outputs.version }}"
-          COMMITS="${{ steps.changelog.outputs.commits }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          FIRST_RELEASE="${{ steps.prev_tag.outputs.first_release }}"
 
-          PROMPT="Generate release notes for Stash Browser v${VERSION}. This is a Stash plugin for browsing booru sites (Rule34, Gelbooru, Danbooru) and adding content to the Stash Downloader queue.
+          # Build context file to avoid shell escaping issues
+          cat > /tmp/release_context.txt << 'CONTEXT_EOF'
+          PLUGIN: Stash Browser
+          DESCRIPTION: A Stash plugin for browsing booru sites (Rule34, Gelbooru, Danbooru) and adding content to the Stash Downloader queue.
 
-          Recent commits:
-          ${COMMITS}
+          COMMITS (changes specific to this plugin only):
+          ${{ steps.changelog.outputs.commits }}
 
-          Format the response EXACTLY like this (use these exact headers and emoji):
+          FILE CHANGES:
+          ${{ steps.changelog.outputs.diff_stat }}
+
+          CHANGE SUMMARY:
+          ${{ steps.changelog.outputs.diff_summary }}
+          CONTEXT_EOF
+
+          # Build the prompt
+          if [ "$FIRST_RELEASE" = "true" ]; then
+            COMPARE_LINK="Initial release"
+            ANALYSIS_INSTRUCTION="This is the first release, so summarize the initial feature set."
+          else
+            COMPARE_LINK="[Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/${PREV_TAG}...${VERSION})"
+            ANALYSIS_INSTRUCTION="Analyze the commits and file changes to determine the NET changes. Look for:
+          - Features added then removed (reversion) - don't mention these
+          - Features that were refactored multiple times - summarize the final state only
+          - Bug fixes that were later reverted - don't mention these
+          Focus on what ACTUALLY changed from the user's perspective between releases."
+          fi
+
+          PROMPT="Generate release notes for Stash Browser v${VERSION}.
+
+          $(cat /tmp/release_context.txt)
+
+          IMPORTANT ANALYSIS RULES:
+          ${ANALYSIS_INSTRUCTION}
+          - ONLY include changes from the COMMITS section above - these are filtered to this plugin only
+          - Do NOT mention changes to other plugins (stash-downloader, browser-extension)
+          - If a feature was added then removed between releases, it's net zero - don't mention it
+
+          Format the response EXACTLY like this:
           ## 🔍 Stash Browser v${VERSION}
 
           ### ✨ What's New
 
-          **Feature Name** — Description of what it does and why it matters.
+          **Feature Name** — Brief description of what it does.
 
-          [repeat for each significant feature/fix]
+          (repeat for each significant user-facing change)
 
-          [Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/PREV_TAG...browser-v${VERSION})
+          ${COMPARE_LINK}
 
           ### 📝 All Changes
 
           - ✨ feat: description
           - 🐛 fix: description
           - ♻️ refactor: description
-          [list all commits with appropriate emoji]
 
           ---
 
@@ -713,16 +895,15 @@ jobs:
           - API credentials for Rule34/Gelbooru (free, get from site settings)
 
           Rules:
-          - Be concise but informative
-          - Focus on user-facing changes
-          - Use bold for feature names
-          - Skip internal/minor changes in What's New section"
+          - Be concise - one line per feature
+          - Focus on user-facing changes only
+          - Skip internal refactoring from What's New (keep in All Changes)
+          - If no significant changes, say 'Maintenance release with minor improvements'"
 
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
 
-          # Check for API errors
           ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
           if [ -n "$ERROR" ]; then
             echo "::warning::Gemini API error: $ERROR"
@@ -730,15 +911,16 @@ jobs:
           fi
 
           NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
-
           if [ -z "$NOTES" ]; then
-            echo "::warning::Gemini returned empty notes. Response: $(echo "$RESPONSE" | jq -c '.')"
+            echo "::warning::Empty response from Gemini"
             exit 0
           fi
 
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -782,48 +964,220 @@ jobs:
       - name: Get previous tag
         id: prev_tag
         run: |
-          PREV_TAG=$(git tag -l 'extension-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
-          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
-            echo "range=HEAD" >> $GITHUB_OUTPUT
-          else
-            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
-          fi
-          echo "Previous tag: $PREV_TAG"
+          CURRENT_TAG="${{ github.ref_name }}"
+          # Get all extension tags sorted by version (newest first)
+          ALL_TAGS=$(git tag -l 'extension-v*' --sort=-v:refname)
 
-      - name: Get changelog
+          # Find the tag immediately before current
+          PREV_TAG=""
+          FOUND_CURRENT=false
+          for tag in $ALL_TAGS; do
+            if [ "$FOUND_CURRENT" = "true" ]; then
+              PREV_TAG="$tag"
+              break
+            fi
+            if [ "$tag" = "$CURRENT_TAG" ]; then
+              FOUND_CURRENT=true
+            fi
+          done
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "first_release=true" >> $GITHUB_OUTPUT
+            echo "prev_tag=" >> $GITHUB_OUTPUT
+            echo "First release detected"
+          else
+            echo "first_release=false" >> $GITHUB_OUTPUT
+            echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+            echo "Previous tag: $PREV_TAG"
+          fi
+
+      - name: Get changelog and diff analysis
         id: changelog
         run: |
-          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- browser-extension/ 2>/dev/null || git log --pretty=format:"- %s" -10)
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          CURRENT_TAG="${{ github.ref_name }}"
+          EXT_PATH="browser-extension/"
+
+          if [ "${{ steps.prev_tag.outputs.first_release }}" = "true" ]; then
+            # First release - get recent commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" -20 -- $EXT_PATH 2>/dev/null || echo "Initial release")
+            DIFF_STAT="Initial release - all files are new"
+            DIFF_SUMMARY=""
+          else
+            # Commits between tags, ONLY for extension path
+            COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s (%h)" -- $EXT_PATH 2>/dev/null)
+
+            # If no commits for extension, note that
+            if [ -z "$COMMITS" ]; then
+              COMMITS="No direct changes to extension code (dependency or config updates only)"
+            fi
+
+            # Diff statistics for extension only
+            DIFF_STAT=$(git diff ${PREV_TAG}..${CURRENT_TAG} --stat -- $EXT_PATH 2>/dev/null || echo "")
+
+            # Get summary of actual changes
+            DIFF_SUMMARY=$(git diff ${PREV_TAG}..${CURRENT_TAG} --numstat -- $EXT_PATH 2>/dev/null | awk '{added+=$1; deleted+=$2; print $3": +"$1"/-"$2} END {print "\nTotal: +"added"/-"deleted" lines"}' || echo "")
+          fi
+
+          # Output using heredoc (safe for multiline)
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_stat<<DIFFSTAT_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFFSTAT_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_summary<<DIFFSUMMARY_EOF"
+            echo "$DIFF_SUMMARY"
+            echo "DIFFSUMMARY_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Generate AI release notes
+        id: ai_notes
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY configured, skipping AI release notes"
+            exit 0
+          fi
+
+          VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          FIRST_RELEASE="${{ steps.prev_tag.outputs.first_release }}"
+
+          # Build context file to avoid shell escaping issues
+          cat > /tmp/release_context.txt << 'CONTEXT_EOF'
+          PROJECT: Firefox Browser Extension for Stash Downloader
+          DESCRIPTION: A Firefox extension that allows users to send URLs directly to their Stash Downloader queue from any webpage via context menu or popup.
+
+          COMMITS (changes specific to this extension only):
+          ${{ steps.changelog.outputs.commits }}
+
+          FILE CHANGES:
+          ${{ steps.changelog.outputs.diff_stat }}
+
+          CHANGE SUMMARY:
+          ${{ steps.changelog.outputs.diff_summary }}
+          CONTEXT_EOF
+
+          # Build the prompt
+          if [ "$FIRST_RELEASE" = "true" ]; then
+            COMPARE_LINK="Initial release"
+            ANALYSIS_INSTRUCTION="This is the first release, so summarize the initial feature set."
+          else
+            COMPARE_LINK="[Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/${PREV_TAG}...extension-v${VERSION})"
+            ANALYSIS_INSTRUCTION="Analyze the commits and file changes to determine the NET changes. Look for:
+          - Features added then removed (reversion) - don't mention these
+          - Features that were refactored multiple times - summarize the final state only
+          - Bug fixes that were later reverted - don't mention these
+          Focus on what ACTUALLY changed from the user's perspective between releases."
+          fi
+
+          PROMPT="Generate release notes for Stash Downloader Firefox Extension v${VERSION}.
+
+          $(cat /tmp/release_context.txt)
+
+          IMPORTANT ANALYSIS RULES:
+          ${ANALYSIS_INSTRUCTION}
+          - ONLY include changes from the COMMITS section above - these are filtered to browser-extension/ only
+          - Do NOT mention changes to Stash plugins (stash-downloader, stash-browser)
+          - If a feature was added then removed between releases, it's net zero - don't mention it
+
+          Format the response EXACTLY like this:
+          ## 🦊 Stash Downloader Extension v${VERSION}
+
+          Firefox browser extension for sending URLs directly to your Stash Downloader queue.
+
+          ### ✨ What's New
+
+          **Feature Name** — Brief description of what it does.
+
+          (repeat for each significant user-facing change)
+
+          ${COMPARE_LINK}
+
+          ### 📝 All Changes
+
+          - ✨ feat: description
+          - 🐛 fix: description
+          - ♻️ refactor: description
+
+          ---
+
+          ### 📦 Installation
+
+          **From Firefox Add-ons (Recommended):**
+          - [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+
+          **Manual Installation:**
+          1. Download \`stash-downloader-extension.zip\` below
+          2. Go to \`about:debugging\` → This Firefox → Load Temporary Add-on
+          3. Select the ZIP file
+
+          ### ⚠️ Note
+          After downloading from GitHub, you still need to **submit to AMO** for the public release.
+          The ZIP is ready for upload to [Firefox Add-ons Developer Hub](https://addons.mozilla.org/developers/).
+
+          Rules:
+          - Be concise - one line per feature
+          - Focus on user-facing changes only
+          - Skip internal changes from What's New
+          - If no significant changes, say 'Maintenance release with minor improvements'"
+
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
+
+          ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "::warning::Gemini API error: $ERROR"
+            exit 0
+          fi
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+          if [ -z "$NOTES" ]; then
+            echo "::warning::Empty response from Gemini"
+            exit 0
+          fi
+
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Firefox Extension v${{ steps.version.outputs.version }}"
-          body: |
-            ## 🦊 Stash Downloader Extension v${{ steps.version.outputs.version }}
+          body: ${{ steps.ai_notes.outputs.notes || format('## 🦊 Stash Downloader Extension v{0}
 
-            Firefox browser extension for sending URLs directly to your Stash Downloader queue.
+Firefox browser extension for sending URLs directly to your Stash Downloader queue.
 
-            ### 📝 Changes
+### 📝 Changes
 
-            ${{ steps.changelog.outputs.commits }}
+{1}
 
-            ---
+---
 
-            ### 📦 Installation
+### 📦 Installation
 
-            **From Firefox Add-ons (Recommended):**
-            - [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+**From Firefox Add-ons (Recommended):**
+- [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 
-            **Manual Installation:**
-            1. Download `stash-downloader-extension.zip` below
-            2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
-            3. Select the ZIP file
+**Manual Installation:**
+1. Download `stash-downloader-extension.zip` below
+2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
+3. Select the ZIP file
 
-            ### ⚠️ Note
-            After downloading from GitHub, you still need to **submit to AMO** for the public release.
-            The ZIP is ready for upload to [Firefox Add-ons Developer Hub](https://addons.mozilla.org/developers/).
+### ⚠️ Note
+After downloading from GitHub, you still need to **submit to AMO** for the public release.', steps.version.outputs.version, steps.changelog.outputs.commits) }}
           files: browser-extension/stash-downloader-extension.zip
