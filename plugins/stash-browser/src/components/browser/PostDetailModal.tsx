@@ -284,7 +284,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
               </div>
 
               {/* Body - Scrollable */}
-              <div className="card-body" style={{ overflowY: 'auto', flex: 1 }}>
+              <div className="card-body" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 {/* Metadata */}
                 <div className="mb-3">
                   <div className="d-flex flex-wrap gap-2 mb-2">
