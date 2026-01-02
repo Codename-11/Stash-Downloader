@@ -114,20 +114,19 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
         role="dialog"
         aria-modal="true"
         onClick={onClose}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
       >
         <div
-          className="d-flex gap-3"
-          style={{
-            maxWidth: '95vw',
-            maxHeight: '90vh',
-          }}
-          onClick={(e) => e.stopPropagation()}
+          className="modal-dialog modal-dialog-centered"
+          style={{ maxWidth: 'fit-content', margin: 'auto' }}
         >
+          <div
+            className="d-flex gap-3"
+            style={{
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Media Container */}
             <div
               className="d-flex align-items-center justify-content-center"
@@ -441,6 +440,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
               </div>
             </div>
           </div>
+        </div>
         </div>
       </>
     );
