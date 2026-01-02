@@ -1158,26 +1158,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "Firefox Extension v${{ steps.version.outputs.version }}"
-          body: ${{ steps.ai_notes.outputs.notes || format('## 🦊 Stash Downloader Extension v{0}
-
-Firefox browser extension for sending URLs directly to your Stash Downloader queue.
-
-### 📝 Changes
-
-{1}
-
----
-
-### 📦 Installation
-
-**From Firefox Add-ons (Recommended):**
-- [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-
-**Manual Installation:**
-1. Download `stash-downloader-extension.zip` below
-2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
-3. Select the ZIP file
-
-### ⚠️ Note
-After downloading from GitHub, you still need to **submit to AMO** for the public release.', steps.version.outputs.version, steps.changelog.outputs.commits) }}
+          body: ${{ steps.ai_notes.outputs.notes }}
           files: browser-extension/stash-downloader-extension.zip
+          generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
