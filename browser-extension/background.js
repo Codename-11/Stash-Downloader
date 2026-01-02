@@ -1,33 +1,49 @@
 // Stash Downloader - Background Script
 
-// Create context menu on install
+// Create context menus - runs on every background script load
+// Using removeAll first to avoid duplicate ID errors
+function createContextMenus() {
+  browser.contextMenus.removeAll().then(() => {
+    browser.contextMenus.create({
+      id: 'send-to-stash',
+      title: 'Send to Stash Downloader',
+      contexts: ['link', 'page', 'video', 'image', 'audio', 'selection']
+    });
+
+    browser.contextMenus.create({
+      id: 'send-to-stash-video',
+      title: 'As Video',
+      parentId: 'send-to-stash',
+      contexts: ['link', 'page', 'video', 'selection']
+    });
+
+    browser.contextMenus.create({
+      id: 'send-to-stash-image',
+      title: 'As Image',
+      parentId: 'send-to-stash',
+      contexts: ['link', 'image', 'selection']
+    });
+
+    browser.contextMenus.create({
+      id: 'send-to-stash-gallery',
+      title: 'As Gallery',
+      parentId: 'send-to-stash',
+      contexts: ['link', 'page', 'selection']
+    });
+
+    console.log('[Stash Downloader] Context menus created');
+  }).catch(err => {
+    console.error('[Stash Downloader] Failed to create context menus:', err);
+  });
+}
+
+// Create menus immediately when background script loads
+createContextMenus();
+
+// Also recreate on install/update (belt and suspenders)
 browser.runtime.onInstalled.addListener(() => {
-  browser.contextMenus.create({
-    id: 'send-to-stash',
-    title: 'Send to Stash Downloader',
-    contexts: ['link', 'page', 'video', 'image', 'audio', 'selection']
-  });
-
-  browser.contextMenus.create({
-    id: 'send-to-stash-video',
-    title: 'As Video',
-    parentId: 'send-to-stash',
-    contexts: ['link', 'page', 'video', 'selection']
-  });
-
-  browser.contextMenus.create({
-    id: 'send-to-stash-image',
-    title: 'As Image',
-    parentId: 'send-to-stash',
-    contexts: ['link', 'image', 'selection']
-  });
-
-  browser.contextMenus.create({
-    id: 'send-to-stash-gallery',
-    title: 'As Gallery',
-    parentId: 'send-to-stash',
-    contexts: ['link', 'page', 'selection']
-  });
+  console.log('[Stash Downloader] Extension installed/updated');
+  createContextMenus();
 });
 
 // Handle context menu clicks
