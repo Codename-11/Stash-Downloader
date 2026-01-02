@@ -798,46 +798,6 @@ jobs:
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Generate release notes
-        id: notes
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          COMMITS="${{ steps.changelog.outputs.commits }}"
-
-          cat > /tmp/release_notes.md << 'EOF'
-          ## 🦊 Stash Downloader Extension v${VERSION}
-
-          Firefox browser extension for sending URLs directly to your Stash Downloader queue.
-
-          ### 📝 Changes
-
-          ${COMMITS}
-
-          ---
-
-          ### 📦 Installation
-
-          **From Firefox Add-ons (Recommended):**
-          - [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-
-          **Manual Installation:**
-          1. Download `stash-downloader-extension.zip` below
-          2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
-          3. Select the ZIP file
-
-          ### 📋 Requirements
-          - Firefox 109+
-          - Stash instance with Stash Downloader plugin installed
-          EOF
-
-          # Substitute variables
-          sed -i "s/\${VERSION}/${VERSION}/g" /tmp/release_notes.md
-          sed -i "s/\${COMMITS}/${COMMITS//\//\\/}/g" /tmp/release_notes.md
-
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          cat /tmp/release_notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
