@@ -508,6 +508,7 @@ export const BrowserMain: React.FC = () => {
           setSearchTags(tags);
           handleSearch({ ...searchParams, tags: tags.join(' '), page: 0 });
         }}
+        showThumbnails={settings.showThumbnails}
       />
     </div>
   );

@@ -16,6 +16,8 @@ interface PostDetailModalProps {
   currentSearchTags?: string[];
   /** Called when user wants to update search with new tags */
   onUpdateSearch?: (tags: string[]) => void;
+  /** Whether to show thumbnails/preview images */
+  showThumbnails?: boolean;
 }
 
 // Tag category colors (booru convention)
@@ -33,6 +35,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
   onAddToQueue,
   currentSearchTags = [],
   onUpdateSearch,
+  showThumbnails = true,
 }) => {
   // Pending tags for the tag editor
   const [pendingTags, setPendingTags] = useState<string[]>([]);
@@ -111,28 +114,68 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
         role="dialog"
         aria-modal="true"
         onClick={onClose}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
         <div
-          className="modal-dialog modal-dialog-centered"
-          style={{ maxWidth: '95vw', margin: '1.75rem auto' }}
+          className="d-flex gap-3"
+          style={{
+            maxWidth: '95vw',
+            maxHeight: '90vh',
+          }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="d-flex gap-3 justify-content-center"
-            style={{ maxHeight: '90vh' }}
-          >
             {/* Media Container */}
             <div
               className="d-flex align-items-center justify-content-center"
               style={{
                 maxWidth: '70vw',
                 maxHeight: '90vh',
-                backgroundColor: '#000',
+                backgroundColor: showThumbnails ? '#000' : stashColors.headerBg,
                 borderRadius: 8,
                 overflow: 'hidden',
               }}
             >
-              {isVideo ? (
+              {!showThumbnails ? (
+                // Hidden thumbnail placeholder
+                <div
+                  className="d-flex flex-column align-items-center justify-content-center text-muted"
+                  style={{
+                    minWidth: 400,
+                    minHeight: 300,
+                    padding: '2rem',
+                  }}
+                >
+                  {/* Eye-slash icon */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="64"
+                    height="64"
+                    fill="currentColor"
+                    viewBox="0 0 16 16"
+                    className="mb-3"
+                    style={{ opacity: 0.5 }}
+                  >
+                    <path d="m10.79 12.912-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.088z"/>
+                    <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.707z"/>
+                  </svg>
+                  <span style={{ fontSize: '1rem' }}>Preview Hidden</span>
+                  <small className="mt-1" style={{ opacity: 0.7 }}>
+                    {isVideo ? 'Video' : 'Image'} • {post.width} x {post.height}
+                  </small>
+                  <a
+                    href={post.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline-secondary btn-sm mt-3"
+                  >
+                    View Full Size
+                  </a>
+                </div>
+              ) : isVideo ? (
                 // Video placeholder - can't embed due to CSP restrictions
                 <div
                   className="position-relative d-flex flex-column align-items-center justify-content-center"
@@ -399,7 +442,6 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
 };
