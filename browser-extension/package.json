@@ -1,0 +1,17 @@
+{
+  "name": "@stash-plugins/browser-extension",
+  "version": "0.1.1",
+  "description": "Firefox extension for sending URLs to Stash Downloader queue",
+  "private": true,
+  "author": "Codename-11",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Codename-11/Stash-Downloader.git",
+    "directory": "browser-extension"
+  },
+  "scripts": {
+    "version": "node scripts/sync-version.js && git add manifest.json",
+    "package": "node scripts/package.js"
+  }
+}

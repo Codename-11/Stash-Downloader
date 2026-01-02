@@ -6,6 +6,7 @@ on:
     tags:
       - 'downloader-v*'  # Stash Downloader releases
       - 'browser-v*'     # Stash Browser releases
+      - 'extension-v*'   # Firefox Extension releases
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -746,3 +747,123 @@ jobs:
           body: ${{ steps.ai_notes.outputs.notes }}
           files: stash-browser.zip
           generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
+
+  # ============================================================================
+  # RELEASE EXTENSION - Creates GitHub Release for Firefox Extension
+  # ============================================================================
+  release-extension:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/extension-v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./browser-extension/package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create ZIP package
+        run: |
+          cd browser-extension
+          zip -r stash-downloader-extension.zip \
+            manifest.json \
+            background.js \
+            content.js \
+            popup/ \
+            options/ \
+            icons/ \
+            README.md
+
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV_TAG=$(git tag -l 'extension-v*' --sort=-v:refname | head -2 | tail -1 || echo "")
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ github.ref_name }}" ]; then
+            echo "range=HEAD" >> $GITHUB_OUTPUT
+          else
+            echo "range=${PREV_TAG}..HEAD" >> $GITHUB_OUTPUT
+          fi
+          echo "Previous tag: $PREV_TAG"
+
+      - name: Get changelog
+        id: changelog
+        run: |
+          COMMITS=$(git log ${{ steps.prev_tag.outputs.range }} --pretty=format:"- %s" -- browser-extension/ 2>/dev/null || git log --pretty=format:"- %s" -10)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMITS="${{ steps.changelog.outputs.commits }}"
+
+          cat > /tmp/release_notes.md << 'EOF'
+          ## 🦊 Stash Downloader Extension v${VERSION}
+
+          Firefox browser extension for sending URLs directly to your Stash Downloader queue.
+
+          ### 📝 Changes
+
+          ${COMMITS}
+
+          ---
+
+          ### 📦 Installation
+
+          **From Firefox Add-ons (Recommended):**
+          - [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+
+          **Manual Installation:**
+          1. Download `stash-downloader-extension.zip` below
+          2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
+          3. Select the ZIP file
+
+          ### 📋 Requirements
+          - Firefox 109+
+          - Stash instance with Stash Downloader plugin installed
+          EOF
+
+          # Substitute variables
+          sed -i "s/\${VERSION}/${VERSION}/g" /tmp/release_notes.md
+          sed -i "s/\${COMMITS}/${COMMITS//\//\\/}/g" /tmp/release_notes.md
+
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Firefox Extension v${{ steps.version.outputs.version }}"
+          body: |
+            ## 🦊 Stash Downloader Extension v${{ steps.version.outputs.version }}
+
+            Firefox browser extension for sending URLs directly to your Stash Downloader queue.
+
+            ### 📝 Changes
+
+            ${{ steps.changelog.outputs.commits }}
+
+            ---
+
+            ### 📦 Installation
+
+            **From Firefox Add-ons (Recommended):**
+            - [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
+
+            **Manual Installation:**
+            1. Download `stash-downloader-extension.zip` below
+            2. Go to `about:debugging` → This Firefox → Load Temporary Add-on
+            3. Select the ZIP file
+
+            ### ⚠️ Note
+            After downloading from GitHub, you still need to **submit to AMO** for the public release.
+            The ZIP is ready for upload to [Firefox Add-ons Developer Hub](https://addons.mozilla.org/developers/).
+          files: browser-extension/stash-downloader-extension.zip

@@ -344,12 +344,13 @@ chore: refactor related to #45
 
 ### Releasing (Tag-Based)
 
-This project uses **prefixed tag-based releases** for each plugin:
+This project uses **prefixed tag-based releases** for each component:
 
-| Plugin | Tag Format | Example |
-|--------|-----------|---------|
-| Stash Downloader | `downloader-vX.Y.Z` | `downloader-v0.5.2` |
-| Stash Browser | `browser-vX.Y.Z` | `browser-v0.1.0` |
+| Component | Tag Format | Example | Auto-Deploy |
+|-----------|-----------|---------|-------------|
+| Stash Downloader | `downloader-vX.Y.Z` | `downloader-v0.5.2` | GitHub Pages + Release |
+| Stash Browser | `browser-vX.Y.Z` | `browser-v0.1.0` | GitHub Pages + Release |
+| Firefox Extension | `extension-vX.Y.Z` | `extension-v0.2.0` | GitHub Release only |
 
 ```bash
 # Release Stash Downloader:
@@ -363,6 +364,13 @@ git checkout main && git merge dev
 cd plugins/stash-browser && npm version patch
 git add . && git commit -m "🔖 chore: release browser-vX.Y.Z"
 git tag browser-vX.Y.Z && git push origin main --tags
+
+# Release Firefox Extension:
+git checkout main && git merge dev
+cd browser-extension && npm version patch  # syncs manifest.json automatically
+git add . && git commit -m "🔖 chore: release extension-vX.Y.Z"
+git tag extension-vX.Y.Z && git push origin main --tags
+# THEN: Download ZIP from GitHub Release and upload to AMO
 
 # Sync version back to dev (WAIT for workflow to complete first!)
 # Check: https://github.com/Codename-11/Stash-Downloader/actions
@@ -459,18 +467,20 @@ Each component has its own version - they don't need to match:
 |-----------|--------------|----------------|
 | Stash Downloader | `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag |
 | Stash Browser | `plugins/stash-browser/package.json` | `browser-vX.Y.Z` tag |
-| Firefox Extension | `browser-extension/manifest.json` | Manual AMO upload |
+| Firefox Extension | `browser-extension/package.json` | `extension-vX.Y.Z` tag + AMO upload |
 
 **Version Bump Rules:**
 - Downloader changes only → Bump Downloader `package.json`, tag with `downloader-v*`
 - Browser changes only → Bump Browser `package.json`, tag with `browser-v*`
-- Extension changes only → Bump `manifest.json`, upload to AMO manually
-- Multiple plugins changed → Release each separately with its own tag
+- Extension changes only → Bump Extension `package.json`, tag with `extension-v*`, then upload to AMO
+- Multiple components changed → Release each separately with its own tag
 
-**Browser Extension Uploads:**
-- **Manual uploads only** - Upload to [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
-- Do NOT upload on every plugin release if extension hasn't changed
-- Future TODO: Automate with CI change detection (web-ext sign)
+**Firefox Extension Release Process:**
+1. `cd browser-extension && npm version patch` (auto-syncs manifest.json)
+2. Commit and tag: `git tag extension-vX.Y.Z`
+3. Push: `git push origin main --tags`
+4. GitHub Action creates Release with ZIP attached
+5. Download ZIP from Release, upload to [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 
 ## Documentation
 - **Code Comments**: Explain "why", not "what"

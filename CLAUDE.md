@@ -57,12 +57,12 @@ A monorepo for Stash plugins including:
 5. WAIT for workflow to complete before syncing dev
 ```
 
-### Plugin Versions (Independent)
-| Plugin              | Version Location                        | Release Trigger              |
-|---------------------|-----------------------------------------|------------------------------|
-| **Stash Downloader**| `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag      |
-| **Stash Browser**   | `plugins/stash-browser/package.json`    | `browser-vX.Y.Z` tag         |
-| **Firefox Extension**| `browser-extension/manifest.json`      | Manual upload to AMO         |
+### Component Versions (Independent)
+| Component            | Version Location                        | Release Trigger              |
+|----------------------|-----------------------------------------|------------------------------|
+| **Stash Downloader** | `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag      |
+| **Stash Browser**    | `plugins/stash-browser/package.json`    | `browser-vX.Y.Z` tag         |
+| **Firefox Extension**| `browser-extension/package.json`        | `extension-vX.Y.Z` tag + AMO |
 
 ### Stable vs Dev Builds
 | Plugin           | Stable Tag          | Dev Trigger    | Plugin IDs                          |
@@ -86,14 +86,21 @@ git checkout main && git merge dev
 cd plugins/stash-browser && npm version patch
 git add . && git commit -m "🔖 chore: release browser-vX.Y.Z"
 git tag browser-vX.Y.Z && git push origin main --tags
+
+# Release Firefox Extension:
+git checkout main && git merge dev
+cd browser-extension && npm version patch  # auto-syncs manifest.json
+git add . && git commit -m "🔖 chore: release extension-vX.Y.Z"
+git tag extension-vX.Y.Z && git push origin main --tags
+# Then: Download ZIP from GitHub Release → upload to AMO
 ```
 
 Or use `/release` skill for guided release.
 
 ### After Releasing
-- **Stable**: GitHub Actions builds + deploys to GitHub Pages + creates GitHub Release
-- **Dev**: Sync dev with main AFTER workflow completes (to avoid cancelling stable deploy)
-- **Extension**: Manually run `python package_extension.py` and upload ZIP to AMO
+- **Plugins**: GitHub Actions builds + deploys to GitHub Pages + creates GitHub Release
+- **Extension**: GitHub Actions creates Release with ZIP → download and upload to AMO manually
+- **Dev sync**: Sync dev with main AFTER workflow completes (to avoid cancelling stable deploy)
 
 **⚠️ WAIT for stable workflow to complete before pushing to dev** - concurrent deploys cancel each other!
 
