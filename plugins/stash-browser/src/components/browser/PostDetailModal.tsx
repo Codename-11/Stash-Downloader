@@ -124,6 +124,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
             style={{
               maxWidth: '95vw',
               maxHeight: '90vh',
+              overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -263,6 +264,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
                 backgroundColor: stashColors.cardBg,
                 minWidth: 300,
                 maxWidth: 400,
+                height: '100%',
                 maxHeight: '90vh',
                 overflow: 'hidden',
                 display: 'flex',
