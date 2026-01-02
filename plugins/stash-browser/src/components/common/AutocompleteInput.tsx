@@ -178,6 +178,19 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       return;
     }
 
+    // Handle Ctrl+Enter to submit search immediately with current tags
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      setInputValue('');
+      setSuggestions([]);
+      setIsOpen(false);
+      // Submit with current tags
+      if (value.length > 0) {
+        onSubmit();
+      }
+      return;
+    }
+
     // Handle enter to add tag or submit
     if (e.key === 'Enter') {
       e.preventDefault();

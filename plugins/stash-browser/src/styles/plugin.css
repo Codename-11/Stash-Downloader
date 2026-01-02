@@ -248,6 +248,29 @@
    Modal Styles
    ========================================================================== */
 
+/* Fix z-index stacking for modal elements */
+.stash-browser .modal-backdrop {
+  z-index: 1040 !important;
+  pointer-events: auto;
+}
+
+.stash-browser .modal {
+  z-index: 1050 !important;
+  pointer-events: none; /* Allow clicks to pass through to backdrop */
+}
+
+.stash-browser .modal-dialog {
+  z-index: 1051;
+  pointer-events: auto; /* Re-enable clicks on the dialog content */
+}
+
+/* Ensure the content container captures clicks properly */
+.stash-browser .modal .d-flex {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
 .stash-browser .modal-overlay {
   animation: fade-in var(--transition-fast) ease-out;
 }

@@ -207,7 +207,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {/* Help text */}
       <div className="mt-2">
         <small className="text-muted d-block" style={{ fontSize: '0.7rem' }}>
-          Press <kbd>Enter</kbd> or <kbd>Space</kbd> to add tags
+          <kbd>Enter</kbd> add tag • <kbd>Ctrl+Enter</kbd> search
         </small>
       </div>
     </form>
