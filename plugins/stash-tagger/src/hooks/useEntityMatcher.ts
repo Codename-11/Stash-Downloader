@@ -2,7 +2,7 @@
  * Hook for entity matching workflow
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type {
   StashBoxInstance,
   StashBoxStudio,
@@ -68,7 +68,10 @@ export function useStudioMatcher(
   const [error, setError] = useState<string | null>(null);
 
   const stats = calculateMatchStats(matches, threshold);
-  const matcher = instance ? new StudioMatcher(instance) : null;
+  const matcher = useMemo(
+    () => (instance ? new StudioMatcher(instance) : null),
+    [instance]
+  );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
     : { auto: [], review: [], noMatch: [], skipped: [] };
@@ -221,7 +224,10 @@ export function usePerformerMatcher(
   const [error, setError] = useState<string | null>(null);
 
   const stats = calculateMatchStats(matches, threshold);
-  const matcher = instance ? new PerformerMatcher(instance) : null;
+  const matcher = useMemo(
+    () => (instance ? new PerformerMatcher(instance) : null),
+    [instance]
+  );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
     : { auto: [], review: [], noMatch: [], skipped: [] };
@@ -350,7 +356,10 @@ export function useTagMatcher(
   const [error, setError] = useState<string | null>(null);
 
   const stats = calculateMatchStats(matches, threshold);
-  const matcher = instance ? new TagMatcher(instance) : null;
+  const matcher = useMemo(
+    () => (instance ? new TagMatcher(instance) : null),
+    [instance]
+  );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
     : { auto: [], review: [], noMatch: [], skipped: [] };

@@ -19,12 +19,9 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
 }) => {
   const {
     entities: studios,
-    totalCount: _totalCount,
     loading: loadingStudios,
     error: studiosError,
     refresh: refreshStudios,
-    isSkipped: _isSkipped,
-    toggleSkipped: _toggleSkipped,
     clearSkipped,
   } = useUnmatchedStudios(instance);
 
