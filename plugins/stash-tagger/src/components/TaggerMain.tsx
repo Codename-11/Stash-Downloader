@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { useStashBoxes } from '@/hooks';
-import { StashBoxSelector } from '@/components/common';
+import { StashBoxSelector, HelpModal } from '@/components/common';
 import { StudioTagger } from '@/components/studios';
 import { PerformerTagger } from '@/components/performers';
 import { TagTagger } from '@/components/tags';
@@ -25,6 +25,7 @@ const tabs: TabConfig[] = [
 
 export const TaggerMain: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('studios');
+  const [showHelp, setShowHelp] = useState(false);
 
   const {
     instances,
@@ -51,7 +52,17 @@ export const TaggerMain: React.FC = () => {
             Match studios, performers, and tags from StashBox
           </small>
         </div>
-        <small className="text-muted">v{APP_VERSION}</small>
+        <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => setShowHelp(true)}
+            title="Help"
+          >
+            ?
+          </button>
+          <small className="text-muted">v{APP_VERSION}</small>
+        </div>
       </div>
 
       {/* StashBox selector */}
@@ -147,6 +158,9 @@ export const TaggerMain: React.FC = () => {
           Configure settings in Stash → Settings → Plugins → {PLUGIN_NAME}
         </small>
       </div>
+
+      {/* Help Modal */}
+      <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 };
