@@ -1,6 +1,6 @@
 {
   "name": "@stash-plugins/browser-extension",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Firefox extension for sending URLs to Stash Downloader queue",
   "private": true,
   "author": "Codename-11",
