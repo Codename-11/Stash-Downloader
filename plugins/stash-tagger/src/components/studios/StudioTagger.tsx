@@ -2,7 +2,7 @@
  * Studio tagger tab component
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxStudio, LocalStudio } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useUnmatchedStudios, useStudioMatcher } from '@/hooks';
@@ -39,13 +39,14 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
   const [searchingId, setSearchingId] = useState<string | null>(null);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalStudio, StashBoxStudio> | null>(null);
+  const [hasScanned, setHasScanned] = useState(false);
 
-  // Find matches when studios are loaded
-  useEffect(() => {
-    if (studios.length > 0 && matches.length === 0) {
-      void findMatches(studios);
+  const handleScan = useCallback(async () => {
+    if (studios.length > 0) {
+      await findMatches(studios);
+      setHasScanned(true);
     }
-  }, [studios, matches.length, findMatches]);
+  }, [studios, findMatches]);
 
   const handleRefresh = useCallback(async () => {
     await refreshStudios();
@@ -115,15 +116,22 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
         <BulkActions
           stats={stats}
+          onScan={handleScan}
           onAutoMatchAll={handleAutoMatchAll}
           onRefresh={handleRefresh}
           onClearSkipped={clearSkipped}
           loading={loading}
+          hasScanned={hasScanned}
         />
       </div>
 
       {/* Studio list */}
-      {loading && matches.length === 0 ? (
+      {!hasScanned ? (
+        <div className="text-center py-4 text-muted">
+          <p>Click "Scan for Matches" to search StashBox for matching studios.</p>
+          <small>{studios.length} unmatched studios found</small>
+        </div>
+      ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">
           <span className="spinner-border" />
         </div>

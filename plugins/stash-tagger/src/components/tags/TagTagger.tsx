@@ -2,7 +2,7 @@
  * Tag tagger tab component
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxTag, LocalTag } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useTags, useTagMatcher } from '@/hooks';
@@ -37,17 +37,18 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
   } = useTagMatcher(instance, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
+  const [hasScanned, setHasScanned] = useState(false);
 
-  // Find matches when tags are loaded
-  useEffect(() => {
-    if (tags.length > 0 && matches.length === 0) {
+  const handleScan = useCallback(async () => {
+    if (tags.length > 0) {
       // Only search for tags without descriptions
       const tagsWithoutDescription = tags.filter((t) => !t.description);
       if (tagsWithoutDescription.length > 0) {
-        void findMatches(tagsWithoutDescription);
+        await findMatches(tagsWithoutDescription);
       }
+      setHasScanned(true);
     }
-  }, [tags, matches.length, findMatches]);
+  }, [tags, findMatches]);
 
   const handleRefresh = useCallback(async () => {
     await refreshTags();
@@ -119,15 +120,22 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
         <BulkActions
           stats={stats}
+          onScan={handleScan}
           onAutoMatchAll={handleAutoMatchAll}
           onRefresh={handleRefresh}
           onClearSkipped={clearSkipped}
           loading={loading}
+          hasScanned={hasScanned}
         />
       </div>
 
       {/* Tag list */}
-      {loading && matches.length === 0 ? (
+      {!hasScanned ? (
+        <div className="text-center py-4 text-muted">
+          <p>Click "Scan for Matches" to search StashBox for matching tags.</p>
+          <small>{tags.filter((t) => !t.description).length} tags without descriptions found</small>
+        </div>
+      ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">
           <span className="spinner-border" />
         </div>

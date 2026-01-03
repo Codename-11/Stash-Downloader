@@ -2,7 +2,7 @@
  * Performer tagger tab component
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxPerformer, LocalPerformer } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useUnmatchedPerformers, usePerformerMatcher } from '@/hooks';
@@ -37,13 +37,14 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
   } = usePerformerMatcher(instance, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
+  const [hasScanned, setHasScanned] = useState(false);
 
-  // Find matches when performers are loaded
-  useEffect(() => {
-    if (performers.length > 0 && matches.length === 0) {
-      void findMatches(performers);
+  const handleScan = useCallback(async () => {
+    if (performers.length > 0) {
+      await findMatches(performers);
+      setHasScanned(true);
     }
-  }, [performers, matches.length, findMatches]);
+  }, [performers, findMatches]);
 
   const handleRefresh = useCallback(async () => {
     await refreshPerformers();
@@ -115,15 +116,22 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
         <BulkActions
           stats={stats}
+          onScan={handleScan}
           onAutoMatchAll={handleAutoMatchAll}
           onRefresh={handleRefresh}
           onClearSkipped={clearSkipped}
           loading={loading}
+          hasScanned={hasScanned}
         />
       </div>
 
       {/* Performer list */}
-      {loading && matches.length === 0 ? (
+      {!hasScanned ? (
+        <div className="text-center py-4 text-muted">
+          <p>Click "Scan for Matches" to search StashBox for matching performers.</p>
+          <small>{performers.length} unmatched performers found</small>
+        </div>
+      ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">
           <span className="spinner-border" />
         </div>
