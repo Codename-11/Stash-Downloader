@@ -6,7 +6,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxPerformer, LocalPerformer } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useUnmatchedPerformers, usePerformerMatcher } from '@/hooks';
-import { BulkActions, EntityCard, MatchCard } from '@/components/common';
+import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/components/common';
 
 interface PerformerTaggerProps {
   instance: StashBoxInstance | null;
@@ -68,6 +68,20 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     await findMatches([performer]);
     setSearchingId(null);
   }, [findMatches]);
+
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalPerformer, StashBoxPerformer> | null>(null);
+
+  const handleOpenSearchModal = useCallback((match: EntityMatch<LocalPerformer, StashBoxPerformer>) => {
+    setSearchModalMatch(match);
+    setSearchModalOpen(true);
+  }, []);
+
+  const handleSearchModalSelect = useCallback(async (result: StashBoxPerformer) => {
+    if (searchModalMatch) {
+      await applyMatch(searchModalMatch, result);
+    }
+  }, [searchModalMatch, applyMatch]);
 
   const loading = loadingPerformers || loadingMatches;
   const error = performersError || matchesError;
@@ -137,8 +151,8 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
                 }
               }}
             >
-              {/* Search button */}
-              <div className="mb-2">
+              {/* Search buttons */}
+              <div className="mb-2 d-flex gap-2">
                 <button
                   type="button"
                   className="btn btn-outline-light btn-sm"
@@ -151,8 +165,15 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
                       Searching...
                     </>
                   ) : (
-                    'Search StashBox'
+                    'Auto Search'
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => handleOpenSearchModal(match)}
+                >
+                  Manual Search
                 </button>
               </div>
 
@@ -189,6 +210,18 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
             </EntityCard>
           ))}
         </div>
+      )}
+
+      {/* Manual Search Modal */}
+      {instance && searchModalMatch && (
+        <ManualSearchModal
+          open={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          entityType="performer"
+          instance={instance}
+          initialQuery={searchModalMatch.local.name}
+          onSelect={handleSearchModalSelect}
+        />
       )}
     </div>
   );

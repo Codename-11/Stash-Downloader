@@ -6,7 +6,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxTag, LocalTag } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useTags, useTagMatcher } from '@/hooks';
-import { BulkActions, EntityCard, MatchCard } from '@/components/common';
+import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/components/common';
 
 interface TagTaggerProps {
   instance: StashBoxInstance | null;
@@ -72,6 +72,20 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     await findMatches([tag]);
     setSearchingId(null);
   }, [findMatches]);
+
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalTag, StashBoxTag> | null>(null);
+
+  const handleOpenSearchModal = useCallback((match: EntityMatch<LocalTag, StashBoxTag>) => {
+    setSearchModalMatch(match);
+    setSearchModalOpen(true);
+  }, []);
+
+  const handleSearchModalSelect = useCallback(async (result: StashBoxTag) => {
+    if (searchModalMatch) {
+      await applyMatch(searchModalMatch, result);
+    }
+  }, [searchModalMatch, applyMatch]);
 
   const loading = loadingTags || loadingMatches;
   const error = tagsError || matchesError;
@@ -145,8 +159,8 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
                 </div>
               )}
 
-              {/* Search button */}
-              <div className="mb-2">
+              {/* Search buttons */}
+              <div className="mb-2 d-flex gap-2">
                 <button
                   type="button"
                   className="btn btn-outline-light btn-sm"
@@ -159,8 +173,15 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
                       Searching...
                     </>
                   ) : (
-                    'Search StashBox'
+                    'Auto Search'
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => handleOpenSearchModal(match)}
+                >
+                  Manual Search
                 </button>
               </div>
 
@@ -198,6 +219,18 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
             </EntityCard>
           ))}
         </div>
+      )}
+
+      {/* Manual Search Modal */}
+      {instance && searchModalMatch && (
+        <ManualSearchModal
+          open={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          entityType="tag"
+          instance={instance}
+          initialQuery={searchModalMatch.local.name}
+          onSelect={handleSearchModalSelect}
+        />
       )}
     </div>
   );

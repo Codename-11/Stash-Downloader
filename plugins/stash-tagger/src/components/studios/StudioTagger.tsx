@@ -6,7 +6,7 @@ import React, { useEffect, useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxStudio, LocalStudio } from '@/types';
 import type { EntityMatch } from '@/types/matching';
 import { useUnmatchedStudios, useStudioMatcher } from '@/hooks';
-import { BulkActions, EntityCard, MatchCard } from '@/components/common';
+import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/components/common';
 
 interface StudioTaggerProps {
   instance: StashBoxInstance | null;
@@ -37,6 +37,8 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
   } = useStudioMatcher(instance, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalStudio, StashBoxStudio> | null>(null);
 
   // Find matches when studios are loaded
   useEffect(() => {
@@ -69,6 +71,17 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     await findMatches([studio]);
     setSearchingId(null);
   }, [findMatches]);
+
+  const handleOpenSearchModal = useCallback((match: EntityMatch<LocalStudio, StashBoxStudio>) => {
+    setSearchModalMatch(match);
+    setSearchModalOpen(true);
+  }, []);
+
+  const handleSearchModalSelect = useCallback(async (result: StashBoxStudio) => {
+    if (searchModalMatch) {
+      await applyMatch(searchModalMatch, result);
+    }
+  }, [searchModalMatch, applyMatch]);
 
   const loading = loadingStudios || loadingMatches;
   const error = studiosError || matchesError;
@@ -137,8 +150,8 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
                 }
               }}
             >
-              {/* Search button */}
-              <div className="mb-2">
+              {/* Search buttons */}
+              <div className="mb-2 d-flex gap-2">
                 <button
                   type="button"
                   className="btn btn-outline-light btn-sm"
@@ -151,8 +164,15 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
                       Searching...
                     </>
                   ) : (
-                    'Search StashBox'
+                    'Auto Search'
                   )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={() => handleOpenSearchModal(match)}
+                >
+                  Manual Search
                 </button>
               </div>
 
@@ -187,6 +207,18 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
             </EntityCard>
           ))}
         </div>
+      )}
+
+      {/* Manual Search Modal */}
+      {instance && searchModalMatch && (
+        <ManualSearchModal
+          open={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          entityType="studio"
+          instance={instance}
+          initialQuery={searchModalMatch.local.name}
+          onSelect={handleSearchModalSelect}
+        />
       )}
     </div>
   );
