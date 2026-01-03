@@ -24,6 +24,7 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
+- [x] Stash Tagger plugin - Match studios, performers, and tags from StashBox instances (like StashDB)
 - [x] Firefox extension published on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 - [x] Proper job cancellation via Stash jobQueue (cancels all queued + running jobs)
 - [x] Remove concurrency setting (Stash processes jobs sequentially anyway)

@@ -1,0 +1,30 @@
+name: Stash Tagger
+description: Match and scrape studios, performers, and tags from StashBox instances like StashDB
+version: 0.1.0
+url: https://github.com/Codename-11/Stash-Downloader
+
+settings:
+  defaultStashBox:
+    displayName: Default StashBox
+    description: StashBox instance to use by default (e.g., "stashdb.org")
+    type: STRING
+  autoMatchThreshold:
+    displayName: Auto-match Threshold
+    description: Confidence percentage for automatic matching (0-100, default 95)
+    type: NUMBER
+  includeImages:
+    displayName: Include Images
+    description: Download and apply images from StashBox when matching
+    type: BOOLEAN
+  includeParentStudios:
+    displayName: Include Parent Studios
+    description: Auto-create and link parent studios from StashBox
+    type: BOOLEAN
+  batchSize:
+    displayName: Batch Size
+    description: Number of entities to process per batch (default 50)
+    type: NUMBER
+
+ui:
+  javascript:
+    - dist/stash-tagger.js

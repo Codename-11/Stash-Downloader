@@ -3,6 +3,7 @@
 A monorepo for Stash plugins including:
 - **Stash Downloader** - Download images and videos with automatic metadata extraction
 - **Stash Browser** - Browse and preview content from external sources
+- **Stash Tagger** - Match studios, performers, and tags from StashBox
 
 ## Documentation
 
@@ -24,6 +25,7 @@ A monorepo for Stash plugins including:
 | `npm run build`            | Build all plugins                 |
 | `npm run build:downloader` | Build Stash Downloader only       |
 | `npm run build:browser`    | Build Stash Browser only          |
+| `npm run build:tagger`     | Build Stash Tagger only           |
 | `npm run test`             | Run tests for all plugins         |
 | `npm run type-check`       | TypeScript check all plugins      |
 | `npm run lint`             | ESLint all plugins                |
@@ -62,6 +64,7 @@ A monorepo for Stash plugins including:
 |----------------------|-----------------------------------------|------------------------------|
 | **Stash Downloader** | `plugins/stash-downloader/package.json` | `downloader-vX.Y.Z` tag      |
 | **Stash Browser**    | `plugins/stash-browser/package.json`    | `browser-vX.Y.Z` tag         |
+| **Stash Tagger**     | `plugins/stash-tagger/package.json`     | `tagger-vX.Y.Z` tag          |
 | **Firefox Extension**| `browser-extension/package.json`        | `extension-vX.Y.Z` tag + AMO |
 
 ### Stable vs Dev Builds
@@ -69,6 +72,7 @@ A monorepo for Stash plugins including:
 |------------------|---------------------|----------------|-------------------------------------|
 | **Downloader**   | `downloader-vX.Y.Z` | Push to `dev`  | `stash-downloader` / `stash-downloader-dev` |
 | **Browser**      | `browser-vX.Y.Z`    | Push to `dev`  | `stash-browser` / `stash-browser-dev` |
+| **Tagger**       | `tagger-vX.Y.Z`     | Push to `dev`  | `stash-tagger` / `stash-tagger-dev` |
 
 Both can be installed simultaneously in Stash (different plugin IDs via YAML filename).  
 Both are served from the same `index.yml` - each deploy preserves the other's entry.
@@ -86,6 +90,12 @@ git checkout main && git merge dev
 cd plugins/stash-browser && npm version patch
 git add . && git commit -m "🔖 chore: release browser-vX.Y.Z"
 git tag browser-vX.Y.Z && git push origin main --tags
+
+# Release Stash Tagger:
+git checkout main && git merge dev
+cd plugins/stash-tagger && npm version patch
+git add . && git commit -m "🔖 chore: release tagger-vX.Y.Z"
+git tag tagger-vX.Y.Z && git push origin main --tags
 
 # Release Firefox Extension:
 git checkout main && git merge dev

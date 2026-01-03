@@ -12,8 +12,10 @@
     "build": "npm run build --workspaces --if-present",
     "build:downloader": "npm run build -w @stash-plugins/stash-downloader",
     "build:browser": "npm run build -w @stash-plugins/stash-browser",
+    "build:tagger": "npm run build -w @stash-plugins/stash-tagger",
     "dev:downloader": "npm run dev -w @stash-plugins/stash-downloader",
     "dev:browser": "npm run dev -w @stash-plugins/stash-browser",
+    "dev:tagger": "npm run dev -w @stash-plugins/stash-tagger",
     "test": "npm run test --workspaces --if-present",
     "type-check": "npm run type-check --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

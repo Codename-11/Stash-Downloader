@@ -6,6 +6,7 @@ on:
     tags:
       - 'downloader-v*'  # Stash Downloader releases
       - 'browser-v*'     # Stash Browser releases
+      - 'tagger-v*'      # Stash Tagger releases
       - 'extension-v*'   # Firefox Extension releases
   pull_request:
     branches: [main]
@@ -87,12 +88,15 @@ jobs:
         run: |
           DOWNLOADER_VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
           BROWSER_VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
+          TAGGER_VERSION=$(node -p "require('./plugins/stash-tagger/package.json').version")
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
 
           echo "downloader_version=${DOWNLOADER_VERSION}-dev.${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "browser_version=${BROWSER_VERSION}-dev.${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "tagger_version=${TAGGER_VERSION}-dev.${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "downloader_base=${DOWNLOADER_VERSION}" >> $GITHUB_OUTPUT
           echo "browser_base=${BROWSER_VERSION}" >> $GITHUB_OUTPUT
+          echo "tagger_base=${TAGGER_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Modify Downloader source for dev
         run: |
@@ -109,6 +113,13 @@ jobs:
           sed -i 's/Stash Browser/Stash Browser (Dev)/g' plugins/stash-browser/src/constants/index.ts
           sed -i 's/name: Stash Browser$/name: Stash Browser (Dev)/g' plugins/stash-browser/stash-browser.yml
           cd plugins/stash-browser && npm version ${{ steps.versions.outputs.browser_version }} --no-git-tag-version --allow-same-version
+
+      - name: Modify Tagger source for dev
+        run: |
+          sed -i 's/stash-tagger/stash-tagger-dev/g' plugins/stash-tagger/src/constants/index.ts
+          sed -i 's/Stash Tagger/Stash Tagger (Dev)/g' plugins/stash-tagger/src/constants/index.ts
+          sed -i 's/name: Stash Tagger$/name: Stash Tagger (Dev)/g' plugins/stash-tagger/stash-tagger.yml
+          cd plugins/stash-tagger && npm version ${{ steps.versions.outputs.tagger_version }} --no-git-tag-version --allow-same-version
 
       - name: Build all plugins
         run: npm run build
@@ -135,11 +146,20 @@ jobs:
           cd _pkg_browser && zip -r ../stash-browser-dev.zip . && cd ..
           mv stash-browser-dev.zip _site/
 
+          # Package Stash Tagger Dev
+          mkdir -p _pkg_tagger
+          cp -r plugins/stash-tagger/dist _pkg_tagger/
+          cp plugins/stash-tagger/stash-tagger.yml _pkg_tagger/stash-tagger-dev.yml
+          cp LICENSE _pkg_tagger/
+          cd _pkg_tagger && zip -r ../stash-tagger-dev.zip . && cd ..
+          mv stash-tagger-dev.zip _site/
+
       - name: Fetch existing stable builds
         continue-on-error: true
         run: |
           curl -fsSL "${PAGES_URL}/stash-downloader.zip" -o _site/stash-downloader.zip || echo "No existing downloader stable"
           curl -fsSL "${PAGES_URL}/stash-browser.zip" -o _site/stash-browser.zip || echo "No existing browser stable"
+          curl -fsSL "${PAGES_URL}/stash-tagger.zip" -o _site/stash-tagger.zip || echo "No existing tagger stable"
           curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || echo "No existing index"
 
       - name: Copy docs
@@ -217,6 +237,38 @@ jobs:
           EOF
           fi
 
+          # Tagger Dev
+          HASH=$(sha256sum _site/stash-tagger-dev.zip | awk '{print $1}')
+          cat >> _site/index.yml << EOF
+          - id: stash-tagger-dev
+            name: Stash Tagger (Dev)
+            version: ${{ steps.versions.outputs.tagger_version }}
+            date: ${CURRENT_DATETIME}
+            path: stash-tagger-dev.zip
+            sha256: ${HASH}
+            description: "[DEV] Match studios, performers, and tags from StashBox"
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+
+          # Tagger Stable (if exists)
+          if [[ -f _site/stash-tagger.zip ]]; then
+            HASH=$(sha256sum _site/stash-tagger.zip | awk '{print $1}')
+            VERSION=$(grep -A1 "id: stash-tagger$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+            DATE=$(grep -A3 "id: stash-tagger$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+            [[ -z "$VERSION" ]] && VERSION="${{ steps.versions.outputs.tagger_base }}"
+            [[ -z "$DATE" ]] && DATE="${CURRENT_DATETIME}"
+            cat >> _site/index.yml << EOF
+          - id: stash-tagger
+            name: Stash Tagger
+            version: ${VERSION}
+            date: ${DATE}
+            path: stash-tagger.zip
+            sha256: ${HASH}
+            description: Match studios, performers, and tags from StashBox
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+          fi
+
           echo "Generated index.yml:"
           cat _site/index.yml
 
@@ -257,8 +309,10 @@ jobs:
         run: |
           VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
           BROWSER_VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
+          TAGGER_VERSION=$(node -p "require('./plugins/stash-tagger/package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "browser_version=${BROWSER_VERSION}" >> $GITHUB_OUTPUT
+          echo "tagger_version=${TAGGER_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create package
         run: |
@@ -276,6 +330,8 @@ jobs:
           curl -fsSL "${PAGES_URL}/stash-downloader-dev.zip" -o _site/stash-downloader-dev.zip || true
           curl -fsSL "${PAGES_URL}/stash-browser.zip" -o _site/stash-browser.zip || true
           curl -fsSL "${PAGES_URL}/stash-browser-dev.zip" -o _site/stash-browser-dev.zip || true
+          curl -fsSL "${PAGES_URL}/stash-tagger.zip" -o _site/stash-tagger.zip || true
+          curl -fsSL "${PAGES_URL}/stash-tagger-dev.zip" -o _site/stash-tagger-dev.zip || true
           curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || true
 
       - name: Copy docs
@@ -305,9 +361,10 @@ jobs:
           # Version fallbacks from current package.json (not 0.0.0)
           BROWSER_FALLBACK="${{ steps.version.outputs.browser_version }}"
           DOWNLOADER_FALLBACK="${{ steps.version.outputs.version }}"
+          TAGGER_FALLBACK="${{ steps.version.outputs.tagger_version }}"
 
           # Preserve other entries with proper fallbacks
-          for entry in "stash-downloader-dev" "stash-browser" "stash-browser-dev"; do
+          for entry in "stash-downloader-dev" "stash-browser" "stash-browser-dev" "stash-tagger" "stash-tagger-dev"; do
             ZIP="_site/${entry}.zip"
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
@@ -323,6 +380,8 @@ jobs:
               if [[ -z "$VERSION_ENTRY" ]]; then
                 if [[ "$entry" == *"browser"* ]]; then
                   VERSION_ENTRY="${BROWSER_FALLBACK}"
+                elif [[ "$entry" == *"tagger"* ]]; then
+                  VERSION_ENTRY="${TAGGER_FALLBACK}"
                 else
                   VERSION_ENTRY="${DOWNLOADER_FALLBACK}"
                 fi
@@ -389,8 +448,10 @@ jobs:
         run: |
           VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
           DOWNLOADER_VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
+          TAGGER_VERSION=$(node -p "require('./plugins/stash-tagger/package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "downloader_version=${DOWNLOADER_VERSION}" >> $GITHUB_OUTPUT
+          echo "tagger_version=${TAGGER_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Create package
         run: |
@@ -408,6 +469,8 @@ jobs:
           curl -fsSL "${PAGES_URL}/stash-downloader.zip" -o _site/stash-downloader.zip || true
           curl -fsSL "${PAGES_URL}/stash-downloader-dev.zip" -o _site/stash-downloader-dev.zip || true
           curl -fsSL "${PAGES_URL}/stash-browser-dev.zip" -o _site/stash-browser-dev.zip || true
+          curl -fsSL "${PAGES_URL}/stash-tagger.zip" -o _site/stash-tagger.zip || true
+          curl -fsSL "${PAGES_URL}/stash-tagger-dev.zip" -o _site/stash-tagger-dev.zip || true
           curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || true
 
       - name: Copy docs
@@ -437,9 +500,10 @@ jobs:
           # Version fallbacks from current package.json (not 0.0.0)
           BROWSER_FALLBACK="${{ steps.version.outputs.version }}"
           DOWNLOADER_FALLBACK="${{ steps.version.outputs.downloader_version }}"
+          TAGGER_FALLBACK="${{ steps.version.outputs.tagger_version }}"
 
           # Preserve other entries with proper fallbacks
-          for entry in "stash-downloader" "stash-downloader-dev" "stash-browser-dev"; do
+          for entry in "stash-downloader" "stash-downloader-dev" "stash-browser-dev" "stash-tagger" "stash-tagger-dev"; do
             ZIP="_site/${entry}.zip"
             if [[ -f "$ZIP" ]]; then
               HASH=$(sha256sum "$ZIP" | awk '{print $1}')
@@ -455,6 +519,8 @@ jobs:
               if [[ -z "$VERSION_ENTRY" ]]; then
                 if [[ "$entry" == *"browser"* ]]; then
                   VERSION_ENTRY="${BROWSER_FALLBACK}"
+                elif [[ "$entry" == *"tagger"* ]]; then
+                  VERSION_ENTRY="${TAGGER_FALLBACK}"
                 else
                   VERSION_ENTRY="${DOWNLOADER_FALLBACK}"
                 fi
@@ -490,6 +556,144 @@ jobs:
         with:
           name: browser-stable-zip
           path: _site/stash-browser.zip
+
+  # ============================================================================
+  # DEPLOY TAGGER STABLE - Only on tagger-v* tags
+  # ============================================================================
+  deploy-tagger-stable:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/tagger-v')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Get versions
+        id: version
+        run: |
+          VERSION=$(node -p "require('./plugins/stash-tagger/package.json').version")
+          DOWNLOADER_VERSION=$(node -p "require('./plugins/stash-downloader/package.json').version")
+          BROWSER_VERSION=$(node -p "require('./plugins/stash-browser/package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "downloader_version=${DOWNLOADER_VERSION}" >> $GITHUB_OUTPUT
+          echo "browser_version=${BROWSER_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create package
+        run: |
+          mkdir -p _site _package
+          cp -r plugins/stash-tagger/dist _package/
+          cp plugins/stash-tagger/stash-tagger.yml _package/
+          cp LICENSE _package/
+          cd _package && zip -r ../stash-tagger.zip . && cd ..
+          mv stash-tagger.zip _site/
+
+      - name: Fetch existing builds
+        continue-on-error: true
+        run: |
+          curl -fsSL "${PAGES_URL}/stash-downloader.zip" -o _site/stash-downloader.zip || true
+          curl -fsSL "${PAGES_URL}/stash-downloader-dev.zip" -o _site/stash-downloader-dev.zip || true
+          curl -fsSL "${PAGES_URL}/stash-browser.zip" -o _site/stash-browser.zip || true
+          curl -fsSL "${PAGES_URL}/stash-browser-dev.zip" -o _site/stash-browser-dev.zip || true
+          curl -fsSL "${PAGES_URL}/stash-tagger-dev.zip" -o _site/stash-tagger-dev.zip || true
+          curl -fsSL "${PAGES_URL}/index.yml" -o /tmp/existing-index.yml || true
+
+      - name: Copy docs
+        run: |
+          if [ -d "docs" ]; then cp -r docs/* _site/; fi
+
+      - name: Generate index.yml
+        run: |
+          CURRENT_DATETIME=$(TZ='America/New_York' date +'%Y-%m-%d %H:%M:%S')
+          VERSION=${{ steps.version.outputs.version }}
+
+          echo "" > _site/index.yml
+
+          # Tagger Stable (NEW)
+          HASH=$(sha256sum _site/stash-tagger.zip | awk '{print $1}')
+          cat >> _site/index.yml << EOF
+          - id: stash-tagger
+            name: Stash Tagger
+            version: ${VERSION}
+            date: ${CURRENT_DATETIME}
+            path: stash-tagger.zip
+            sha256: ${HASH}
+            description: Match studios, performers, and tags from StashBox
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+
+          # Version fallbacks from current package.json (not 0.0.0)
+          TAGGER_FALLBACK="${{ steps.version.outputs.version }}"
+          DOWNLOADER_FALLBACK="${{ steps.version.outputs.downloader_version }}"
+          BROWSER_FALLBACK="${{ steps.version.outputs.browser_version }}"
+
+          # Preserve other entries with proper fallbacks
+          for entry in "stash-downloader" "stash-downloader-dev" "stash-browser" "stash-browser-dev" "stash-tagger-dev"; do
+            ZIP="_site/${entry}.zip"
+            if [[ -f "$ZIP" ]]; then
+              HASH=$(sha256sum "$ZIP" | awk '{print $1}')
+
+              # Extract values with proper empty handling (version is 2 lines after id)
+              VERSION_ENTRY=$(grep -A2 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "version:" | sed 's/.*version: *//' | tr -d '[:space:]')
+              DATE_ENTRY=$(grep -A3 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "date:" | sed 's/.*date: *//')
+              NAME=$(grep -A1 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "name:" | sed 's/.*name: *//')
+              DESC=$(grep -A6 "id: ${entry}$" /tmp/existing-index.yml 2>/dev/null | grep "description:" | sed 's/.*description: *//')
+
+              # Apply fallbacks - use package.json versions for STABLE entries only
+              # Dev entries should keep their -dev.sha suffix from existing index
+              if [[ -z "$VERSION_ENTRY" ]]; then
+                if [[ "$entry" == *"browser"* ]]; then
+                  VERSION_ENTRY="${BROWSER_FALLBACK}"
+                elif [[ "$entry" == *"tagger"* ]]; then
+                  VERSION_ENTRY="${TAGGER_FALLBACK}"
+                else
+                  VERSION_ENTRY="${DOWNLOADER_FALLBACK}"
+                fi
+              fi
+              [[ -z "$DATE_ENTRY" ]] && DATE_ENTRY="${CURRENT_DATETIME}"
+              [[ -z "$NAME" ]] && NAME="${entry}"
+              [[ -z "$DESC" ]] && DESC="Stash plugin"
+
+              cat >> _site/index.yml << EOF
+          - id: ${entry}
+            name: ${NAME}
+            version: ${VERSION_ENTRY}
+            date: ${DATE_ENTRY}
+            path: ${entry}.zip
+            sha256: ${HASH}
+            description: ${DESC}
+            url: ${{ github.server_url }}/${{ github.repository }}
+          EOF
+            fi
+          done
+
+          cat _site/index.yml
+
+      - name: Deploy to GitHub Pages
+        uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+      - uses: actions/deploy-pages@v4
+
+      - name: Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: tagger-stable-zip
+          path: _site/stash-tagger.zip
 
   # ============================================================================
   # RELEASE DOWNLOADER - Creates GitHub Release for Downloader
@@ -928,6 +1132,225 @@ jobs:
           name: "Stash Browser v${{ needs.deploy-browser-stable.outputs.version }}"
           body: ${{ steps.ai_notes.outputs.notes }}
           files: stash-browser.zip
+          generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
+
+  # ============================================================================
+  # RELEASE TAGGER - Creates GitHub Release for Tagger
+  # ============================================================================
+  release-tagger:
+    needs: deploy-tagger-stable
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/tagger-v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download ZIP
+        uses: actions/download-artifact@v4
+        with:
+          name: tagger-stable-zip
+
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          CURRENT_TAG="${{ github.ref_name }}"
+          # Get all tagger tags sorted by version (newest first)
+          ALL_TAGS=$(git tag -l 'tagger-v*' --sort=-v:refname)
+
+          # Find the tag immediately before current
+          PREV_TAG=""
+          FOUND_CURRENT=false
+          for tag in $ALL_TAGS; do
+            if [ "$FOUND_CURRENT" = "true" ]; then
+              PREV_TAG="$tag"
+              break
+            fi
+            if [ "$tag" = "$CURRENT_TAG" ]; then
+              FOUND_CURRENT=true
+            fi
+          done
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "first_release=true" >> $GITHUB_OUTPUT
+            echo "prev_tag=" >> $GITHUB_OUTPUT
+            echo "First release detected"
+          else
+            echo "first_release=false" >> $GITHUB_OUTPUT
+            echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+            echo "Previous tag: $PREV_TAG"
+          fi
+
+      - name: Get changelog and diff analysis
+        id: changelog
+        run: |
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          CURRENT_TAG="${{ github.ref_name }}"
+          PLUGIN_PATHS="plugins/stash-tagger/ shared/"
+
+          if [ "${{ steps.prev_tag.outputs.first_release }}" = "true" ]; then
+            # First release - get recent commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" -30 -- $PLUGIN_PATHS 2>/dev/null || echo "Initial release")
+            DIFF_STAT="Initial release - all files are new"
+            DIFF_SUMMARY=""
+          else
+            # Commits between tags, ONLY for this plugin's paths
+            COMMITS=$(git log ${PREV_TAG}..${CURRENT_TAG} --pretty=format:"- %s (%h)" -- $PLUGIN_PATHS 2>/dev/null)
+
+            # If no commits for this plugin, note that
+            if [ -z "$COMMITS" ]; then
+              COMMITS="No direct changes to plugin code (dependency or config updates only)"
+            fi
+
+            # Diff statistics for this plugin only
+            DIFF_STAT=$(git diff ${PREV_TAG}..${CURRENT_TAG} --stat -- $PLUGIN_PATHS 2>/dev/null || echo "")
+
+            # Get summary of actual changes (additions/deletions per file)
+            DIFF_SUMMARY=$(git diff ${PREV_TAG}..${CURRENT_TAG} --numstat -- $PLUGIN_PATHS 2>/dev/null | awk '{added+=$1; deleted+=$2; print $3": +"$1"/-"$2} END {print "\nTotal: +"added"/-"deleted" lines"}' || echo "")
+          fi
+
+          # Output using heredoc (safe for multiline)
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_stat<<DIFFSTAT_EOF"
+            echo "$DIFF_STAT"
+            echo "DIFFSTAT_EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "diff_summary<<DIFFSUMMARY_EOF"
+            echo "$DIFF_SUMMARY"
+            echo "DIFFSUMMARY_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Generate AI release notes
+        id: ai_notes
+        continue-on-error: true
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY configured, skipping AI release notes"
+            exit 0
+          fi
+
+          VERSION="${{ needs.deploy-tagger-stable.outputs.version }}"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          FIRST_RELEASE="${{ steps.prev_tag.outputs.first_release }}"
+
+          # Build context file to avoid shell escaping issues
+          cat > /tmp/release_context.txt << 'CONTEXT_EOF'
+          PLUGIN: Stash Tagger
+          DESCRIPTION: A Stash plugin for matching studios, performers, and tags from StashBox instances (like StashDB) to apply metadata.
+
+          COMMITS (changes specific to this plugin only):
+          ${{ steps.changelog.outputs.commits }}
+
+          FILE CHANGES:
+          ${{ steps.changelog.outputs.diff_stat }}
+
+          CHANGE SUMMARY:
+          ${{ steps.changelog.outputs.diff_summary }}
+          CONTEXT_EOF
+
+          # Build the prompt
+          if [ "$FIRST_RELEASE" = "true" ]; then
+            COMPARE_LINK="Initial release"
+            ANALYSIS_INSTRUCTION="This is the first release, so summarize the initial feature set."
+          else
+            COMPARE_LINK="[Full Changelog](https://github.com/Codename-11/Stash-Downloader/compare/${PREV_TAG}...${VERSION})"
+            ANALYSIS_INSTRUCTION="Analyze the commits and file changes to determine the NET changes. Look for:
+          - Features added then removed (reversion) - don't mention these
+          - Features that were refactored multiple times - summarize the final state only
+          - Bug fixes that were later reverted - don't mention these
+          Focus on what ACTUALLY changed from the user's perspective between releases."
+          fi
+
+          PROMPT="Generate release notes for Stash Tagger v${VERSION}.
+
+          $(cat /tmp/release_context.txt)
+
+          IMPORTANT ANALYSIS RULES:
+          ${ANALYSIS_INSTRUCTION}
+          - ONLY include changes from the COMMITS section above - these are filtered to this plugin only
+          - Do NOT mention changes to other plugins (stash-downloader, stash-browser, browser-extension)
+          - If a feature was added then removed between releases, it's net zero - don't mention it
+
+          Format the response EXACTLY like this:
+          ## 🏷️ Stash Tagger v${VERSION}
+
+          ### ✨ What's New
+
+          **Feature Name** — Brief description of what it does.
+
+          (repeat for each significant user-facing change)
+
+          ${COMPARE_LINK}
+
+          ### 📝 All Changes
+
+          - ✨ feat: description
+          - 🐛 fix: description
+          - ♻️ refactor: description
+
+          ---
+
+          ### 📦 Installation
+
+          **Via Stash Plugin Manager (Recommended):**
+          1. Settings → Plugins → Available Plugins → Add Source
+          2. Enter: \`https://codename-11.github.io/Stash-Downloader/index.yml\`
+          3. Find \"Stash Tagger\" and click Install
+
+          **Manual Installation:**
+          1. Download \`stash-tagger.zip\` below
+          2. Extract to \`~/.stash/plugins/stash-tagger/\`
+          3. Reload plugins in Stash
+
+          ### 📋 Requirements
+          - Stash v0.20+
+          - At least one StashBox instance configured in Stash settings
+
+          Rules:
+          - Be concise - one line per feature
+          - Focus on user-facing changes only
+          - Skip internal refactoring from What's New (keep in All Changes)
+          - If no significant changes, say 'Maintenance release with minor improvements'"
+
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"contents\":[{\"parts\":[{\"text\":$(echo "$PROMPT" | jq -Rs .)}]}]}")
+
+          ERROR=$(echo "$RESPONSE" | jq -r '.error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "::warning::Gemini API error: $ERROR"
+            exit 0
+          fi
+
+          NOTES=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
+          if [ -z "$NOTES" ]; then
+            echo "::warning::Empty response from Gemini"
+            exit 0
+          fi
+
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Stash Tagger v${{ needs.deploy-tagger-stable.outputs.version }}"
+          body: ${{ steps.ai_notes.outputs.notes }}
+          files: stash-tagger.zip
           generate_release_notes: ${{ steps.ai_notes.outputs.notes == '' }}
 
   # ============================================================================
