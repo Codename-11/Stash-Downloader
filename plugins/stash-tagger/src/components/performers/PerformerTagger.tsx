@@ -10,11 +10,14 @@ import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/compone
 
 interface PerformerTaggerProps {
   instance: StashBoxInstance | null;
+  /** All available StashBox instances for manual search source selection */
+  instances: StashBoxInstance[];
   threshold: number;
 }
 
 export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
   instance,
+  instances,
   threshold,
 }) => {
   const {
@@ -227,6 +230,7 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
           onClose={() => setSearchModalOpen(false)}
           entityType="performer"
           instance={instance}
+          instances={instances}
           initialQuery={searchModalMatch.local.name}
           onSelect={handleSearchModalSelect}
         />

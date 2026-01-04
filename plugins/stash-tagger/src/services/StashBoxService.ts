@@ -11,6 +11,9 @@ import type {
   StashBoxPerformer,
   StashBoxTag,
 } from '@/types';
+import { createLogger } from '@/utils';
+
+const log = createLogger('StashBoxService');
 
 interface GraphQLResponse<T> {
   data?: T;
@@ -100,6 +103,8 @@ class StashBoxService {
     query: string,
     variables?: Record<string, unknown>
   ): Promise<GraphQLResponse<T>> {
+    log.debug('Executing GraphQL request', { variables });
+
     const response = await fetch(this.apiEndpoint, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -107,10 +112,18 @@ class StashBoxService {
     });
 
     if (!response.ok) {
-      throw new Error(`GraphQL request failed: ${response.statusText}`);
+      const errorMsg = `GraphQL request failed: ${response.statusText}`;
+      log.error(errorMsg, { status: response.status, statusText: response.statusText });
+      throw new Error(errorMsg);
     }
 
-    return response.json();
+    const result = await response.json() as GraphQLResponse<T>;
+
+    if (result.errors?.length) {
+      log.warn('GraphQL response contains errors', result.errors);
+    }
+
+    return result;
   }
 
   /**
@@ -172,6 +185,11 @@ class StashBoxService {
     term: string,
     _limit = 10
   ): Promise<StashBoxStudio[]> {
+    log.info(`Searching studios: "${term}"`, {
+      endpoint: instance.endpoint,
+      instanceName: instance.name,
+    });
+
     const query = `
       query ScrapeSingleStudio($source: ScraperSourceInput!, $input: ScrapeSingleStudioInput!) {
         scrapeSingleStudio(source: $source, input: $input) {
@@ -203,10 +221,19 @@ class StashBoxService {
     });
 
     if (result.errors?.length) {
-      throw new Error(result.errors[0]?.message ?? 'Failed to search studios');
+      const errorMsg = result.errors[0]?.message ?? 'Failed to search studios';
+      log.error(`Studio search failed: ${errorMsg}`, result.errors);
+      throw new Error(errorMsg);
     }
 
-    return (result.data?.scrapeSingleStudio ?? []).map((s) => this.mapScrapedStudio(s));
+    const studios = (result.data?.scrapeSingleStudio ?? []).map((s) => this.mapScrapedStudio(s));
+    log.info(`Studio search complete: ${studios.length} results`, {
+      query: term,
+      resultCount: studios.length,
+      results: studios.map(s => ({ id: s.id, name: s.name })),
+    });
+
+    return studios;
   }
 
   /**
@@ -217,6 +244,11 @@ class StashBoxService {
     term: string,
     _limit = 10
   ): Promise<StashBoxPerformer[]> {
+    log.info(`Searching performers: "${term}"`, {
+      endpoint: instance.endpoint,
+      instanceName: instance.name,
+    });
+
     const query = `
       query ScrapeSinglePerformer($source: ScraperSourceInput!, $input: ScrapeSinglePerformerInput!) {
         scrapeSinglePerformer(source: $source, input: $input) {
@@ -258,10 +290,19 @@ class StashBoxService {
     });
 
     if (result.errors?.length) {
-      throw new Error(result.errors[0]?.message ?? 'Failed to search performers');
+      const errorMsg = result.errors[0]?.message ?? 'Failed to search performers';
+      log.error(`Performer search failed: ${errorMsg}`, result.errors);
+      throw new Error(errorMsg);
     }
 
-    return (result.data?.scrapeSinglePerformer ?? []).map((p) => this.mapScrapedPerformer(p));
+    const performers = (result.data?.scrapeSinglePerformer ?? []).map((p) => this.mapScrapedPerformer(p));
+    log.info(`Performer search complete: ${performers.length} results`, {
+      query: term,
+      resultCount: performers.length,
+      results: performers.map(p => ({ id: p.id, name: p.name, disambiguation: p.disambiguation })),
+    });
+
+    return performers;
   }
 
   /**
@@ -272,6 +313,11 @@ class StashBoxService {
     term: string,
     _limit = 10
   ): Promise<StashBoxTag[]> {
+    log.info(`Searching tags: "${term}"`, {
+      endpoint: instance.endpoint,
+      instanceName: instance.name,
+    });
+
     const query = `
       query ScrapeSingleTag($source: ScraperSourceInput!, $input: ScrapeSingleTagInput!) {
         scrapeSingleTag(source: $source, input: $input) {
@@ -290,10 +336,19 @@ class StashBoxService {
     });
 
     if (result.errors?.length) {
-      throw new Error(result.errors[0]?.message ?? 'Failed to search tags');
+      const errorMsg = result.errors[0]?.message ?? 'Failed to search tags';
+      log.error(`Tag search failed: ${errorMsg}`, result.errors);
+      throw new Error(errorMsg);
     }
 
-    return (result.data?.scrapeSingleTag ?? []).map((t) => this.mapScrapedTag(t));
+    const tags = (result.data?.scrapeSingleTag ?? []).map((t) => this.mapScrapedTag(t));
+    log.info(`Tag search complete: ${tags.length} results`, {
+      query: term,
+      resultCount: tags.length,
+      results: tags.map(t => ({ id: t.id, name: t.name })),
+    });
+
+    return tags;
   }
 
   /**
@@ -336,6 +391,11 @@ class StashBoxService {
    * Test connection to a StashBox instance
    */
   async testConnection(instance: StashBoxInstance): Promise<boolean> {
+    log.info('Testing StashBox connection', {
+      endpoint: instance.endpoint,
+      instanceName: instance.name,
+    });
+
     try {
       const query = `
         query ValidateStashBoxCredentials($input: StashBoxInput!) {
@@ -356,8 +416,18 @@ class StashBoxService {
         },
       });
 
-      return result.data?.validateStashBoxCredentials?.valid ?? false;
-    } catch {
+      const valid = result.data?.validateStashBoxCredentials?.valid ?? false;
+      const status = result.data?.validateStashBoxCredentials?.status ?? 'unknown';
+
+      if (valid) {
+        log.info('StashBox connection valid', { endpoint: instance.endpoint, status });
+      } else {
+        log.warn('StashBox connection invalid', { endpoint: instance.endpoint, status });
+      }
+
+      return valid;
+    } catch (err) {
+      log.error('StashBox connection test failed', err);
       return false;
     }
   }

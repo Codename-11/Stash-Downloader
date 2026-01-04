@@ -135,18 +135,21 @@ export const TaggerMain: React.FC = () => {
         {activeTab === 'studios' && (
           <StudioTagger
             instance={selectedInstance}
+            instances={instances}
             threshold={threshold}
           />
         )}
         {activeTab === 'performers' && (
           <PerformerTagger
             instance={selectedInstance}
+            instances={instances}
             threshold={threshold}
           />
         )}
         {activeTab === 'tags' && (
           <TagTagger
             instance={selectedInstance}
+            instances={instances}
             threshold={threshold}
           />
         )}

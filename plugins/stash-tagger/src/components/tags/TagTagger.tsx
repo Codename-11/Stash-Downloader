@@ -10,11 +10,14 @@ import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/compone
 
 interface TagTaggerProps {
   instance: StashBoxInstance | null;
+  /** All available StashBox instances for manual search source selection */
+  instances: StashBoxInstance[];
   threshold: number;
 }
 
 export const TagTagger: React.FC<TagTaggerProps> = ({
   instance,
+  instances,
   threshold,
 }) => {
   const {
@@ -236,6 +239,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
           onClose={() => setSearchModalOpen(false)}
           entityType="tag"
           instance={instance}
+          instances={instances}
           initialQuery={searchModalMatch.local.name}
           onSelect={handleSearchModalSelect}
         />

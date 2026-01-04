@@ -1,8 +1,13 @@
 /**
  * ManualSearchModal - Modal for manually searching StashBox entities
+ *
+ * Allows users to:
+ * - Search across different StashBox instances
+ * - Select which source to search from
+ * - View detailed search results
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type {
   StashBoxInstance,
   StashBoxStudio,
@@ -10,6 +15,9 @@ import type {
   StashBoxTag,
 } from '@/types';
 import { stashBoxService } from '@/services';
+import { createLogger } from '@/utils';
+
+const log = createLogger('ManualSearch');
 
 type EntityType = 'studio' | 'performer' | 'tag';
 type SearchResult = StashBoxStudio | StashBoxPerformer | StashBoxTag;
@@ -18,7 +26,10 @@ interface ManualSearchModalProps {
   open: boolean;
   onClose: () => void;
   entityType: EntityType;
+  /** Currently selected instance (used as default) */
   instance: StashBoxInstance;
+  /** All available StashBox instances for source selection */
+  instances?: StashBoxInstance[];
   initialQuery?: string;
   onSelect: (result: SearchResult) => void;
 }
@@ -175,6 +186,7 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
   onClose,
   entityType,
   instance,
+  instances,
   initialQuery = '',
   onSelect,
 }) => {
@@ -183,6 +195,14 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  // Local instance selection for searching (defaults to parent's selected instance)
+  const [selectedInstance, setSelectedInstance] = useState<StashBoxInstance>(instance);
+
+  // Available instances (use prop if provided, otherwise just the single instance)
+  const availableInstances = useMemo(
+    () => (instances && instances.length > 0 ? instances : [instance]),
+    [instances, instance]
+  );
 
   // Reset state when modal opens
   useEffect(() => {
@@ -191,8 +211,10 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
       setResults([]);
       setError(null);
       setHasSearched(false);
+      setSelectedInstance(instance);
+      log.debug('Modal opened', { entityType, initialQuery, instance: instance.name });
     }
-  }, [open, initialQuery]);
+  }, [open, initialQuery, instance, entityType]);
 
   // Handle body scroll lock
   useEffect(() => {
@@ -205,6 +227,21 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
   }, [open]);
 
   /**
+   * Handle instance change
+   */
+  const handleInstanceChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const endpoint = e.target.value;
+    const newInstance = availableInstances.find((i) => i.endpoint === endpoint);
+    if (newInstance) {
+      log.info(`Switched search source to: ${newInstance.name || newInstance.endpoint}`);
+      setSelectedInstance(newInstance);
+      // Clear previous results when switching sources
+      setResults([]);
+      setHasSearched(false);
+    }
+  }, [availableInstances]);
+
+  /**
    * Perform search
    */
   const handleSearch = useCallback(async () => {
@@ -214,31 +251,39 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
     setError(null);
     setHasSearched(true);
 
+    log.info(`Starting ${entityType} search`, {
+      query,
+      source: selectedInstance.name || selectedInstance.endpoint,
+    });
+
     try {
       let searchResults: SearchResult[];
 
       switch (entityType) {
         case 'studio':
-          searchResults = await stashBoxService.searchStudios(instance, query);
+          searchResults = await stashBoxService.searchStudios(selectedInstance, query);
           break;
         case 'performer':
-          searchResults = await stashBoxService.searchPerformers(instance, query);
+          searchResults = await stashBoxService.searchPerformers(selectedInstance, query);
           break;
         case 'tag':
-          searchResults = await stashBoxService.searchTags(instance, query);
+          searchResults = await stashBoxService.searchTags(selectedInstance, query);
           break;
         default:
           searchResults = [];
       }
 
+      log.info(`Search completed: ${searchResults.length} results found`);
       setResults(searchResults);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
+      const errorMessage = err instanceof Error ? err.message : 'Search failed';
+      log.error(`Search failed: ${errorMessage}`, err);
+      setError(errorMessage);
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [query, entityType, instance]);
+  }, [query, entityType, selectedInstance]);
 
   /**
    * Handle Enter key in search input
@@ -258,10 +303,14 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
    */
   const handleSelect = useCallback(
     (result: SearchResult) => {
+      log.info(`Selected ${entityType}: ${result.name}`, {
+        id: result.id,
+        source: selectedInstance.name || selectedInstance.endpoint,
+      });
       onSelect(result);
       onClose();
     },
-    [onSelect, onClose]
+    [onSelect, onClose, entityType, selectedInstance]
   );
 
   if (!open) return null;
@@ -297,6 +346,33 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
             </div>
 
             <div className="modal-body">
+              {/* Source selector - only show if multiple instances available */}
+              {availableInstances.length > 1 && (
+                <div className="mb-3">
+                  <label htmlFor="search-source-select" className="form-label text-muted small">
+                    Search Source
+                  </label>
+                  <select
+                    id="search-source-select"
+                    className="form-select form-select-sm"
+                    style={{
+                      backgroundColor: '#243340',
+                      borderColor: '#394b59',
+                      color: '#fff',
+                    }}
+                    value={selectedInstance.endpoint}
+                    onChange={handleInstanceChange}
+                    disabled={loading}
+                  >
+                    {availableInstances.map((inst) => (
+                      <option key={inst.endpoint} value={inst.endpoint}>
+                        {inst.name || inst.endpoint}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Search input */}
               <div className="input-group mb-3">
                 <input
@@ -346,7 +422,12 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
                 ) : results.length > 0 ? (
                   <>
                     <div className="text-muted mb-2">
-                      <small>Found {results.length} result{results.length !== 1 ? 's' : ''}</small>
+                      <small>
+                        Found {results.length} result{results.length !== 1 ? 's' : ''}
+                        {availableInstances.length > 1 && (
+                          <> from {selectedInstance.name || selectedInstance.endpoint}</>
+                        )}
+                      </small>
                     </div>
                     {results.map((result) => (
                       <ResultCard
