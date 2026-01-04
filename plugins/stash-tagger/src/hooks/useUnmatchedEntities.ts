@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { StashBoxInstance, LocalStudio, LocalPerformer, LocalTag } from '@/types';
+import type { LocalStudio, LocalPerformer, LocalTag } from '@/types';
 import type { EntityType } from '@/constants';
 import { stashService } from '@/services';
 import { STORAGE_KEYS } from '@/constants';
@@ -27,8 +27,7 @@ interface UseUnmatchedEntitiesReturn<T> {
  */
 function useUnmatchedEntitiesBase<T extends { id: string }>(
   _entityType: EntityType,
-  instance: StashBoxInstance | null,
-  loadFn: (endpoint: string, limit: number, page: number) => Promise<{ entities: T[]; count: number }>,
+  loadFn: (limit: number, page: number) => Promise<{ entities: T[]; count: number }>,
   storageKey: string
 ): UseUnmatchedEntitiesReturn<T> {
   const [entities, setEntities] = useState<T[]>([]);
@@ -51,13 +50,11 @@ function useUnmatchedEntitiesBase<T extends { id: string }>(
    * Load entities from Stash
    */
   const loadEntities = useCallback(async (pageNum: number, append = false) => {
-    if (!instance) return;
-
     setLoading(true);
     setError(null);
 
     try {
-      const result = await loadFn(instance.endpoint, pageSize, pageNum);
+      const result = await loadFn(pageSize, pageNum);
 
       if (append) {
         setEntities((prev) => [...prev, ...result.entities]);
@@ -71,7 +68,7 @@ function useUnmatchedEntitiesBase<T extends { id: string }>(
     } finally {
       setLoading(false);
     }
-  }, [instance, loadFn]);
+  }, [loadFn]);
 
   /**
    * Load more entities (pagination)
@@ -119,12 +116,10 @@ function useUnmatchedEntitiesBase<T extends { id: string }>(
     localStorage.removeItem(storageKey);
   }, [storageKey]);
 
-  // Load entities when instance changes
+  // Load entities on mount
   useEffect(() => {
-    if (instance) {
-      void loadEntities(1, false);
-    }
-  }, [instance, loadEntities]);
+    void loadEntities(1, false);
+  }, [loadEntities]);
 
   const hasMore = entities.length < totalCount;
 
@@ -144,38 +139,32 @@ function useUnmatchedEntitiesBase<T extends { id: string }>(
 }
 
 /**
- * Hook for loading unmatched studios
+ * Hook for loading unmatched studios (no stash_ids from ANY endpoint)
  */
-export function useUnmatchedStudios(
-  instance: StashBoxInstance | null
-): UseUnmatchedEntitiesReturn<LocalStudio> {
-  const loadFn = useCallback(async (endpoint: string, limit: number, page: number) => {
-    const result = await stashService.getUnmatchedStudios(endpoint, limit, page);
+export function useUnmatchedStudios(): UseUnmatchedEntitiesReturn<LocalStudio> {
+  const loadFn = useCallback(async (limit: number, page: number) => {
+    const result = await stashService.getUnmatchedStudios(limit, page);
     return { entities: result.studios, count: result.count };
   }, []);
 
   return useUnmatchedEntitiesBase(
     'studio',
-    instance,
     loadFn,
     STORAGE_KEYS.SKIPPED_STUDIOS
   );
 }
 
 /**
- * Hook for loading unmatched performers
+ * Hook for loading unmatched performers (no stash_ids from ANY endpoint)
  */
-export function useUnmatchedPerformers(
-  instance: StashBoxInstance | null
-): UseUnmatchedEntitiesReturn<LocalPerformer> {
-  const loadFn = useCallback(async (endpoint: string, limit: number, page: number) => {
-    const result = await stashService.getUnmatchedPerformers(endpoint, limit, page);
+export function useUnmatchedPerformers(): UseUnmatchedEntitiesReturn<LocalPerformer> {
+  const loadFn = useCallback(async (limit: number, page: number) => {
+    const result = await stashService.getUnmatchedPerformers(limit, page);
     return { entities: result.performers, count: result.count };
   }, []);
 
   return useUnmatchedEntitiesBase(
     'performer',
-    instance,
     loadFn,
     STORAGE_KEYS.SKIPPED_PERFORMERS
   );
@@ -184,17 +173,14 @@ export function useUnmatchedPerformers(
 /**
  * Hook for loading tags
  */
-export function useTags(
-  _instance: StashBoxInstance | null
-): UseUnmatchedEntitiesReturn<LocalTag> {
-  const loadFn = useCallback(async (_endpoint: string, limit: number, page: number) => {
+export function useTags(): UseUnmatchedEntitiesReturn<LocalTag> {
+  const loadFn = useCallback(async (limit: number, page: number) => {
     const result = await stashService.getTags(limit, page);
     return { entities: result.tags, count: result.count };
   }, []);
 
   return useUnmatchedEntitiesBase(
     'tag',
-    _instance,
     loadFn,
     STORAGE_KEYS.SKIPPED_TAGS
   );

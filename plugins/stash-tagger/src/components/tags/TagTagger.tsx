@@ -26,7 +26,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     error: tagsError,
     refresh: refreshTags,
     clearSkipped,
-  } = useTags(instance);
+  } = useTags();
 
   const {
     matches,
@@ -37,7 +37,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     applyMatch,
     applyAllAutoMatches,
     skipMatch,
-  } = useTagMatcher(instance, threshold);
+  } = useTagMatcher(instances, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
@@ -94,10 +94,10 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
   const loading = loadingTags || loadingMatches;
   const error = tagsError || matchesError;
 
-  if (!instance) {
+  if (instances.length === 0) {
     return (
       <div className="alert alert-info">
-        Select a StashBox instance to start matching tags.
+        No StashBox instances configured. Add StashBox sources in Stash settings to start matching.
       </div>
     );
   }

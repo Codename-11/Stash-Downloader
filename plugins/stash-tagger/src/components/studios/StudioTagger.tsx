@@ -26,7 +26,7 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     error: studiosError,
     refresh: refreshStudios,
     clearSkipped,
-  } = useUnmatchedStudios(instance);
+  } = useUnmatchedStudios();
 
   const {
     matches,
@@ -37,7 +37,7 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     applyMatch,
     applyAllAutoMatches,
     skipMatch,
-  } = useStudioMatcher(instance, threshold);
+  } = useStudioMatcher(instances, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -90,10 +90,10 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
   const loading = loadingStudios || loadingMatches;
   const error = studiosError || matchesError;
 
-  if (!instance) {
+  if (instances.length === 0) {
     return (
       <div className="alert alert-info">
-        Select a StashBox instance to start matching studios.
+        No StashBox instances configured. Add StashBox sources in Stash settings to start matching.
       </div>
     );
   }

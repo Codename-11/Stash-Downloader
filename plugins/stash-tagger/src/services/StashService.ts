@@ -118,14 +118,13 @@ class StashService {
   }
 
   /**
-   * Get unmatched studios (no stash_ids for the given endpoint)
+   * Get unmatched studios (no stash_ids from ANY endpoint)
    */
   async getUnmatchedStudios(
-    endpoint: string,
     limit = 100,
     page = 1
   ): Promise<{ studios: LocalStudio[]; count: number }> {
-    // Use studio_filter to only get studios without a stash_id for this endpoint
+    // Use is_missing filter to get studios with no stash_ids at all
     const query = `
       query FindUnmatchedStudios($filter: FindFilterType, $studioFilter: StudioFilterType) {
         findStudios(filter: $filter, studio_filter: $studioFilter) {
@@ -161,10 +160,7 @@ class StashService {
         page,
       },
       studioFilter: {
-        stash_id_endpoint: {
-          endpoint,
-          modifier: 'IS_NULL',
-        },
+        is_missing: 'stash_id',
       },
     });
 
@@ -175,14 +171,13 @@ class StashService {
   }
 
   /**
-   * Get unmatched performers (no stash_ids for the given endpoint)
+   * Get unmatched performers (no stash_ids from ANY endpoint)
    */
   async getUnmatchedPerformers(
-    endpoint: string,
     limit = 100,
     page = 1
   ): Promise<{ performers: LocalPerformer[]; count: number }> {
-    // Use performer_filter to only get performers without a stash_id for this endpoint
+    // Use is_missing filter to get performers with no stash_ids at all
     const query = `
       query FindUnmatchedPerformers($filter: FindFilterType, $performerFilter: PerformerFilterType) {
         findPerformers(filter: $filter, performer_filter: $performerFilter) {
@@ -226,10 +221,7 @@ class StashService {
         page,
       },
       performerFilter: {
-        stash_id_endpoint: {
-          endpoint,
-          modifier: 'IS_NULL',
-        },
+        is_missing: 'stash_id',
       },
     });
 

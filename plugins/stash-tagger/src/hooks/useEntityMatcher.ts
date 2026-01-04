@@ -58,9 +58,10 @@ const defaultApplyOptions: ApplyOptions = {
 
 /**
  * Hook for studio matching
+ * Searches ALL configured endpoints for matches
  */
 export function useStudioMatcher(
-  instance: StashBoxInstance | null,
+  instances: StashBoxInstance[],
   threshold: number = CONFIDENCE_THRESHOLDS.HIGH
 ): UseEntityMatcherReturn<LocalStudio, StashBoxStudio> {
   const [matches, setMatches] = useState<EntityMatch<LocalStudio, StashBoxStudio>[]>([]);
@@ -69,19 +70,19 @@ export function useStudioMatcher(
 
   const stats = calculateMatchStats(matches, threshold);
   const matcher = useMemo(
-    () => (instance ? new StudioMatcher(instance) : null),
-    [instance]
+    () => (instances.length > 0 ? new StudioMatcher(instances) : null),
+    [instances]
   );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
     : { auto: [], review: [], noMatch: [], skipped: [] };
 
   /**
-   * Find matches for studios
+   * Find matches for studios across all instances
    */
   const findMatches = useCallback(async (studios: LocalStudio[]) => {
     if (!matcher) {
-      setError('No StashBox instance selected');
+      setError('No StashBox instances configured');
       return;
     }
 
@@ -100,19 +101,26 @@ export function useStudioMatcher(
 
   /**
    * Apply a match to a studio
+   * Uses the source from the candidate to determine which endpoint to link
    */
   const applyMatch = useCallback(async (
     match: EntityMatch<LocalStudio, StashBoxStudio>,
     selectedRemote: StashBoxStudio,
     options: ApplyOptions = defaultApplyOptions
   ) => {
-    if (!instance) throw new Error('No StashBox instance selected');
+    // Find the candidate to get the source
+    const candidate = match.candidates.find((c) => c.remote.id === selectedRemote.id);
+    const source = (candidate as { source?: StashBoxInstance })?.source;
+
+    if (!source) {
+      throw new Error('Could not determine source for match');
+    }
 
     const input: StudioUpdateInput = {
       id: match.local.id,
       stash_ids: [
         ...(match.local.stash_ids ?? []),
-        { endpoint: instance.endpoint, stash_id: selectedRemote.id },
+        { endpoint: source.endpoint, stash_id: selectedRemote.id },
       ],
     };
 
@@ -138,7 +146,7 @@ export function useStudioMatcher(
     if (options.includeParent && selectedRemote.parent) {
       const parentStudio = await stashService.getOrCreateStudio(
         selectedRemote.parent.name,
-        instance.endpoint,
+        source.endpoint,
         selectedRemote.parent.id,
         selectedRemote.parent.images?.[0]?.url
       );
@@ -155,7 +163,7 @@ export function useStudioMatcher(
           : m
       )
     );
-  }, [instance]);
+  }, []);
 
   /**
    * Apply all auto-matches
@@ -214,9 +222,10 @@ export function useStudioMatcher(
 
 /**
  * Hook for performer matching
+ * Searches ALL configured endpoints for matches
  */
 export function usePerformerMatcher(
-  instance: StashBoxInstance | null,
+  instances: StashBoxInstance[],
   threshold: number = CONFIDENCE_THRESHOLDS.HIGH
 ): UseEntityMatcherReturn<LocalPerformer, StashBoxPerformer> {
   const [matches, setMatches] = useState<EntityMatch<LocalPerformer, StashBoxPerformer>[]>([]);
@@ -225,8 +234,8 @@ export function usePerformerMatcher(
 
   const stats = calculateMatchStats(matches, threshold);
   const matcher = useMemo(
-    () => (instance ? new PerformerMatcher(instance) : null),
-    [instance]
+    () => (instances.length > 0 ? new PerformerMatcher(instances) : null),
+    [instances]
   );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
@@ -234,7 +243,7 @@ export function usePerformerMatcher(
 
   const findMatches = useCallback(async (performers: LocalPerformer[]) => {
     if (!matcher) {
-      setError('No StashBox instance selected');
+      setError('No StashBox instances configured');
       return;
     }
 
@@ -256,13 +265,19 @@ export function usePerformerMatcher(
     selectedRemote: StashBoxPerformer,
     options: ApplyOptions = defaultApplyOptions
   ) => {
-    if (!instance) throw new Error('No StashBox instance selected');
+    // Find the candidate to get the source
+    const candidate = match.candidates.find((c) => c.remote.id === selectedRemote.id);
+    const source = (candidate as { source?: StashBoxInstance })?.source;
+
+    if (!source) {
+      throw new Error('Could not determine source for match');
+    }
 
     const input: PerformerUpdateInput = {
       id: match.local.id,
       stash_ids: [
         ...(match.local.stash_ids ?? []),
-        { endpoint: instance.endpoint, stash_id: selectedRemote.id },
+        { endpoint: source.endpoint, stash_id: selectedRemote.id },
       ],
     };
 
@@ -296,7 +311,7 @@ export function usePerformerMatcher(
           : m
       )
     );
-  }, [instance]);
+  }, []);
 
   const applyAllAutoMatches = useCallback(async (
     options: ApplyOptions = defaultApplyOptions
@@ -346,9 +361,10 @@ export function usePerformerMatcher(
 
 /**
  * Hook for tag matching
+ * Searches ALL configured endpoints for matches
  */
 export function useTagMatcher(
-  instance: StashBoxInstance | null,
+  instances: StashBoxInstance[],
   threshold: number = CONFIDENCE_THRESHOLDS.HIGH
 ): UseEntityMatcherReturn<LocalTag, StashBoxTag> {
   const [matches, setMatches] = useState<EntityMatch<LocalTag, StashBoxTag>[]>([]);
@@ -357,8 +373,8 @@ export function useTagMatcher(
 
   const stats = calculateMatchStats(matches, threshold);
   const matcher = useMemo(
-    () => (instance ? new TagMatcher(instance) : null),
-    [instance]
+    () => (instances.length > 0 ? new TagMatcher(instances) : null),
+    [instances]
   );
   const categorized = matcher
     ? matcher.categorizeMatches(matches, threshold)
@@ -366,7 +382,7 @@ export function useTagMatcher(
 
   const findMatches = useCallback(async (tags: LocalTag[]) => {
     if (!matcher) {
-      setError('No StashBox instance selected');
+      setError('No StashBox instances configured');
       return;
     }
 

@@ -26,7 +26,7 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     error: performersError,
     refresh: refreshPerformers,
     clearSkipped,
-  } = useUnmatchedPerformers(instance);
+  } = useUnmatchedPerformers();
 
   const {
     matches,
@@ -37,7 +37,7 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     applyMatch,
     applyAllAutoMatches,
     skipMatch,
-  } = usePerformerMatcher(instance, threshold);
+  } = usePerformerMatcher(instances, threshold);
 
   const [searchingId, setSearchingId] = useState<string | null>(null);
   const [hasScanned, setHasScanned] = useState(false);
@@ -90,10 +90,10 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
   const loading = loadingPerformers || loadingMatches;
   const error = performersError || matchesError;
 
-  if (!instance) {
+  if (instances.length === 0) {
     return (
       <div className="alert alert-info">
-        Select a StashBox instance to start matching performers.
+        No StashBox instances configured. Add StashBox sources in Stash settings to start matching.
       </div>
     );
   }
