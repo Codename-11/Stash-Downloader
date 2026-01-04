@@ -35,6 +35,7 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     error: matchesError,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
   } = usePerformerMatcher(instances, threshold);
@@ -81,11 +82,11 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     setSearchModalOpen(true);
   }, []);
 
-  const handleSearchModalSelect = useCallback(async (result: StashBoxPerformer) => {
+  const handleSearchModalSelect = useCallback(async (result: StashBoxPerformer, source: StashBoxInstance) => {
     if (searchModalMatch) {
-      await applyMatch(searchModalMatch, result);
+      await applyManualMatch(searchModalMatch.local, result, source);
     }
-  }, [searchModalMatch, applyMatch]);
+  }, [searchModalMatch, applyManualMatch]);
 
   const loading = loadingPerformers || loadingMatches;
   const error = performersError || matchesError;
@@ -130,9 +131,48 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
 
       {/* Performer list */}
       {!hasScanned ? (
-        <div className="text-center py-4 text-muted">
-          <p>Click "Scan for Matches" to search StashBox for matching performers.</p>
-          <small>{performers.length} unmatched performers found</small>
+        <div>
+          <div className="mb-3 text-muted">
+            <small>
+              {performers.length} unmatched performer{performers.length !== 1 ? 's' : ''} found.
+              Click "Scan for Matches" to search all StashBox endpoints.
+            </small>
+          </div>
+          {loadingPerformers ? (
+            <div className="d-flex justify-content-center p-4">
+              <span className="spinner-border" />
+            </div>
+          ) : performers.length === 0 ? (
+            <div className="alert alert-info">
+              No unmatched performers found. All performers are linked to StashBox!
+            </div>
+          ) : (
+            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              {performers.map((performer) => (
+                <div
+                  key={performer.id}
+                  className="d-flex align-items-center gap-3 p-2 mb-1"
+                  style={{ backgroundColor: '#283845', borderRadius: '4px' }}
+                >
+                  {performer.image_path && (
+                    <img
+                      src={performer.image_path}
+                      alt={performer.name}
+                      style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+                    />
+                  )}
+                  <div className="flex-grow-1">
+                    <div className="text-light">{performer.name}</div>
+                    <small className="text-muted">
+                      {[performer.gender, performer.country, performer.scene_count ? `${performer.scene_count} scenes` : null]
+                        .filter(Boolean)
+                        .join(' • ')}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">

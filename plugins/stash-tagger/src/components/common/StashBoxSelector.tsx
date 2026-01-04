@@ -46,29 +46,35 @@ export const StashBoxSelector: React.FC<StashBoxSelectorProps> = ({
   }
 
   return (
-    <div className="d-flex align-items-center gap-2">
-      <label htmlFor="stashbox-select" className="form-label mb-0 text-nowrap">
-        StashBox:
-      </label>
-      <select
-        id="stashbox-select"
-        className="form-select form-select-sm"
-        style={{
-          backgroundColor: '#243340',
-          borderColor: '#394b59',
-          color: '#fff',
-          maxWidth: '300px',
-        }}
-        value={selectedInstance?.endpoint ?? ''}
-        onChange={handleChange}
-        disabled={disabled}
-      >
-        {instances.map((instance) => (
-          <option key={instance.endpoint} value={instance.endpoint}>
-            {instance.name || instance.endpoint}
-          </option>
-        ))}
-      </select>
+    <div className="d-flex flex-column gap-2">
+      <div className="d-flex align-items-center gap-2">
+        <label htmlFor="stashbox-select" className="form-label mb-0 text-nowrap">
+          Manual Search Source:
+        </label>
+        <select
+          id="stashbox-select"
+          className="form-select form-select-sm"
+          style={{
+            backgroundColor: '#243340',
+            borderColor: '#394b59',
+            color: '#fff',
+            maxWidth: '300px',
+          }}
+          value={selectedInstance?.endpoint ?? ''}
+          onChange={handleChange}
+          disabled={disabled}
+        >
+          {instances.map((instance) => (
+            <option key={instance.endpoint} value={instance.endpoint}>
+              {instance.name || instance.endpoint}
+            </option>
+          ))}
+        </select>
+      </div>
+      <small className="text-muted">
+        Auto-scan searches all {instances.length} configured endpoint{instances.length !== 1 ? 's' : ''}.
+        Manual search uses the selected source above.
+      </small>
     </div>
   );
 };

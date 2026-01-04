@@ -35,6 +35,7 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     error: matchesError,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
   } = useStudioMatcher(instances, threshold);
@@ -81,11 +82,11 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     setSearchModalOpen(true);
   }, []);
 
-  const handleSearchModalSelect = useCallback(async (result: StashBoxStudio) => {
+  const handleSearchModalSelect = useCallback(async (result: StashBoxStudio, source: StashBoxInstance) => {
     if (searchModalMatch) {
-      await applyMatch(searchModalMatch, result);
+      await applyManualMatch(searchModalMatch.local, result, source);
     }
-  }, [searchModalMatch, applyMatch]);
+  }, [searchModalMatch, applyManualMatch]);
 
   const loading = loadingStudios || loadingMatches;
   const error = studiosError || matchesError;
@@ -130,9 +131,48 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
 
       {/* Studio list */}
       {!hasScanned ? (
-        <div className="text-center py-4 text-muted">
-          <p>Click "Scan for Matches" to search StashBox for matching studios.</p>
-          <small>{studios.length} unmatched studios found</small>
+        <div>
+          <div className="mb-3 text-muted">
+            <small>
+              {studios.length} unmatched studio{studios.length !== 1 ? 's' : ''} found.
+              Click "Scan for Matches" to search all StashBox endpoints.
+            </small>
+          </div>
+          {loadingStudios ? (
+            <div className="d-flex justify-content-center p-4">
+              <span className="spinner-border" />
+            </div>
+          ) : studios.length === 0 ? (
+            <div className="alert alert-info">
+              No unmatched studios found. All studios are linked to StashBox!
+            </div>
+          ) : (
+            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              {studios.map((studio) => (
+                <div
+                  key={studio.id}
+                  className="d-flex align-items-center gap-3 p-2 mb-1"
+                  style={{ backgroundColor: '#283845', borderRadius: '4px' }}
+                >
+                  {studio.image_path && (
+                    <img
+                      src={studio.image_path}
+                      alt={studio.name}
+                      style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+                    />
+                  )}
+                  <div className="flex-grow-1">
+                    <div className="text-light">{studio.name}</div>
+                    <small className="text-muted">
+                      {studio.parent_studio?.name
+                        ? `Parent: ${studio.parent_studio.name}`
+                        : `${studio.scene_count ?? 0} scenes`}
+                    </small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">

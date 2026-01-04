@@ -31,7 +31,8 @@ interface ManualSearchModalProps {
   /** All available StashBox instances for source selection */
   instances?: StashBoxInstance[];
   initialQuery?: string;
-  onSelect: (result: SearchResult) => void;
+  /** Called when user selects a result - includes the source instance */
+  onSelect: (result: SearchResult, source: StashBoxInstance) => void;
 }
 
 /**
@@ -307,7 +308,7 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
         id: result.id,
         source: selectedInstance.name || selectedInstance.endpoint,
       });
-      onSelect(result);
+      onSelect(result, selectedInstance);
       onClose();
     },
     [onSelect, onClose, entityType, selectedInstance]

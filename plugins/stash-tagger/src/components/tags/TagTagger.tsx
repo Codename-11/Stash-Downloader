@@ -35,6 +35,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     error: matchesError,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
   } = useTagMatcher(instances, threshold);
@@ -85,11 +86,11 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     setSearchModalOpen(true);
   }, []);
 
-  const handleSearchModalSelect = useCallback(async (result: StashBoxTag) => {
+  const handleSearchModalSelect = useCallback(async (result: StashBoxTag, source: StashBoxInstance) => {
     if (searchModalMatch) {
-      await applyMatch(searchModalMatch, result);
+      await applyManualMatch(searchModalMatch.local, result, source);
     }
-  }, [searchModalMatch, applyMatch]);
+  }, [searchModalMatch, applyManualMatch]);
 
   const loading = loadingTags || loadingMatches;
   const error = tagsError || matchesError;
@@ -134,9 +135,44 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
 
       {/* Tag list */}
       {!hasScanned ? (
-        <div className="text-center py-4 text-muted">
-          <p>Click "Scan for Matches" to search StashBox for matching tags.</p>
-          <small>{tags.filter((t) => !t.description).length} tags without descriptions found</small>
+        <div>
+          <div className="mb-3 text-muted">
+            <small>
+              {tags.filter((t) => !t.description).length} tag{tags.filter((t) => !t.description).length !== 1 ? 's' : ''} without descriptions found.
+              Click "Scan for Matches" to search all StashBox endpoints.
+            </small>
+          </div>
+          {loadingTags ? (
+            <div className="d-flex justify-content-center p-4">
+              <span className="spinner-border" />
+            </div>
+          ) : tags.filter((t) => !t.description).length === 0 ? (
+            <div className="alert alert-info">
+              No tags without descriptions found. Tags may already have descriptions or none exist.
+            </div>
+          ) : (
+            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              {tags.filter((t) => !t.description).map((tag) => (
+                <div
+                  key={tag.id}
+                  className="d-flex align-items-center gap-3 p-2 mb-1"
+                  style={{ backgroundColor: '#283845', borderRadius: '4px' }}
+                >
+                  {tag.image_path && (
+                    <img
+                      src={tag.image_path}
+                      alt={tag.name}
+                      style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }}
+                    />
+                  )}
+                  <div className="flex-grow-1">
+                    <div className="text-light">{tag.name}</div>
+                    <small className="text-muted">{tag.scene_count ?? 0} scenes</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : loading && matches.length === 0 ? (
         <div className="d-flex justify-content-center p-4">

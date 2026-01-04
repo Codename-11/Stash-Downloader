@@ -42,6 +42,13 @@ interface UseEntityMatcherReturn<TLocal, TRemote> {
     selectedRemote: TRemote,
     options?: ApplyOptions
   ) => Promise<void>;
+  /** Apply a match from manual search with explicit source */
+  applyManualMatch: (
+    local: TLocal,
+    selectedRemote: TRemote,
+    source: StashBoxInstance,
+    options?: ApplyOptions
+  ) => Promise<void>;
   applyAllAutoMatches: (options?: ApplyOptions) => Promise<number>;
   skipMatch: (match: EntityMatch<TLocal, TRemote>) => void;
   clearMatches: () => void;
@@ -55,6 +62,17 @@ const defaultApplyOptions: ApplyOptions = {
   includeParent: true,
   includeAliases: true,
 };
+
+/**
+ * Normalize gender value to Stash's expected enum values
+ * Stash expects: MALE, FEMALE, TRANSGENDER_MALE, TRANSGENDER_FEMALE, INTERSEX, NON_BINARY
+ */
+function normalizeGender(gender: string | undefined): string | undefined {
+  if (!gender) return undefined;
+  const g = gender.toUpperCase().replace(/[- ]/g, '_');
+  const validGenders = ['MALE', 'FEMALE', 'TRANSGENDER_MALE', 'TRANSGENDER_FEMALE', 'INTERSEX', 'NON_BINARY'];
+  return validGenders.includes(g) ? g : undefined;
+}
 
 /**
  * Hook for studio matching
@@ -166,6 +184,60 @@ export function useStudioMatcher(
   }, []);
 
   /**
+   * Apply a manual match with explicit source
+   */
+  const applyManualMatch = useCallback(async (
+    local: LocalStudio,
+    selectedRemote: StashBoxStudio,
+    source: StashBoxInstance,
+    options: ApplyOptions = defaultApplyOptions
+  ) => {
+    const input: StudioUpdateInput = {
+      id: local.id,
+      stash_ids: [
+        ...(local.stash_ids ?? []),
+        { endpoint: source.endpoint, stash_id: selectedRemote.id },
+      ],
+    };
+
+    if (options.includeImage && selectedRemote.images?.[0]?.url) {
+      input.image = selectedRemote.images[0].url;
+    }
+
+    if (options.includeAliases && selectedRemote.aliases?.length) {
+      input.aliases = [
+        ...(local.aliases ?? []),
+        ...selectedRemote.aliases.filter((a) => !local.aliases?.includes(a)),
+      ];
+    }
+
+    if (selectedRemote.urls?.[0]?.url) {
+      input.url = selectedRemote.urls[0].url;
+    }
+
+    if (options.includeParent && selectedRemote.parent) {
+      const parentStudio = await stashService.getOrCreateStudio(
+        selectedRemote.parent.name,
+        source.endpoint,
+        selectedRemote.parent.id,
+        selectedRemote.parent.images?.[0]?.url
+      );
+      input.parent_id = parentStudio.id;
+    }
+
+    await stashService.updateStudio(input);
+
+    // Update local state if this entity is in matches
+    setMatches((prev) =>
+      prev.map((m) =>
+        m.local.id === local.id
+          ? { ...m, status: 'matched' as const, selectedMatch: selectedRemote }
+          : m
+      )
+    );
+  }, []);
+
+  /**
    * Apply all auto-matches
    */
   const applyAllAutoMatches = useCallback(async (
@@ -214,6 +286,7 @@ export function useStudioMatcher(
     error,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
     clearMatches,
@@ -295,8 +368,9 @@ export function usePerformerMatcher(
       }
     }
 
-    // Include other fields from StashBox
-    if (selectedRemote.gender) input.gender = selectedRemote.gender;
+    // Include other fields from StashBox (normalize gender to valid enum)
+    const normalizedGender = normalizeGender(selectedRemote.gender);
+    if (normalizedGender) input.gender = normalizedGender;
     if (selectedRemote.birth_date) input.birthdate = selectedRemote.birth_date;
     if (selectedRemote.country) input.country = selectedRemote.country;
     if (selectedRemote.ethnicity) input.ethnicity = selectedRemote.ethnicity;
@@ -307,6 +381,53 @@ export function usePerformerMatcher(
     setMatches((prev) =>
       prev.map((m) =>
         m.local.id === match.local.id
+          ? { ...m, status: 'matched' as const, selectedMatch: selectedRemote }
+          : m
+      )
+    );
+  }, []);
+
+  /**
+   * Apply a manual match with explicit source
+   */
+  const applyManualMatch = useCallback(async (
+    local: LocalPerformer,
+    selectedRemote: StashBoxPerformer,
+    source: StashBoxInstance,
+    options: ApplyOptions = defaultApplyOptions
+  ) => {
+    const input: PerformerUpdateInput = {
+      id: local.id,
+      stash_ids: [
+        ...(local.stash_ids ?? []),
+        { endpoint: source.endpoint, stash_id: selectedRemote.id },
+      ],
+    };
+
+    if (options.includeImage && selectedRemote.images?.[0]?.url) {
+      input.image = selectedRemote.images[0].url;
+    }
+
+    if (options.includeAliases && selectedRemote.aliases?.length) {
+      const existingAliases = local.aliases?.split(',').map((a) => a.trim()) ?? [];
+      const newAliases = selectedRemote.aliases.filter((a) => !existingAliases.includes(a));
+      if (newAliases.length > 0) {
+        input.aliases = [...existingAliases, ...newAliases].join(', ');
+      }
+    }
+
+    const normalizedGender = normalizeGender(selectedRemote.gender);
+    if (normalizedGender) input.gender = normalizedGender;
+    if (selectedRemote.birth_date) input.birthdate = selectedRemote.birth_date;
+    if (selectedRemote.country) input.country = selectedRemote.country;
+    if (selectedRemote.ethnicity) input.ethnicity = selectedRemote.ethnicity;
+    if (selectedRemote.height) input.height_cm = selectedRemote.height;
+
+    await stashService.updatePerformer(input);
+
+    setMatches((prev) =>
+      prev.map((m) =>
+        m.local.id === local.id
           ? { ...m, status: 'matched' as const, selectedMatch: selectedRemote }
           : m
       )
@@ -353,6 +474,7 @@ export function usePerformerMatcher(
     error,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
     clearMatches,
@@ -432,6 +554,41 @@ export function useTagMatcher(
     );
   }, []);
 
+  /**
+   * Apply a manual match with explicit source (tags don't use stash_ids, but keep consistent API)
+   */
+  const applyManualMatch = useCallback(async (
+    local: LocalTag,
+    selectedRemote: StashBoxTag,
+    _source: StashBoxInstance,
+    options: ApplyOptions = defaultApplyOptions
+  ) => {
+    const input: TagUpdateInput = {
+      id: local.id,
+    };
+
+    if (selectedRemote.description) {
+      input.description = selectedRemote.description;
+    }
+
+    if (options.includeAliases && selectedRemote.aliases?.length) {
+      input.aliases = [
+        ...(local.aliases ?? []),
+        ...selectedRemote.aliases.filter((a) => !local.aliases?.includes(a)),
+      ];
+    }
+
+    await stashService.updateTag(input);
+
+    setMatches((prev) =>
+      prev.map((m) =>
+        m.local.id === local.id
+          ? { ...m, status: 'matched' as const, selectedMatch: selectedRemote }
+          : m
+      )
+    );
+  }, []);
+
   const applyAllAutoMatches = useCallback(async (
     options: ApplyOptions = defaultApplyOptions
   ): Promise<number> => {
@@ -472,6 +629,7 @@ export function useTagMatcher(
     error,
     findMatches,
     applyMatch,
+    applyManualMatch,
     applyAllAutoMatches,
     skipMatch,
     clearMatches,

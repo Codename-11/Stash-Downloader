@@ -111,6 +111,16 @@ export const EntityCard: React.FC<EntityCardProps> = ({
       {expanded && children && (
         <div className="card-body">
           {children}
+          {/* Collapse button */}
+          <div className="mt-3 pt-2 border-top" style={{ borderColor: '#394b59' }}>
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleToggle}
+            >
+              ▲ Collapse
+            </button>
+          </div>
         </div>
       )}
     </div>
