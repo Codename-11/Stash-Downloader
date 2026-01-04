@@ -162,7 +162,7 @@ class StashService {
       },
       studioFilter: {
         stash_id_endpoint: {
-          value: endpoint,
+          endpoint,
           modifier: 'IS_NULL',
         },
       },
@@ -227,7 +227,7 @@ class StashService {
       },
       performerFilter: {
         stash_id_endpoint: {
-          value: endpoint,
+          endpoint,
           modifier: 'IS_NULL',
         },
       },
