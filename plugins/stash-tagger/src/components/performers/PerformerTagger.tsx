@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxPerformer, LocalPerformer } from '@/types';
 import type { EntityMatch } from '@/types/matching';
-import { useUnmatchedPerformers, usePerformerMatcher } from '@/hooks';
+import { usePerformers, usePerformerMatcher } from '@/hooks';
 import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/components/common';
 
 interface PerformerTaggerProps {
@@ -25,8 +25,10 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     loading: loadingPerformers,
     error: performersError,
     refresh: refreshPerformers,
+    filterMode,
+    setFilterMode,
     clearSkipped,
-  } = useUnmatchedPerformers();
+  } = usePerformers('unmatched');
 
   const {
     matches,
@@ -34,6 +36,7 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
     loading: loadingMatches,
     error: matchesError,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
@@ -70,9 +73,9 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
 
   const handleSearchPerformer = useCallback(async (performer: LocalPerformer) => {
     setSearchingId(performer.id);
-    await findMatches([performer]);
+    await searchSingleEntity(performer);
     setSearchingId(null);
-  }, [findMatches]);
+  }, [searchSingleEntity]);
 
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalPerformer, StashBoxPerformer> | null>(null);
@@ -116,8 +119,29 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
 
   return (
     <div>
-      {/* Bulk actions */}
+      {/* Filter toggle and bulk actions */}
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <div className="btn-group btn-group-sm" role="group">
+            <button
+              type="button"
+              className={`btn ${filterMode === 'unmatched' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setFilterMode('unmatched')}
+            >
+              Unmatched Only
+            </button>
+            <button
+              type="button"
+              className={`btn ${filterMode === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setFilterMode('all')}
+            >
+              View All
+            </button>
+          </div>
+          <small className="text-muted">
+            {performers.length} performer{performers.length !== 1 ? 's' : ''} loaded
+          </small>
+        </div>
         <BulkActions
           stats={stats}
           onScan={handleScan}
@@ -134,8 +158,10 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
         <div>
           <div className="mb-3 text-muted">
             <small>
-              {performers.length} unmatched performer{performers.length !== 1 ? 's' : ''} found.
-              Click "Scan for Matches" to search all StashBox endpoints.
+              {filterMode === 'unmatched'
+                ? `${performers.length} unmatched performer${performers.length !== 1 ? 's' : ''} found.`
+                : `${performers.length} performer${performers.length !== 1 ? 's' : ''} (showing all).`}
+              {' '}Click "Scan for Matches" to search all StashBox endpoints.
             </small>
           </div>
           {loadingPerformers ? (
@@ -144,7 +170,9 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
             </div>
           ) : performers.length === 0 ? (
             <div className="alert alert-info">
-              No unmatched performers found. All performers are linked to StashBox!
+              {filterMode === 'unmatched'
+                ? 'No unmatched performers found. All performers are linked to StashBox!'
+                : 'No performers found in your library.'}
             </div>
           ) : (
             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -168,6 +196,29 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
                         .filter(Boolean)
                         .join(' • ')}
                     </small>
+                    {/* Show stash_ids if any */}
+                    {performer.stash_ids && performer.stash_ids.length > 0 && (
+                      <div className="mt-1">
+                        {performer.stash_ids.map((sid) => {
+                          const endpointName = sid.endpoint.includes('stashdb') ? 'StashDB'
+                            : sid.endpoint.includes('fansdb') ? 'FansDB'
+                            : sid.endpoint.includes('pmvstash') ? 'PMVStash'
+                            : new URL(sid.endpoint).hostname;
+                          return (
+                            <a
+                              key={sid.endpoint}
+                              href={`${sid.endpoint.replace(/\/graphql$/, '')}/performers/${sid.stash_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="badge bg-secondary me-1 text-decoration-none"
+                              title={sid.endpoint}
+                            >
+                              {endpointName}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -180,7 +231,9 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
         </div>
       ) : matches.length === 0 ? (
         <div className="alert alert-info">
-          No unmatched performers found. All performers are linked to StashBox!
+          {filterMode === 'unmatched'
+            ? 'No unmatched performers found. All performers are linked to StashBox!'
+            : 'No performers found in your library.'}
         </div>
       ) : (
         <div>
@@ -196,6 +249,8 @@ export const PerformerTagger: React.FC<PerformerTaggerProps> = ({
                 match.local.country,
                 match.local.scene_count ? `${match.local.scene_count} scenes` : null,
               ].filter(Boolean).join(' • ')}
+              stashIds={match.local.stash_ids}
+              entityType="performer"
               onExpand={() => {
                 if (match.candidates.length === 0) {
                   void handleSearchPerformer(match.local);

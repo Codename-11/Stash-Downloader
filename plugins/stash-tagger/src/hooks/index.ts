@@ -1,9 +1,13 @@
 export { useStashBoxes } from './useStashBoxes';
 export {
+  useStudios,
+  usePerformers,
+  useTags,
+  // Deprecated - use useStudios/usePerformers instead
   useUnmatchedStudios,
   useUnmatchedPerformers,
-  useTags,
 } from './useUnmatchedEntities';
+export type { EntityFilterMode } from './useUnmatchedEntities';
 export {
   useStudioMatcher,
   usePerformerMatcher,

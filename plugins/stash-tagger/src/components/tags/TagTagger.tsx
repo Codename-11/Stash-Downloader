@@ -34,6 +34,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     loading: loadingMatches,
     error: matchesError,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
@@ -74,9 +75,9 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
 
   const handleSearchTag = useCallback(async (tag: LocalTag) => {
     setSearchingId(tag.id);
-    await findMatches([tag]);
+    await searchSingleEntity(tag);
     setSearchingId(null);
-  }, [findMatches]);
+  }, [searchSingleEntity]);
 
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchModalMatch, setSearchModalMatch] = useState<EntityMatch<LocalTag, StashBoxTag> | null>(null);
@@ -118,10 +119,20 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
     );
   }
 
+  const tagsWithoutDescription = tags.filter((t) => !t.description);
+
   return (
     <div>
       {/* Bulk actions */}
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <small className="text-muted">
+            Tags are matched by description (not StashBox IDs)
+          </small>
+          <small className="text-muted">
+            {tagsWithoutDescription.length} tag{tagsWithoutDescription.length !== 1 ? 's' : ''} without descriptions
+          </small>
+        </div>
         <BulkActions
           stats={stats}
           onScan={handleScan}
@@ -138,7 +149,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
         <div>
           <div className="mb-3 text-muted">
             <small>
-              {tags.filter((t) => !t.description).length} tag{tags.filter((t) => !t.description).length !== 1 ? 's' : ''} without descriptions found.
+              {tagsWithoutDescription.length} tag{tagsWithoutDescription.length !== 1 ? 's' : ''} without descriptions found.
               Click "Scan for Matches" to search all StashBox endpoints.
             </small>
           </div>
@@ -146,13 +157,13 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
             <div className="d-flex justify-content-center p-4">
               <span className="spinner-border" />
             </div>
-          ) : tags.filter((t) => !t.description).length === 0 ? (
+          ) : tagsWithoutDescription.length === 0 ? (
             <div className="alert alert-info">
               No tags without descriptions found. Tags may already have descriptions or none exist.
             </div>
           ) : (
             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-              {tags.filter((t) => !t.description).map((tag) => (
+              {tagsWithoutDescription.map((tag) => (
                 <div
                   key={tag.id}
                   className="d-flex align-items-center gap-3 p-2 mb-1"
@@ -192,6 +203,7 @@ export const TagTagger: React.FC<TagTaggerProps> = ({
               imagePath={match.local.image_path}
               status={match.status}
               subtitle={`${match.local.scene_count ?? 0} scenes`}
+              entityType="tag"
               onExpand={() => {
                 if (match.candidates.length === 0) {
                   void handleSearchTag(match.local);

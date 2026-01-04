@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import type { MatchStatus } from '@/types/matching';
+import type { StashID } from '@/types';
 
 interface EntityCardProps {
   id: string;
@@ -11,9 +12,37 @@ interface EntityCardProps {
   imagePath?: string;
   status: MatchStatus;
   subtitle?: string;
+  stashIds?: StashID[];
+  /** Entity type for generating correct StashBox URLs */
+  entityType?: 'studio' | 'performer' | 'tag';
   children?: React.ReactNode;
   onExpand?: () => void;
   defaultExpanded?: boolean;
+}
+
+/**
+ * Get a friendly name for a StashBox endpoint
+ */
+function getEndpointName(endpoint: string): string {
+  if (endpoint.includes('stashdb')) return 'StashDB';
+  if (endpoint.includes('fansdb')) return 'FansDB';
+  if (endpoint.includes('pmvstash')) return 'PMVStash';
+  try {
+    return new URL(endpoint).hostname;
+  } catch {
+    return endpoint;
+  }
+}
+
+/**
+ * Build a URL to view the entity on a StashBox instance
+ */
+function buildStashBoxUrl(endpoint: string, entityType: string, stashId: string): string {
+  const baseUrl = endpoint.replace(/\/graphql$/, '');
+  const typePath = entityType === 'performer' ? 'performers'
+    : entityType === 'studio' ? 'studios'
+    : 'tags';
+  return `${baseUrl}/${typePath}/${stashId}`;
 }
 
 const statusColors: Record<MatchStatus, string> = {
@@ -36,6 +65,8 @@ export const EntityCard: React.FC<EntityCardProps> = ({
   imagePath,
   status,
   subtitle,
+  stashIds,
+  entityType = 'studio',
   children,
   onExpand,
   defaultExpanded = false,
@@ -82,11 +113,28 @@ export const EntityCard: React.FC<EntityCardProps> = ({
           />
         )}
 
-        {/* Name and subtitle */}
+        {/* Name, subtitle, and stash IDs */}
         <div className="flex-grow-1">
           <div className="text-light fw-medium">{name}</div>
           {subtitle && (
             <small className="text-muted">{subtitle}</small>
+          )}
+          {/* StashBox IDs */}
+          {stashIds && stashIds.length > 0 && (
+            <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+              {stashIds.map((sid) => (
+                <a
+                  key={sid.endpoint}
+                  href={buildStashBoxUrl(sid.endpoint, entityType, sid.stash_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="badge bg-secondary me-1 text-decoration-none"
+                  title={`${sid.endpoint}\nID: ${sid.stash_id}`}
+                >
+                  {getEndpointName(sid.endpoint)}
+                </a>
+              ))}
+            </div>
           )}
         </div>
 

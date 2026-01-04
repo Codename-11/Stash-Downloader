@@ -118,15 +118,18 @@ class StashService {
   }
 
   /**
-   * Get unmatched studios (no stash_ids from ANY endpoint)
+   * Get studios with optional filter mode
+   * @param limit - Number of results per page
+   * @param page - Page number
+   * @param unmatchedOnly - If true, only return studios without stash_ids
    */
-  async getUnmatchedStudios(
+  async getStudios(
     limit = 100,
-    page = 1
+    page = 1,
+    unmatchedOnly = true
   ): Promise<{ studios: LocalStudio[]; count: number }> {
-    // Use is_missing filter to get studios with no stash_ids at all
     const query = `
-      query FindUnmatchedStudios($filter: FindFilterType, $studioFilter: StudioFilterType) {
+      query FindStudios($filter: FindFilterType, $studioFilter: StudioFilterType) {
         findStudios(filter: $filter, studio_filter: $studioFilter) {
           count
           studios {
@@ -149,20 +152,26 @@ class StashService {
       }
     `;
 
+    const variables: Record<string, unknown> = {
+      filter: {
+        per_page: limit,
+        page,
+      },
+    };
+
+    // Only add is_missing filter when getting unmatched studios
+    if (unmatchedOnly) {
+      variables.studioFilter = {
+        is_missing: 'stash_id',
+      };
+    }
+
     const result = await this.gqlRequest<{
       findStudios?: {
         count: number;
         studios: LocalStudio[];
       };
-    }>(query, {
-      filter: {
-        per_page: limit,
-        page,
-      },
-      studioFilter: {
-        is_missing: 'stash_id',
-      },
-    });
+    }>(query, variables);
 
     return {
       studios: result.data?.findStudios?.studios ?? [],
@@ -171,15 +180,29 @@ class StashService {
   }
 
   /**
-   * Get unmatched performers (no stash_ids from ANY endpoint)
+   * Get unmatched studios (no stash_ids from ANY endpoint)
+   * @deprecated Use getStudios(limit, page, true) instead
    */
-  async getUnmatchedPerformers(
+  async getUnmatchedStudios(
     limit = 100,
     page = 1
+  ): Promise<{ studios: LocalStudio[]; count: number }> {
+    return this.getStudios(limit, page, true);
+  }
+
+  /**
+   * Get performers with optional filter mode
+   * @param limit - Number of results per page
+   * @param page - Page number
+   * @param unmatchedOnly - If true, only return performers without stash_ids
+   */
+  async getPerformers(
+    limit = 100,
+    page = 1,
+    unmatchedOnly = true
   ): Promise<{ performers: LocalPerformer[]; count: number }> {
-    // Use is_missing filter to get performers with no stash_ids at all
     const query = `
-      query FindUnmatchedPerformers($filter: FindFilterType, $performerFilter: PerformerFilterType) {
+      query FindPerformers($filter: FindFilterType, $performerFilter: PerformerFilterType) {
         findPerformers(filter: $filter, performer_filter: $performerFilter) {
           count
           performers {
@@ -210,25 +233,42 @@ class StashService {
       }
     `;
 
+    const variables: Record<string, unknown> = {
+      filter: {
+        per_page: limit,
+        page,
+      },
+    };
+
+    // Only add is_missing filter when getting unmatched performers
+    if (unmatchedOnly) {
+      variables.performerFilter = {
+        is_missing: 'stash_id',
+      };
+    }
+
     const result = await this.gqlRequest<{
       findPerformers?: {
         count: number;
         performers: LocalPerformer[];
       };
-    }>(query, {
-      filter: {
-        per_page: limit,
-        page,
-      },
-      performerFilter: {
-        is_missing: 'stash_id',
-      },
-    });
+    }>(query, variables);
 
     return {
       performers: result.data?.findPerformers?.performers ?? [],
       count: result.data?.findPerformers?.count ?? 0,
     };
+  }
+
+  /**
+   * Get unmatched performers (no stash_ids from ANY endpoint)
+   * @deprecated Use getPerformers(limit, page, true) instead
+   */
+  async getUnmatchedPerformers(
+    limit = 100,
+    page = 1
+  ): Promise<{ performers: LocalPerformer[]; count: number }> {
+    return this.getPerformers(limit, page, true);
   }
 
   /**

@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import type { StashBoxInstance, StashBoxStudio, LocalStudio } from '@/types';
 import type { EntityMatch } from '@/types/matching';
-import { useUnmatchedStudios, useStudioMatcher } from '@/hooks';
+import { useStudios, useStudioMatcher } from '@/hooks';
 import { BulkActions, EntityCard, MatchCard, ManualSearchModal } from '@/components/common';
 
 interface StudioTaggerProps {
@@ -25,8 +25,10 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     loading: loadingStudios,
     error: studiosError,
     refresh: refreshStudios,
+    filterMode,
+    setFilterMode,
     clearSkipped,
-  } = useUnmatchedStudios();
+  } = useStudios('unmatched');
 
   const {
     matches,
@@ -34,6 +36,7 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
     loading: loadingMatches,
     error: matchesError,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
@@ -73,9 +76,9 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
 
   const handleSearchStudio = useCallback(async (studio: LocalStudio) => {
     setSearchingId(studio.id);
-    await findMatches([studio]);
+    await searchSingleEntity(studio);
     setSearchingId(null);
-  }, [findMatches]);
+  }, [searchSingleEntity]);
 
   const handleOpenSearchModal = useCallback((match: EntityMatch<LocalStudio, StashBoxStudio>) => {
     setSearchModalMatch(match);
@@ -116,8 +119,29 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
 
   return (
     <div>
-      {/* Bulk actions */}
+      {/* Filter toggle and bulk actions */}
       <div className="mb-3 p-2" style={{ backgroundColor: '#243340', borderRadius: '4px' }}>
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <div className="btn-group btn-group-sm" role="group">
+            <button
+              type="button"
+              className={`btn ${filterMode === 'unmatched' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setFilterMode('unmatched')}
+            >
+              Unmatched Only
+            </button>
+            <button
+              type="button"
+              className={`btn ${filterMode === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+              onClick={() => setFilterMode('all')}
+            >
+              View All
+            </button>
+          </div>
+          <small className="text-muted">
+            {studios.length} studio{studios.length !== 1 ? 's' : ''} loaded
+          </small>
+        </div>
         <BulkActions
           stats={stats}
           onScan={handleScan}
@@ -134,8 +158,10 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
         <div>
           <div className="mb-3 text-muted">
             <small>
-              {studios.length} unmatched studio{studios.length !== 1 ? 's' : ''} found.
-              Click "Scan for Matches" to search all StashBox endpoints.
+              {filterMode === 'unmatched'
+                ? `${studios.length} unmatched studio${studios.length !== 1 ? 's' : ''} found.`
+                : `${studios.length} studio${studios.length !== 1 ? 's' : ''} (showing all).`}
+              {' '}Click "Scan for Matches" to search all StashBox endpoints.
             </small>
           </div>
           {loadingStudios ? (
@@ -144,7 +170,9 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
             </div>
           ) : studios.length === 0 ? (
             <div className="alert alert-info">
-              No unmatched studios found. All studios are linked to StashBox!
+              {filterMode === 'unmatched'
+                ? 'No unmatched studios found. All studios are linked to StashBox!'
+                : 'No studios found in your library.'}
             </div>
           ) : (
             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -168,6 +196,29 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
                         ? `Parent: ${studio.parent_studio.name}`
                         : `${studio.scene_count ?? 0} scenes`}
                     </small>
+                    {/* Show stash_ids if any */}
+                    {studio.stash_ids && studio.stash_ids.length > 0 && (
+                      <div className="mt-1">
+                        {studio.stash_ids.map((sid) => {
+                          const endpointName = sid.endpoint.includes('stashdb') ? 'StashDB'
+                            : sid.endpoint.includes('fansdb') ? 'FansDB'
+                            : sid.endpoint.includes('pmvstash') ? 'PMVStash'
+                            : new URL(sid.endpoint).hostname;
+                          return (
+                            <a
+                              key={sid.endpoint}
+                              href={`${sid.endpoint.replace(/\/graphql$/, '')}/studios/${sid.stash_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="badge bg-secondary me-1 text-decoration-none"
+                              title={sid.endpoint}
+                            >
+                              {endpointName}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -180,7 +231,9 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
         </div>
       ) : matches.length === 0 ? (
         <div className="alert alert-info">
-          No unmatched studios found. All studios are linked to StashBox!
+          {filterMode === 'unmatched'
+            ? 'No unmatched studios found. All studios are linked to StashBox!'
+            : 'No studios found in your library.'}
         </div>
       ) : (
         <div>
@@ -195,6 +248,8 @@ export const StudioTagger: React.FC<StudioTaggerProps> = ({
                 ? `Parent: ${match.local.parent_studio.name}`
                 : `${match.local.scene_count ?? 0} scenes`
               }
+              stashIds={match.local.stash_ids}
+              entityType="studio"
               onExpand={() => {
                 if (match.candidates.length === 0) {
                   void handleSearchStudio(match.local);

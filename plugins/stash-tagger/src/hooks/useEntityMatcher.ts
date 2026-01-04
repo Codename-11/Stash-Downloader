@@ -37,6 +37,8 @@ interface UseEntityMatcherReturn<TLocal, TRemote> {
   loading: boolean;
   error: string | null;
   findMatches: (entities: TLocal[]) => Promise<void>;
+  /** Search for a single entity and update its matches without replacing the list */
+  searchSingleEntity: (entity: TLocal) => Promise<void>;
   applyMatch: (
     match: EntityMatch<TLocal, TRemote>,
     selectedRemote: TRemote,
@@ -112,6 +114,39 @@ export function useStudioMatcher(
       setMatches(results);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to find matches');
+    } finally {
+      setLoading(false);
+    }
+  }, [matcher]);
+
+  /**
+   * Search for a single entity and update its matches without replacing the list
+   */
+  const searchSingleEntity = useCallback(async (studio: LocalStudio) => {
+    if (!matcher) {
+      setError('No StashBox instances configured');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await matcher.findMatchesForStudio(studio);
+      setMatches((prev) => {
+        const existingIndex = prev.findIndex((m) => m.local.id === studio.id);
+        if (existingIndex >= 0) {
+          // Update existing entry
+          const updated = [...prev];
+          updated[existingIndex] = result;
+          return updated;
+        } else {
+          // Add new entry
+          return [...prev, result];
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search');
     } finally {
       setLoading(false);
     }
@@ -285,6 +320,7 @@ export function useStudioMatcher(
     loading,
     error,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
@@ -328,6 +364,37 @@ export function usePerformerMatcher(
       setMatches(results);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to find matches');
+    } finally {
+      setLoading(false);
+    }
+  }, [matcher]);
+
+  /**
+   * Search for a single entity and update its matches without replacing the list
+   */
+  const searchSingleEntity = useCallback(async (performer: LocalPerformer) => {
+    if (!matcher) {
+      setError('No StashBox instances configured');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await matcher.findMatchesForPerformer(performer);
+      setMatches((prev) => {
+        const existingIndex = prev.findIndex((m) => m.local.id === performer.id);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = result;
+          return updated;
+        } else {
+          return [...prev, result];
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search');
     } finally {
       setLoading(false);
     }
@@ -473,6 +540,7 @@ export function usePerformerMatcher(
     loading,
     error,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
@@ -516,6 +584,37 @@ export function useTagMatcher(
       setMatches(results);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to find matches');
+    } finally {
+      setLoading(false);
+    }
+  }, [matcher]);
+
+  /**
+   * Search for a single entity and update its matches without replacing the list
+   */
+  const searchSingleEntity = useCallback(async (tag: LocalTag) => {
+    if (!matcher) {
+      setError('No StashBox instances configured');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await matcher.findMatchesForTag(tag);
+      setMatches((prev) => {
+        const existingIndex = prev.findIndex((m) => m.local.id === tag.id);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex] = result;
+          return updated;
+        } else {
+          return [...prev, result];
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search');
     } finally {
       setLoading(false);
     }
@@ -628,6 +727,7 @@ export function useTagMatcher(
     loading,
     error,
     findMatches,
+    searchSingleEntity,
     applyMatch,
     applyManualMatch,
     applyAllAutoMatches,
