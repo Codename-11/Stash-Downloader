@@ -236,8 +236,10 @@ export function useStudios(initialFilterMode: EntityFilterMode = 'unmatched'): U
     localStorage.removeItem(STORAGE_KEYS.SKIPPED_STUDIOS);
   }, []);
 
+  // Load on mount only - loadEntities is intentionally excluded
   useEffect(() => {
     void loadEntities(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasMore = entities.length < totalCount;
@@ -337,8 +339,10 @@ export function usePerformers(initialFilterMode: EntityFilterMode = 'unmatched')
     localStorage.removeItem(STORAGE_KEYS.SKIPPED_PERFORMERS);
   }, []);
 
+  // Load on mount only - loadEntities is intentionally excluded
   useEffect(() => {
     void loadEntities(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasMore = entities.length < totalCount;
