@@ -118,16 +118,17 @@ class StashService {
   }
 
   /**
-   * Get unmatched studios (no stash_ids)
+   * Get unmatched studios (no stash_ids for the given endpoint)
    */
   async getUnmatchedStudios(
     endpoint: string,
     limit = 100,
     page = 1
   ): Promise<{ studios: LocalStudio[]; count: number }> {
+    // Use studio_filter to only get studios without a stash_id for this endpoint
     const query = `
-      query FindStudios($filter: FindFilterType) {
-        findStudios(filter: $filter) {
+      query FindUnmatchedStudios($filter: FindFilterType, $studioFilter: StudioFilterType) {
+        findStudios(filter: $filter, studio_filter: $studioFilter) {
           count
           studios {
             id
@@ -159,32 +160,32 @@ class StashService {
         per_page: limit,
         page,
       },
+      studioFilter: {
+        stash_id_endpoint: {
+          value: endpoint,
+          modifier: 'IS_NULL',
+        },
+      },
     });
 
-    const studios = result.data?.findStudios?.studios ?? [];
-
-    // Filter to only unmatched (no stash_id for this endpoint)
-    const unmatched = studios.filter(
-      (s) => !s.stash_ids?.some((id) => id.endpoint === endpoint)
-    );
-
     return {
-      studios: unmatched,
+      studios: result.data?.findStudios?.studios ?? [],
       count: result.data?.findStudios?.count ?? 0,
     };
   }
 
   /**
-   * Get unmatched performers (no stash_ids)
+   * Get unmatched performers (no stash_ids for the given endpoint)
    */
   async getUnmatchedPerformers(
     endpoint: string,
     limit = 100,
     page = 1
   ): Promise<{ performers: LocalPerformer[]; count: number }> {
+    // Use performer_filter to only get performers without a stash_id for this endpoint
     const query = `
-      query FindPerformers($filter: FindFilterType) {
-        findPerformers(filter: $filter) {
+      query FindUnmatchedPerformers($filter: FindFilterType, $performerFilter: PerformerFilterType) {
+        findPerformers(filter: $filter, performer_filter: $performerFilter) {
           count
           performers {
             id
@@ -224,17 +225,16 @@ class StashService {
         per_page: limit,
         page,
       },
+      performerFilter: {
+        stash_id_endpoint: {
+          value: endpoint,
+          modifier: 'IS_NULL',
+        },
+      },
     });
 
-    const performers = result.data?.findPerformers?.performers ?? [];
-
-    // Filter to only unmatched
-    const unmatched = performers.filter(
-      (p) => !p.stash_ids?.some((id) => id.endpoint === endpoint)
-    );
-
     return {
-      performers: unmatched,
+      performers: result.data?.findPerformers?.performers ?? [],
       count: result.data?.findPerformers?.count ?? 0,
     };
   }
