@@ -147,11 +147,11 @@ describe('ScraperRegistry', () => {
   });
 
   describe('content type filtering', () => {
-    it('should skip YtDlpScraper for Image content type (it only supports Video)', () => {
+    it('should prefer BooruScraper over YtDlpScraper for booru URLs', () => {
       const registry = new ScraperRegistry();
 
       // For booru URL with Image content type,
-      // YtDlpScraper should be skipped (Video only), BooruScraper should be used
+      // BooruScraper should be preferred over YtDlpScraper (more specialized)
       const scraper = registry.findScraper(
         'https://rule34.xxx/index.php?page=post&s=view&id=123',
         ContentType.Image

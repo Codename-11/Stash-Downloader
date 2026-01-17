@@ -1,9 +1,9 @@
 /**
  * ScraperRegistry - Manages metadata scrapers
  *
- * Priority order:
- * - YtDlpScraper (primary) - Server-side yt-dlp via Python backend
- * - BooruScraper - Image/gallery scraper for booru sites
+ * Priority order (specialized scrapers first):
+ * - BooruScraper - Image/gallery scraper for booru sites (Rule34, Gelbooru, etc.)
+ * - YtDlpScraper - General-purpose server-side yt-dlp via Python backend (all content types)
  * - StashScraper (fallback) - Uses Stash's built-in scraper API
  * - GenericScraper (last resort) - URL parsing only
  */
@@ -30,12 +30,12 @@ export class ScraperRegistry {
     this.fallbackScraper = new GenericScraper();
 
     // Register scrapers in priority order
-    // All scrapers use server-side extraction (no CORS issues)
-    this.register(new YtDlpScraper());   // Primary for video
-    this.register(new BooruScraper());   // Primary for images/galleries
+    // Specialized scrapers first (better metadata), then general-purpose scrapers
+    this.register(new BooruScraper());   // Primary for booru sites (images/galleries)
+    this.register(new YtDlpScraper());   // General-purpose for all content types
     this.register(new StashScraper());   // Fallback (uses Stash's scraper API)
 
-    log.info('Scrapers registered: YtDlpScraper, BooruScraper, StashScraper, GenericScraper (fallback)');
+    log.info('Scrapers registered: BooruScraper, YtDlpScraper, StashScraper, GenericScraper (fallback)');
 
     // Check yt-dlp version asynchronously (fire and forget)
     this.checkYtDlpVersion();
