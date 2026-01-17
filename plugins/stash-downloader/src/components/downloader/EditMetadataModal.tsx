@@ -36,6 +36,8 @@ interface EditMetadataModalProps {
   queuePosition?: number;
   totalPending?: number;
   onSkip?: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }
 
 export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
@@ -48,6 +50,8 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
   queuePosition,
   totalPending,
   onSkip,
+  onPrevious,
+  onNext,
 }) => {
   const toast = useToast();
   const log = useLog();
@@ -280,15 +284,37 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
               <small className="flex-grow-1" style={{ color: '#8b9fad' }}>
                 {isImporting ? 'Please wait...' : isComplete ? 'This item has been imported' : 'Review and import to Stash'}
               </small>
-              {!isImporting && !isComplete && onSkip && totalPending && totalPending > 1 && (
-                <button
-                  type="button"
-                  className="btn btn-outline-warning btn-sm"
-                  onClick={onSkip}
-                  title="Skip to next pending item"
-                >
-                  Skip →
-                </button>
+              {!isImporting && !isComplete && totalPending && totalPending > 1 && (
+                <div className="d-flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={onPrevious}
+                    disabled={!onPrevious}
+                    title="Go to previous item in queue"
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={onNext}
+                    disabled={!onNext}
+                    title="Go to next item in queue"
+                  >
+                    Next →
+                  </button>
+                  {onSkip && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-warning btn-sm"
+                      onClick={onSkip}
+                      title="Skip to next pending item"
+                    >
+                      Skip →
+                    </button>
+                  )}
+                </div>
               )}
               {isComplete && (
                 <button

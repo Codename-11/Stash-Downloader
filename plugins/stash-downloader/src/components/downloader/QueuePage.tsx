@@ -436,6 +436,36 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  // Navigate forward in queue (without wrapping)
+  const handleNavigateNext = () => {
+    if (!editingItem) return;
+
+    const pendingItems = queue.items.filter(
+      (i) => i.status === DownloadStatus.Pending
+    );
+    const currentIndex = pendingItems.findIndex((i) => i.id === editingItem.id);
+
+    if (currentIndex >= 0 && currentIndex < pendingItems.length - 1) {
+      const nextItem = pendingItems[currentIndex + 1];
+      if (nextItem) setEditingItem(nextItem);
+    }
+  };
+
+  // Navigate backward in queue (without wrapping)
+  const handleNavigatePrevious = () => {
+    if (!editingItem) return;
+
+    const pendingItems = queue.items.filter(
+      (i) => i.status === DownloadStatus.Pending
+    );
+    const currentIndex = pendingItems.findIndex((i) => i.id === editingItem.id);
+
+    if (currentIndex > 0) {
+      const previousItem = pendingItems[currentIndex - 1];
+      if (previousItem) setEditingItem(previousItem);
+    }
+  };
+
   // Calculate queue position for modal
   const getQueuePosition = (): { position: number; total: number } | null => {
     if (!editingItem) return null;
@@ -1053,6 +1083,8 @@ export const QueuePage: React.FC = () => {
         queuePosition={queuePosition?.position}
         totalPending={queuePosition?.total}
         onSkip={handleSkipToNext}
+        onPrevious={queuePosition && queuePosition.position > 1 ? handleNavigatePrevious : undefined}
+        onNext={queuePosition && queuePosition.position < queuePosition.total ? handleNavigateNext : undefined}
       />
 
       {/* yt-dlp Warning Modal */}
