@@ -22,7 +22,7 @@ const log = createLogger('YtDlpScraper');
 export class YtDlpScraper implements IMetadataScraper {
   name = 'yt-dlp';
   supportedDomains = ['*']; // Supports all domains
-  contentTypes = [ContentType.Video]; // Primarily for video extraction
+  contentTypes = [ContentType.Video, ContentType.Image, ContentType.Gallery]; // Supports all content types
   private readonly timeoutMs = 60000; // 60 seconds for yt-dlp (proxy connections can be slow)
 
   canHandle(url: string): boolean {
@@ -231,6 +231,9 @@ export class YtDlpScraper implements IMetadataScraper {
     const tags = readResult.tags || readResult.categories || [];
     const performers = this.extractPerformers(readResult);
 
+    // Detect content type from Python script or fallback to metadata detection
+    const contentType = this.detectContentType(readResult);
+
     return {
       url: url,
       videoUrl: videoUrl,
@@ -244,8 +247,64 @@ export class YtDlpScraper implements IMetadataScraper {
       studio: readResult.uploader || readResult.channel || undefined,
       quality: quality,
       availableQualities: availableQualities.length > 0 ? availableQualities : undefined,
-      contentType: 'video' as ContentType,
+      contentType: contentType,
     };
+  }
+
+  /**
+   * Detect content type from yt-dlp metadata
+   * Uses Python script's detection if available, otherwise applies fallback logic
+   */
+  private detectContentType(ytdlpData: any): ContentType {
+    // First, check if Python script already detected the content type
+    if (ytdlpData.detected_content_type) {
+      const detectedType = ytdlpData.detected_content_type.toLowerCase();
+      log.debug(`Using Python-detected content type: ${detectedType}`);
+      
+      if (detectedType === 'image') return ContentType.Image;
+      if (detectedType === 'gallery') return ContentType.Gallery;
+      if (detectedType === 'video') return ContentType.Video;
+    }
+
+    // Fallback: Apply TypeScript-side detection logic
+    log.debug('Python content type not found, applying fallback detection');
+
+    // Check file extension
+    const ext = (ytdlpData.ext || '').toLowerCase();
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    if (imageExtensions.includes(ext)) {
+      log.debug(`Detected image from extension: ${ext}`);
+      return ContentType.Image;
+    }
+
+    // Check codecs - if no video codec, likely an image
+    if (ytdlpData.vcodec === 'none' || !ytdlpData.vcodec) {
+      if (ytdlpData.acodec === 'none' || !ytdlpData.acodec) {
+        log.debug('Detected image: no video or audio codecs');
+        return ContentType.Image;
+      }
+    }
+
+    // Check formats array
+    const formats = ytdlpData.formats || [];
+    const hasVideoFormat = formats.some((f: any) =>
+      (f.height && f.height > 0) || (f.vcodec && f.vcodec !== 'none')
+    );
+
+    if (!hasVideoFormat && formats.length > 0) {
+      log.debug('Detected image: no video formats found');
+      return ContentType.Image;
+    }
+
+    // Has duration? Definitely a video
+    if (ytdlpData.duration && ytdlpData.duration > 0) {
+      log.debug(`Detected video: has duration of ${ytdlpData.duration}s`);
+      return ContentType.Video;
+    }
+
+    // Default to video (most common case for yt-dlp)
+    log.debug('Defaulting to video (no clear indicators)');
+    return ContentType.Video;
   }
 
   /**

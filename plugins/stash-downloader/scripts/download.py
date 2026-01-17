@@ -248,6 +248,75 @@ def check_ytdlp() -> bool:
         return False
 
 
+def detect_content_type(metadata: dict) -> str:
+    """
+    Detect content type from yt-dlp metadata.
+
+    Args:
+        metadata: yt-dlp metadata dictionary
+
+    Returns:
+        Content type: 'video', 'image', or 'gallery'
+    """
+    # Check _type field (yt-dlp sets this for playlists, etc.)
+    if metadata.get("_type") == "playlist":
+        return "gallery"
+
+    # Check file extension
+    ext = (metadata.get("ext") or "").lower()
+    image_extensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp"]
+    if ext in image_extensions:
+        log.debug(f"Detected image from extension: {ext}")
+        return "image"
+
+    # Check video codec - if 'none' or missing, likely not a video
+    vcodec = metadata.get("vcodec")
+    acodec = metadata.get("acodec")
+
+    if vcodec == "none" or not vcodec:
+        # No video codec - check audio codec
+        if acodec == "none" or not acodec:
+            # No video, no audio = likely an image
+            log.debug("Detected image: no video or audio codecs")
+            return "image"
+        else:
+            # Audio-only content (treat as video for now)
+            log.debug("Detected audio-only content (treating as video)")
+            return "video"
+
+    # Check formats array for video characteristics
+    formats = metadata.get("formats", [])
+    has_video_format = False
+    for fmt in formats:
+        if fmt.get("height") and fmt.get("height") > 0:
+            has_video_format = True
+            break
+        if fmt.get("vcodec") and fmt.get("vcodec") != "none":
+            has_video_format = True
+            break
+
+    if not has_video_format and formats:
+        log.debug("Detected image: no video formats found")
+        return "image"
+
+    # Has duration? Definitely a video
+    if metadata.get("duration") and metadata.get("duration") > 0:
+        log.debug(f"Detected video: has duration of {metadata.get('duration')}s")
+        return "video"
+
+    # Check if width/height suggest video dimensions
+    width = metadata.get("width", 0)
+    height = metadata.get("height", 0)
+    if height > 0:
+        # Video-like dimensions (most images don't report this in yt-dlp)
+        log.debug(f"Detected video: has dimensions {width}x{height}")
+        return "video"
+
+    # Default to video (most common case for yt-dlp usage)
+    log.debug("Defaulting to video (no clear indicators)")
+    return "video"
+
+
 def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
     """
     Extract metadata using yt-dlp without downloading.
@@ -956,6 +1025,10 @@ def task_extract_metadata(args: dict) -> dict:
         return result
 
     if metadata:
+        # Detect content type from yt-dlp metadata
+        detected_content_type = detect_content_type(metadata)
+        log.info(f"Detected content type: {detected_content_type}")
+
         # Extract all formats with their URLs (important for HLS streams)
         # For HLS, yt-dlp may include URLs in formats or only at top level
         formats_list = []
@@ -995,6 +1068,7 @@ def task_extract_metadata(args: dict) -> dict:
 
         result = {
             "success": True,
+            "detected_content_type": detected_content_type,  # NEW: Content type detection
             "title": metadata.get("title"),
             "description": metadata.get("description"),
             "duration": metadata.get("duration"),
