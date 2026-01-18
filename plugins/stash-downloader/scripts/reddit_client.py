@@ -24,15 +24,24 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-def check_praw() -> bool:
-    """Check if PRAW is installed."""
+def check_praw() -> dict:
+    """
+    Check if PRAW is installed and return version info.
+    
+    Returns dictionary with available, success, and version fields.
+    Uses 'available' instead of 'result_error' for consistent handling.
+    """
     try:
         import praw
-        log.debug(f"PRAW version: {praw.__version__}")
-        return True
-    except ImportError:
-        log.error("PRAW not installed. Install with: pip install praw")
-        return False
+        version = praw.__version__
+        log.info(f"✓ PRAW available: {version}")
+        return {"available": True, "success": True, "version": version}
+    except ImportError as e:
+        log.warning(f"PRAW not installed: {e}")
+        return {"available": False, "success": True, "version": None}
+    except Exception as e:
+        log.error(f"Error checking PRAW: {e}")
+        return {"available": False, "success": True, "version": None}
 
 
 def fetch_reddit_posts(
@@ -57,7 +66,9 @@ def fetch_reddit_posts(
     Returns:
         List of dictionaries containing post metadata
     """
-    if not check_praw():
+    praw_check = check_praw()
+    if not praw_check['available']:
+        log.error("PRAW not available - cannot fetch posts")
         return []
 
     try:
@@ -184,12 +195,11 @@ def main():
             args = input_data
             task_name = input_data.get("mode") or input_data.get("task", "fetch_posts")
         
-        log.debug(f"Task: {task_name}")
+        log.info(f"Reddit client task: {task_name}")
         
         if task_name == "check_praw":
             # Check if PRAW is available
-            available = check_praw()
-            result = {"available": available, "success": True}
+            result = check_praw()
             write_output(result)
             return
         
