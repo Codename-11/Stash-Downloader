@@ -17,10 +17,13 @@ export class GenericScraper implements IMetadataScraper {
   }
 
   async scrape(url: string): Promise<IScrapedMetadata> {
+    // Detect content type first
+    const contentType = await this.detectContentType(url);
+
     // Basic metadata with URL
     const metadata: IScrapedMetadata = {
       url,
-      contentType: await this.detectContentType(url),
+      contentType,
     };
 
     // Try to extract title from URL
@@ -32,6 +35,12 @@ export class GenericScraper implements IMetadataScraper {
       metadata.title = decodeURIComponent(titleWithoutExt).replace(/[-_]/g, ' ');
     } catch {
       metadata.title = 'Downloaded Content';
+    }
+
+    // For images, use the URL as both imageUrl and thumbnailUrl
+    if (contentType === ContentType.Image) {
+      metadata.imageUrl = url;
+      metadata.thumbnailUrl = url;
     }
 
     return metadata;

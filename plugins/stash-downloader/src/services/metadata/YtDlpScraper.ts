@@ -234,14 +234,30 @@ export class YtDlpScraper implements IMetadataScraper {
     // Detect content type from Python script or fallback to metadata detection
     const contentType = this.detectContentType(readResult);
 
+    // For images, use the URL itself as both imageUrl and thumbnailUrl if not provided
+    let imageUrl: string | undefined;
+    let thumbnailUrl: string | undefined = readResult.thumbnail;
+
+    if (contentType === ContentType.Image) {
+      // For direct image URLs, use the original URL
+      imageUrl = readResult.url || url;
+      
+      // If no thumbnail provided, use the image URL itself
+      if (!thumbnailUrl) {
+        thumbnailUrl = imageUrl;
+        log.debug('Using image URL as thumbnail for Image content type');
+      }
+    }
+
     return {
       url: url,
       videoUrl: videoUrl,
+      imageUrl: imageUrl,
       title: readResult.title || undefined,
       description: readResult.description || undefined,
       date: readResult.upload_date ? this.formatDate(readResult.upload_date) : undefined,
       duration: readResult.duration || undefined,
-      thumbnailUrl: readResult.thumbnail || undefined,
+      thumbnailUrl: thumbnailUrl,
       performers: performers,
       tags: tags,
       studio: readResult.uploader || readResult.channel || undefined,
