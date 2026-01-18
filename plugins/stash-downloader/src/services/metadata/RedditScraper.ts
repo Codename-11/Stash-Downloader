@@ -35,6 +35,7 @@ interface RedditPostData {
   post_hint?: string;
   thumbnail?: string;
   preview_url?: string; // From Python backend
+  gallery_images?: string[]; // From Python backend (NEW)
   over_18?: boolean;
 }
 
@@ -207,11 +208,23 @@ export class RedditScraper implements IMetadataScraper {
       thumbnailUrl: thumbnailUrl,
     };
 
-    // Set video/image URL based on content type
+    // Set URLs based on content type
     if (contentType === ContentType.Video && mediaUrl) {
       metadata.videoUrl = mediaUrl;
     } else if (contentType === ContentType.Image && mediaUrl) {
       metadata.imageUrl = mediaUrl;
+    } else if (contentType === ContentType.Gallery) {
+      // For galleries, set the gallery images array
+      if (postData.gallery_images && postData.gallery_images.length > 0) {
+        metadata.galleryImages = postData.gallery_images.map((url, index) => ({
+          url,
+          index,
+        }));
+        log.info(`Gallery contains ${postData.gallery_images.length} images`);
+      } else {
+        // Fallback to single image if no gallery images
+        metadata.imageUrl = mediaUrl;
+      }
     }
 
     log.debug('Converted Reddit metadata:', JSON.stringify({

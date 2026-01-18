@@ -1373,6 +1373,103 @@ def task_fetch_image(args: dict) -> dict:
         return {"result_error": f"Failed to process image: {str(e)}", "success": False}
 
 
+def task_download_reddit_gallery(args: dict) -> dict:
+    """
+    Download Reddit gallery images directly (bypasses yt-dlp auth requirement).
+    
+    Args:
+        args: Dict with 'url', 'output_dir', and optional 'title'
+        
+    Returns:
+        Dict with success status and file paths
+    """
+    url = args.get("url")
+    output_dir = args.get("output_dir", ".")
+    title = args.get("title", "reddit_gallery")
+    
+    if not url:
+        return {"success": False, "result_error": "No URL provided"}
+    
+    try:
+        import requests
+        import os
+        import re
+        from urllib.parse import urlparse
+        
+        # First, scrape the post to get gallery images
+        scrape_result = task_scrape_reddit({"url": url})
+        
+        if not scrape_result.get("success"):
+            return scrape_result
+        
+        gallery_images = scrape_result.get("gallery_images", [])
+        
+        if not gallery_images:
+            return {
+                "success": False,
+                "result_error": "No gallery images found in post"
+            }
+        
+        # Create output directory if needed
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Sanitize title for filename
+        safe_title = re.sub(r'[<>:"/\\|?*]', '', title)[:100]
+        
+        downloaded_files = []
+        log.info(f"Downloading {len(gallery_images)} gallery images...")
+        
+        for idx, image_url in enumerate(gallery_images, 1):
+            try:
+                # Get file extension from URL
+                parsed = urlparse(image_url)
+                ext = os.path.splitext(parsed.path)[1] or '.jpg'
+                
+                # Build output filename
+                if len(gallery_images) == 1:
+                    filename = f"{safe_title}{ext}"
+                else:
+                    filename = f"{safe_title}_{idx:02d}{ext}"
+                
+                filepath = os.path.join(output_dir, filename)
+                
+                # Download image
+                log.info(f"Downloading image {idx}/{len(gallery_images)}: {filename}")
+                response = requests.get(image_url, headers={'User-Agent': 'Stash-Downloader/1.0'}, timeout=60)
+                
+                if response.status_code == 200:
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    downloaded_files.append(filepath)
+                    log.info(f"✓ Downloaded: {filename}")
+                else:
+                    log.warning(f"Failed to download image {idx}: HTTP {response.status_code}")
+                    
+            except Exception as e:
+                log.error(f"Error downloading image {idx}: {e}")
+                continue
+        
+        if downloaded_files:
+            log.info(f"✓ Successfully downloaded {len(downloaded_files)}/{len(gallery_images)} images")
+            return {
+                "success": True,
+                "files": downloaded_files,
+                "count": len(downloaded_files),
+            }
+        else:
+            return {
+                "success": False,
+                "result_error": "Failed to download any images"
+            }
+            
+    except ImportError:
+        log.error("requests library not available")
+        return {"success": False, "result_error": "requests library not installed"}
+    except Exception as e:
+        log.error(f"Failed to download Reddit gallery: {e}", exc_info=True)
+        return {"success": False, "result_error": str(e)}
+
+
 def task_scrape_reddit(args: dict) -> dict:
     """
     Scrape Reddit post metadata using server-side requests.
@@ -1453,6 +1550,29 @@ def task_scrape_reddit(args: dict) -> dict:
                         result['preview_url'] = source['url']
             except Exception as e:
                 log.debug(f"Could not extract preview: {e}")
+        
+        # Extract gallery images if it's a gallery post
+        if result.get('is_gallery') and 'gallery_data' in post_data:
+            try:
+                gallery_data = post_data['gallery_data']
+                media_metadata = post_data.get('media_metadata', {})
+                
+                gallery_images = []
+                for item in gallery_data.get('items', []):
+                    media_id = item.get('media_id')
+                    if media_id and media_id in media_metadata:
+                        media = media_metadata[media_id]
+                        # Get the highest quality image
+                        if 's' in media and 'u' in media['s']:
+                            # Decode HTML entities
+                            image_url = media['s']['u'].replace('&amp;', '&')
+                            gallery_images.append(image_url)
+                
+                if gallery_images:
+                    result['gallery_images'] = gallery_images
+                    log.info(f"✓ Extracted {len(gallery_images)} gallery images")
+            except Exception as e:
+                log.warning(f"Could not extract gallery images: {e}")
         
         log.info(f"✓ Reddit metadata scraped: {result.get('title', 'Untitled')[:50]}...")
         return result
@@ -1629,6 +1749,7 @@ def main():
             "test_proxy": task_test_proxy,
             "fetch_image": task_fetch_image,
             "scrape_reddit": task_scrape_reddit,
+            "download_reddit_gallery": task_download_reddit_gallery,
             "check_praw": lambda args: delegate_to_reddit_client(args),
             "fetch_posts": lambda args: delegate_to_reddit_client(args),
             "embed_metadata": lambda args: delegate_to_metadata_embedder(args),

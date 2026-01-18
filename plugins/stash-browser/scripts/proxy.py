@@ -165,6 +165,128 @@ def fetch_xml(url: str, proxy_url: str | None = None) -> ET.Element:
         raise Exception(f"XML parse error: {e}")
 
 
+def search_reddit(
+    query: str,
+    sort: str = 'hot',
+    time: str = 'all',
+    limit: int = 40,
+    after: str | None = None,
+    proxy_url: str | None = None
+) -> dict:
+    """Search Reddit posts.
+    
+    Args:
+        query: Subreddit (r/pics) or search query
+        sort: hot, new, top, rising
+        time: hour, day, week, month, year, all (for 'top' sort)
+        limit: Number of results
+        after: Pagination token
+        proxy_url: Optional HTTP(S) proxy
+    
+    Returns:
+        Dict with success, posts array, has_more flag
+    """
+    try:
+        import requests
+    except ImportError:
+        log("requests library not available - install with: pip install requests")
+        return {
+            'success': False,
+            'error': 'requests library not installed',
+            'posts': [],
+            'has_more': False
+        }
+    
+    try:
+        # Parse query - check if it's a subreddit
+        is_subreddit = query.startswith('r/') or query.startswith('subreddit:')
+        
+        if is_subreddit:
+            # Extract subreddit name
+            subreddit = query.replace('subreddit:', '').replace('r/', '').strip()
+            url = f"https://www.reddit.com/r/{subreddit}/{sort}.json"
+        else:
+            # General search
+            url = f"https://www.reddit.com/search.json?q={urllib.parse.quote(query)}&sort={sort}"
+        
+        # Add parameters
+        params = {'limit': limit}
+        if sort == 'top' and time:
+            params['t'] = time
+        if after:
+            params['after'] = after
+        
+        log(f"Fetching Reddit: {url}")
+        
+        # Make request
+        headers = {'User-Agent': 'Stash-Browser/1.0'}
+        proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+        
+        response = requests.get(url, params=params, headers=headers, proxies=proxies, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Parse Reddit response
+        posts = []
+        after_token = None
+        
+        if 'data' in data and 'children' in data['data']:
+            for child in data['data']['children']:
+                post_data = child.get('data', {})
+                
+                # Extract preview image
+                preview_image = None
+                if 'preview' in post_data and 'images' in post_data['preview']:
+                    try:
+                        images = post_data['preview']['images']
+                        if images and len(images) > 0:
+                            source = images[0].get('source', {})
+                            if 'url' in source:
+                                preview_image = source['url'].replace('&amp;', '&')
+                    except:
+                        pass
+                
+                if not preview_image and post_data.get('thumbnail', '').startswith('http'):
+                    preview_image = post_data['thumbnail']
+                
+                posts.append({
+                    'id': post_data.get('id'),
+                    'title': post_data.get('title'),
+                    'url': post_data.get('url'),
+                    'permalink': f"https://reddit.com{post_data.get('permalink', '')}",
+                    'subreddit': post_data.get('subreddit'),
+                    'author': post_data.get('author'),
+                    'created_utc': post_data.get('created_utc'),
+                    'score': post_data.get('score', 0),
+                    'is_video': post_data.get('is_video', False),
+                    'is_gallery': post_data.get('is_gallery', False),
+                    'over_18': post_data.get('over_18', False),
+                    'preview_image': preview_image,
+                    'thumbnail': post_data.get('thumbnail'),
+                })
+            
+            after_token = data['data'].get('after')
+        
+        log(f"✓ Found {len(posts)} Reddit posts")
+        
+        return {
+            'success': True,
+            'posts': posts,
+            'has_more': after_token is not None,
+            'after': after_token
+        }
+        
+    except Exception as e:
+        log(f"Reddit search failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'posts': [],
+            'has_more': False
+        }
+
+
 def search_booru(source: str, tags: str, page: int = 0, limit: int = 40,
                   proxy_url: str | None = None, api_key: str | None = None,
                   user_id: str | None = None) -> dict:
@@ -379,26 +501,43 @@ def autocomplete_tags(source: str, query: str, limit: int = 100,
 def handle_request(args: dict) -> dict:
     """Handle incoming request from Stash."""
     mode = args.get('mode', 'search')
+    source = args.get('source', 'rule34')
     proxy_url = args.get('proxy')
 
     # Get API credentials for authenticated sources
     api_key = args.get('api_key')
     user_id = args.get('user_id')
 
+    # Route Reddit requests to separate handlers
+    if source == 'reddit':
+        if mode == 'search':
+            query = args.get('tags', '')
+            sort = args.get('sort', 'hot')
+            time = args.get('time', 'all')
+            limit = int(args.get('limit', 40))
+            after = args.get('after')
+            return search_reddit(query, sort, time, limit, after, proxy_url)
+        elif mode == 'autocomplete':
+            # Reddit doesn't have autocomplete - return empty
+            return {'success': True, 'suggestions': []}
+        elif mode == 'post':
+            # Reddit post fetching would go here
+            raise Exception("Reddit post mode not implemented")
+        else:
+            raise Exception(f"Unknown mode for Reddit: {mode}")
+
+    # Booru request handling
     if mode == 'search':
-        source = args.get('source', 'rule34')
         tags = args.get('tags', '')
         page = int(args.get('page', 0))
         limit = int(args.get('limit', 40))
         return search_booru(source, tags, page, limit, proxy_url, api_key, user_id)
 
     elif mode == 'post':
-        source = args.get('source', 'rule34')
         post_id = int(args.get('id'))
         return get_post(source, post_id, proxy_url)
 
     elif mode == 'autocomplete':
-        source = args.get('source', 'rule34')
         query = args.get('query', '')
         limit = int(args.get('limit', 10))
         return autocomplete_tags(source, query, limit, proxy_url, api_key, user_id)
