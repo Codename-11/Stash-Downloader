@@ -111,6 +111,10 @@ tasks:
     description: Check if piexif and ffmpeg are available for metadata embedding
     defaultArgs:
       mode: check_metadata_deps
+  - name: Check Metadata
+    description: Check if a file has embedded Reddit metadata (for tagger plugin)
+    defaultArgs:
+      mode: check_metadata
 
 ui:
   javascript:

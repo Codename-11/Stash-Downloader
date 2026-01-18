@@ -1633,6 +1633,8 @@ def main():
             "fetch_posts": lambda args: delegate_to_reddit_client(args),
             "embed_metadata": lambda args: delegate_to_metadata_embedder(args),
             "check_metadata_deps": lambda args: delegate_to_metadata_embedder(args),
+            "check": lambda args: delegate_to_metadata_embedder(args),
+            "check_metadata": lambda args: delegate_to_metadata_embedder(args),
         }
 
         handler = tasks.get(task_name)

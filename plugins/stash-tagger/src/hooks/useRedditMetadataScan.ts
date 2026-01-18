@@ -32,18 +32,23 @@ export function useRedditMetadataScan() {
    */
   const scanScene = useCallback(async (sceneId: string): Promise<ScanResult> => {
     setScanning(true);
+    console.log(`[useRedditMetadataScan] Scanning scene ${sceneId}...`);
     
     try {
       // Get scene details to find file path
       const scene = await stashService.findScene(sceneId);
+      console.log(`[useRedditMetadataScan] Scene found:`, scene);
       
       if (!scene?.files || scene.files.length === 0) {
+        console.warn(`[useRedditMetadataScan] No files found for scene ${sceneId}`);
         return { found: false, error: 'No files found for scene' };
       }
 
       // Check first file (primary)
       const filePath = scene.files[0]?.path;
+      console.log(`[useRedditMetadataScan] Checking file: ${filePath}`);
       if (!filePath) {
+        console.warn(`[useRedditMetadataScan] No file path found`);
         return { found: false, error: 'No file path found' };
       }
 
@@ -101,18 +106,23 @@ export function useRedditMetadataScan() {
    */
   const scanGallery = useCallback(async (galleryId: string): Promise<ScanResult> => {
     setScanning(true);
+    console.log(`[useRedditMetadataScan] Scanning gallery ${galleryId}...`);
     
     try {
       // Get gallery details
       const gallery = await stashService.findGallery(galleryId);
+      console.log(`[useRedditMetadataScan] Gallery found:`, gallery);
       
       if (!gallery?.files || gallery.files.length === 0) {
+        console.warn(`[useRedditMetadataScan] No files found for gallery ${galleryId}`);
         return { found: false, error: 'No files found for gallery' };
       }
 
       // Check first file
       const filePath = gallery.files[0]?.path;
+      console.log(`[useRedditMetadataScan] Checking file: ${filePath}`);
       if (!filePath) {
+        console.warn(`[useRedditMetadataScan] No file path found`);
         return { found: false, error: 'No file path found' };
       }
 
