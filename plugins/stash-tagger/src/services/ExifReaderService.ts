@@ -23,12 +23,12 @@ export class ExifReaderService {
   /**
    * Parse Reddit metadata from raw EXIF/metadata tags
    */
-  parseMetadata(rawMetadata: Record<string, any>): RedditMetadata {
+  parseMetadata(rawMetadata: Record<string, unknown>): RedditMetadata {
     const metadata: RedditMetadata = {};
 
     // Extract author (Artist field)
     if (rawMetadata.artist || rawMetadata.Artist) {
-      const artist = rawMetadata.artist || rawMetadata.Artist;
+      const artist = String(rawMetadata.artist || rawMetadata.Artist);
       const match = artist.match(/u\/(\w+)/);
       if (match) {
         metadata.author = match[1];
@@ -36,7 +36,7 @@ export class ExifReaderService {
     }
 
     // Extract subreddit (album field)
-    if (rawMetadata.album) {
+    if (rawMetadata.album && typeof rawMetadata.album === 'string') {
       const match = rawMetadata.album.match(/r\/(\w+)/);
       if (match) {
         metadata.subreddit = match[1];
@@ -44,35 +44,37 @@ export class ExifReaderService {
     }
 
     // Extract title
-    if (rawMetadata.title || rawMetadata.Title) {
-      metadata.title = rawMetadata.title || rawMetadata.Title;
+    if (rawMetadata.title && typeof rawMetadata.title === 'string') {
+      metadata.title = rawMetadata.title;
+    } else if (rawMetadata.Title && typeof rawMetadata.Title === 'string') {
+      metadata.title = rawMetadata.Title;
     }
 
     // Extract from comment field
-    if (rawMetadata.comment) {
+    if (rawMetadata.comment && typeof rawMetadata.comment === 'string') {
       metadata.comment = rawMetadata.comment;
       
-      const urlMatch = metadata.comment?.match(/https?:\/\/[^\s]+/);
+      const urlMatch = metadata.comment.match(/https?:\/\/[^\s]+/);
       if (urlMatch) {
         metadata.url = urlMatch[0];
       }
       
       if (!metadata.subreddit) {
-        const subMatch = metadata.comment?.match(/r\/(\w+)/);
+        const subMatch = metadata.comment.match(/r\/(\w+)/);
         if (subMatch) {
           metadata.subreddit = subMatch[1];
         }
       }
       
       if (!metadata.author) {
-        const authorMatch = metadata.comment?.match(/u\/(\w+)/);
+        const authorMatch = metadata.comment.match(/u\/(\w+)/);
         if (authorMatch) {
           metadata.author = authorMatch[1];
         }
       }
     }
 
-    if (rawMetadata.date) {
+    if (rawMetadata.date && typeof rawMetadata.date === 'string') {
       metadata.date = rawMetadata.date;
     }
 

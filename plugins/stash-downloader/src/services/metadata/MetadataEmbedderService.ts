@@ -12,6 +12,18 @@ import type { RedditPost } from '../reddit';
 
 const log = createLogger('MetadataEmbedderService');
 
+interface MetadataEmbedResponse {
+  success: boolean;
+  filepath?: string;
+  error?: string;
+}
+
+interface MetadataCheckResponse {
+  success: boolean;
+  has_metadata: boolean;
+  metadata?: Record<string, unknown>;
+}
+
 export interface MetadataEmbedDependencies {
   piexif: boolean;
   ffmpeg: boolean;
@@ -41,7 +53,7 @@ export class MetadataEmbedderService {
         mode: 'check_metadata_deps',
       });
 
-      const deps = (result?.data as any)?.dependencies || { piexif: false, ffmpeg: false };
+      const deps = (result?.data as { dependencies?: MetadataEmbedDependencies })?.dependencies || { piexif: false, ffmpeg: false };
       this.deps = deps;
       this.depsChecked = true;
 
@@ -92,7 +104,7 @@ export class MetadataEmbedderService {
         post_info: postInfo,
       });
 
-      const result = taskResult?.data as any;
+      const result = taskResult?.data as MetadataEmbedResponse | undefined;
 
       if (!result || result.success === false) {
         const error = result?.error || 'Unknown error embedding metadata';
@@ -123,7 +135,7 @@ export class MetadataEmbedderService {
   /**
    * Check if a file already has embedded Reddit metadata
    */
-  async checkMetadata(filepath: string): Promise<{ hasMetadata: boolean; metadata?: any }> {
+  async checkMetadata(filepath: string): Promise<{ hasMetadata: boolean; metadata?: Record<string, unknown> }> {
     try {
       const stashService = getStashService();
       const taskResult = await stashService.runPluginOperation(PLUGIN_ID, {
@@ -131,7 +143,7 @@ export class MetadataEmbedderService {
         filepath: filepath,
       });
 
-      const result = taskResult?.data as any;
+      const result = taskResult?.data as MetadataCheckResponse | undefined;
 
       if (!result || result.success === false) {
         return { hasMetadata: false };

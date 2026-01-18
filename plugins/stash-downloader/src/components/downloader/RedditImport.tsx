@@ -11,6 +11,9 @@ import { createLogger } from '@/utils';
 
 const log = createLogger('RedditImport');
 
+type NSFWFilter = 'all' | 'sfw' | 'nsfw';
+type ContentTypeFilter = 'all' | 'video' | 'image' | 'gallery';
+
 interface RedditImportProps {
   onImportPosts: (permalinks: string[]) => void;
 }
@@ -27,8 +30,8 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
   
   // Filter state
-  const [filterNSFW, setFilterNSFW] = useState<'all' | 'sfw' | 'nsfw'>('all');
-  const [filterContentType, setFilterContentType] = useState<'all' | 'video' | 'image' | 'gallery'>('all');
+  const [filterNSFW, setFilterNSFW] = useState<NSFWFilter>('all');
+  const [filterContentType, setFilterContentType] = useState<ContentTypeFilter>('all');
   const [filterSubreddit, setFilterSubreddit] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -37,13 +40,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   const redditService = getRedditImportService();
 
   // Check PRAW availability when modal opens
-  useEffect(() => {
-    if (showModal && prawAvailable === null) {
-      checkPraw();
-    }
-  }, [showModal, prawAvailable]);
-
-  const checkPraw = async () => {
+  const checkPraw = React.useCallback(async () => {
     try {
       const available = await redditService.checkPrawAvailable();
       setPrawAvailable(available);
@@ -55,7 +52,13 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
       setPrawAvailable(false);
       setError('Failed to check PRAW availability');
     }
-  };
+  }, [redditService]);
+
+  useEffect(() => {
+    if (showModal && prawAvailable === null) {
+      checkPraw();
+    }
+  }, [showModal, prawAvailable, checkPraw]);
 
   const handleFetchPosts = async () => {
     setLoading(true);
@@ -310,7 +313,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                             <select
                               className="form-select form-select-sm bg-dark text-light border-secondary"
                               value={filterNSFW}
-                              onChange={(e) => setFilterNSFW(e.target.value as any)}
+                              onChange={(e) => setFilterNSFW(e.target.value as NSFWFilter)}
                             >
                               <option value="all">All Posts</option>
                               <option value="sfw">SFW Only</option>
@@ -321,7 +324,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                             <select
                               className="form-select form-select-sm bg-dark text-light border-secondary"
                               value={filterContentType}
-                              onChange={(e) => setFilterContentType(e.target.value as any)}
+                              onChange={(e) => setFilterContentType(e.target.value as ContentTypeFilter)}
                             >
                               <option value="all">All Types</option>
                               <option value="video">Videos</option>

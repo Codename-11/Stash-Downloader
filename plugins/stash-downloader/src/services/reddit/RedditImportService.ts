@@ -11,6 +11,19 @@ import { PLUGIN_ID } from '@/constants';
 
 const log = createLogger('RedditImportService');
 
+interface PrawCheckResponse {
+  available: boolean;
+  success: boolean;
+}
+
+interface RedditFetchResponse {
+  success: boolean;
+  posts: RedditPost[];
+  count: number;
+  post_type: string;
+  error?: string;
+}
+
 export interface RedditPost {
   id: string;
   title: string;
@@ -63,7 +76,7 @@ export class RedditImportService {
         mode: 'check_praw',
       });
 
-      this.prawAvailable = (result?.data as any)?.available === true;
+      this.prawAvailable = (result?.data as PrawCheckResponse | undefined)?.available === true;
       return this.prawAvailable;
     } catch (error) {
       log.error('Failed to check PRAW availability:', error instanceof Error ? error.message : String(error));
@@ -118,7 +131,7 @@ export class RedditImportService {
         limit: limit,
       });
 
-      const result = taskResult?.data as any;
+      const result = taskResult?.data as RedditFetchResponse | undefined;
 
       if (!result || result.success === false) {
         const error = result?.error || 'Unknown error fetching Reddit posts';
