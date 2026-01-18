@@ -33,6 +33,14 @@ interface RedditPostData {
   is_video?: boolean;
   is_gallery?: boolean;
   post_hint?: string;
+  thumbnail?: string;
+  preview?: {
+    images?: Array<{
+      source?: {
+        url?: string;
+      };
+    }>;
+  };
 }
 
 export class RedditScraper implements IMetadataScraper {
@@ -176,6 +184,18 @@ export class RedditScraper implements IMetadataScraper {
       mediaUrl = postData.url;
     }
 
+    // Get thumbnail URL from Reddit preview or thumbnail field
+    let thumbnailUrl: string | undefined;
+    if (postData.preview?.images?.[0]?.source?.url) {
+      // Decode HTML entities in preview URL
+      thumbnailUrl = postData.preview.images[0].source.url.replace(/&amp;/g, '&');
+    } else if (postData.thumbnail && postData.thumbnail.startsWith('http')) {
+      thumbnailUrl = postData.thumbnail;
+    } else if (mediaUrl && contentType === ContentType.Image) {
+      // Use the image itself as thumbnail for direct image links
+      thumbnailUrl = mediaUrl;
+    }
+
     // Build metadata
     const metadata: IScrapedMetadata = {
       url: originalUrl,
@@ -188,6 +208,7 @@ export class RedditScraper implements IMetadataScraper {
       tags: postData.subreddit ? [postData.subreddit] : undefined,
       studio: postData.subreddit ? `r/${postData.subreddit}` : undefined,
       contentType: contentType,
+      thumbnailUrl: thumbnailUrl,
     };
 
     // Set video/image URL based on content type

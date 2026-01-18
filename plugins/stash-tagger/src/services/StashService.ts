@@ -528,6 +528,54 @@ class StashService {
   }
 
   /**
+   * Get all scenes with pagination
+   */
+  async getScenes(
+    limit = 100,
+    page = 1
+  ): Promise<{ scenes: Array<{ id: string; title?: string; path?: string }>; count: number }> {
+    const query = `
+      query FindScenes($filter: FindFilterType) {
+        findScenes(filter: $filter) {
+          count
+          scenes {
+            id
+            title
+            files {
+              path
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{
+      findScenes: {
+        count: number;
+        scenes: Array<{ id: string; title?: string; files: Array<{ path: string }> }>;
+      };
+    }>(query, {
+      filter: {
+        per_page: limit,
+        page: page,
+        sort: 'created_at',
+        direction: 'DESC',
+      },
+    });
+
+    const scenes = result.data?.findScenes.scenes.map(s => ({
+      id: s.id,
+      title: s.title,
+      path: s.files[0]?.path,
+    })) || [];
+
+    return {
+      scenes,
+      count: result.data?.findScenes.count || 0,
+    };
+  }
+
+  /**
    * Find a gallery by ID
    */
   async findGallery(id: string): Promise<{ id: string; files: Array<{ path: string }> } | null> {
@@ -548,6 +596,54 @@ class StashService {
     );
 
     return result.data?.findGallery || null;
+  }
+
+  /**
+   * Get all galleries with pagination
+   */
+  async getGalleries(
+    limit = 100,
+    page = 1
+  ): Promise<{ galleries: Array<{ id: string; title?: string; path?: string }>; count: number }> {
+    const query = `
+      query FindGalleries($filter: FindFilterType) {
+        findGalleries(filter: $filter) {
+          count
+          galleries {
+            id
+            title
+            files {
+              path
+            }
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{
+      findGalleries: {
+        count: number;
+        galleries: Array<{ id: string; title?: string; files: Array<{ path: string }> }>;
+      };
+    }>(query, {
+      filter: {
+        per_page: limit,
+        page: page,
+        sort: 'created_at',
+        direction: 'DESC',
+      },
+    });
+
+    const galleries = result.data?.findGalleries.galleries.map(g => ({
+      id: g.id,
+      title: g.title,
+      path: g.files[0]?.path,
+    })) || [];
+
+    return {
+      galleries,
+      count: result.data?.findGalleries.count || 0,
+    };
   }
 
   /**
