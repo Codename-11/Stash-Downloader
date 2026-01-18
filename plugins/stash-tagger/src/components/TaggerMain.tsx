@@ -8,9 +8,10 @@ import { StashBoxSelector, HelpModal } from '@/components/common';
 import { StudioTagger } from '@/components/studios';
 import { PerformerTagger } from '@/components/performers';
 import { TagTagger } from '@/components/tags';
+import { RedditScanner } from '@/components/reddit';
 import { PLUGIN_NAME, APP_VERSION, DEFAULT_SETTINGS } from '@/constants';
 
-type TabType = 'studios' | 'performers' | 'tags';
+type TabType = 'studios' | 'performers' | 'tags' | 'reddit';
 
 interface TabConfig {
   id: TabType;
@@ -21,6 +22,7 @@ const tabs: TabConfig[] = [
   { id: 'studios', label: 'Studios' },
   { id: 'performers', label: 'Performers' },
   { id: 'tags', label: 'Tags' },
+  { id: 'reddit', label: '🔴 Reddit' },
 ];
 
 export const TaggerMain: React.FC = () => {
@@ -153,6 +155,7 @@ export const TaggerMain: React.FC = () => {
             threshold={threshold}
           />
         )}
+        {activeTab === 'reddit' && <RedditScanner />}
       </div>
 
       {/* Footer */}
