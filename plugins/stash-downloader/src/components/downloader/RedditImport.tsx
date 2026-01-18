@@ -13,6 +13,7 @@ const log = createLogger('RedditImport');
 
 type NSFWFilter = 'all' | 'sfw' | 'nsfw';
 type ContentTypeFilter = 'all' | 'video' | 'image' | 'gallery';
+type SortOrder = 'newest' | 'oldest' | 'score';
 
 interface RedditImportProps {
   onImportPosts: (permalinks: string[]) => void;
@@ -34,6 +35,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   const [filterContentType, setFilterContentType] = useState<ContentTypeFilter>('all');
   const [filterSubreddit, setFilterSubreddit] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   
   const toast = useToast();
   const { settings } = useSettings();
@@ -172,25 +174,38 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   const hasCredentials = settings.redditClientId && settings.redditClientSecret && 
                          settings.redditUsername && settings.redditPassword;
 
-  // Apply filters
-  const filteredPosts = posts.filter(post => {
-    // NSFW filter
-    if (filterNSFW === 'sfw' && post.over_18) return false;
-    if (filterNSFW === 'nsfw' && !post.over_18) return false;
+  // Apply filters and sorting
+  const filteredPosts = posts
+    .filter(post => {
+      // NSFW filter
+      if (filterNSFW === 'sfw' && post.over_18) return false;
+      if (filterNSFW === 'nsfw' && !post.over_18) return false;
 
-    // Content type filter
-    if (filterContentType === 'video' && !post.is_video) return false;
-    if (filterContentType === 'gallery' && !post.is_gallery) return false;
-    if (filterContentType === 'image' && (post.is_video || post.is_gallery)) return false;
+      // Content type filter
+      if (filterContentType === 'video' && !post.is_video) return false;
+      if (filterContentType === 'gallery' && !post.is_gallery) return false;
+      if (filterContentType === 'image' && (post.is_video || post.is_gallery)) return false;
 
-    // Subreddit filter
-    if (filterSubreddit && !post.subreddit.toLowerCase().includes(filterSubreddit.toLowerCase())) return false;
+      // Subreddit filter
+      if (filterSubreddit && !post.subreddit.toLowerCase().includes(filterSubreddit.toLowerCase())) return false;
 
-    // Search query
-    if (searchQuery && !post.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      // Search query
+      if (searchQuery && !post.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
 
-    return true;
-  });
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortOrder) {
+        case 'newest':
+          return b.created_utc - a.created_utc; // Most recent first
+        case 'oldest':
+          return a.created_utc - b.created_utc; // Oldest first
+        case 'score':
+          return b.score - a.score; // Highest score first
+        default:
+          return 0;
+      }
+    });
 
   // Get unique subreddits for filter
   const subreddits = Array.from(new Set(posts.map(p => p.subreddit))).sort();
@@ -314,9 +329,22 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                     <>
                       {/* Filters */}
                       <div className="border border-secondary rounded p-3 mb-3">
-                        <h6 className="small text-muted mb-2">Filters</h6>
+                        <h6 className="small text-muted mb-2">Filters & Sort</h6>
                         <div className="row g-2">
                           <div className="col-md-3">
+                            <label className="form-label small text-muted mb-1">Sort By</label>
+                            <select
+                              className="form-select form-select-sm bg-dark text-light border-secondary"
+                              value={sortOrder}
+                              onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                            >
+                              <option value="newest">Newest First</option>
+                              <option value="oldest">Oldest First</option>
+                              <option value="score">Highest Score</option>
+                            </select>
+                          </div>
+                          <div className="col-md-3">
+                            <label className="form-label small text-muted mb-1">NSFW Filter</label>
                             <select
                               className="form-select form-select-sm bg-dark text-light border-secondary"
                               value={filterNSFW}
@@ -328,6 +356,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                             </select>
                           </div>
                           <div className="col-md-3">
+                            <label className="form-label small text-muted mb-1">Content Type</label>
                             <select
                               className="form-select form-select-sm bg-dark text-light border-secondary"
                               value={filterContentType}
@@ -340,6 +369,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                             </select>
                           </div>
                           <div className="col-md-3">
+                            <label className="form-label small text-muted mb-1">Subreddit</label>
                             <select
                               className="form-select form-select-sm bg-dark text-light border-secondary"
                               value={filterSubreddit}
@@ -351,7 +381,10 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                               ))}
                             </select>
                           </div>
-                          <div className="col-md-3">
+                        </div>
+                        <div className="row g-2 mt-1">
+                          <div className="col-md-12">
+                            <label className="form-label small text-muted mb-1">Search Titles</label>
                             <input
                               type="text"
                               className="form-control form-control-sm bg-dark text-light border-secondary"
@@ -361,7 +394,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                             />
                           </div>
                         </div>
-                        {(filterNSFW !== 'all' || filterContentType !== 'all' || filterSubreddit || searchQuery) && (
+                        {(filterNSFW !== 'all' || filterContentType !== 'all' || filterSubreddit || searchQuery || sortOrder !== 'newest') && (
                           <button
                             type="button"
                             className="btn btn-outline-secondary btn-sm mt-2"
@@ -370,9 +403,10 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                               setFilterContentType('all');
                               setFilterSubreddit('');
                               setSearchQuery('');
+                              setSortOrder('newest');
                             }}
                           >
-                            Clear Filters
+                            Reset All
                           </button>
                         )}
                       </div>
@@ -399,26 +433,55 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                           filteredPosts.map((post) => (
                             <div
                               key={post.id}
-                              className="form-check border-bottom border-secondary py-2"
+                              className="form-check border-bottom border-secondary py-2 d-flex align-items-start"
                             >
                               <input
-                                className="form-check-input"
+                                className="form-check-input mt-1 flex-shrink-0"
                                 type="checkbox"
                                 id={`post-${post.id}`}
                                 checked={selectedPosts.has(post.id)}
                                 onChange={() => togglePostSelection(post.id)}
+                                style={{ marginRight: '10px' }}
                               />
+                              {(post.thumbnail || post.preview_image) && (
+                                <img
+                                  src={post.preview_image || post.thumbnail}
+                                  alt={post.title}
+                                  className="flex-shrink-0"
+                                  style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    marginRight: '12px',
+                                    backgroundColor: '#1a1a1a'
+                                  }}
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                  }}
+                                />
+                              )}
                               <label
-                                className="form-check-label small"
+                                className="form-check-label small flex-grow-1"
                                 htmlFor={`post-${post.id}`}
-                                style={{ cursor: 'pointer' }}
+                                style={{ cursor: 'pointer', minWidth: 0 }}
                               >
-                                <div className="fw-bold">{post.title}</div>
-                                <div className="text-muted">
-                                  r/{post.subreddit} • u/{post.author} • {post.score} points
-                                  {post.is_video && ' • Video'}
-                                  {post.is_gallery && ' • Gallery'}
-                                  {post.over_18 && ' • NSFW'}
+                                <div className="fw-bold text-truncate" title={post.title}>{post.title}</div>
+                                <div className="text-muted" style={{ fontSize: '0.85rem' }}>
+                                  <a 
+                                    href={`https://reddit.com${post.permalink}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-info text-decoration-none me-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    r/{post.subreddit}
+                                  </a>
+                                  • u/{post.author} • {post.score} pts
+                                  {post.is_video && ' • 🎥 Video'}
+                                  {post.is_gallery && ' • 🖼️ Gallery'}
+                                  {post.over_18 && ' • 🔞 NSFW'}
                                 </div>
                               </label>
                             </div>

@@ -577,6 +577,7 @@ class StashService {
 
   /**
    * Find a gallery by ID
+   * Handles both zip-based galleries (files) and folder galleries (images)
    */
   async findGallery(id: string): Promise<{ id: string; files: Array<{ path: string }> } | null> {
     const query = `
@@ -586,20 +587,46 @@ class StashService {
           files {
             path
           }
+          images {
+            path
+          }
         }
       }
     `;
 
-    const result = await this.gqlRequest<{ findGallery: { id: string; files: Array<{ path: string }> } | null }>(
+    const result = await this.gqlRequest<{ 
+      findGallery: { 
+        id: string; 
+        files: Array<{ path: string }>; 
+        images: Array<{ path: string }>;
+      } | null 
+    }>(
       query,
       { id }
     );
 
-    return result.data?.findGallery || null;
+    if (!result.data?.findGallery) {
+      return null;
+    }
+
+    const gallery = result.data.findGallery;
+    
+    // Merge files and images into a single files array
+    // Prefer files (zip-based), fallback to images (folder-based)
+    const allFiles = [
+      ...(gallery.files || []),
+      ...(gallery.images || [])
+    ];
+
+    return {
+      id: gallery.id,
+      files: allFiles
+    };
   }
 
   /**
    * Get all galleries with pagination
+   * Handles both zip-based galleries (files) and folder galleries (images)
    */
   async getGalleries(
     limit = 100,
@@ -615,6 +642,9 @@ class StashService {
             files {
               path
             }
+            images {
+              path
+            }
           }
         }
       }
@@ -623,7 +653,12 @@ class StashService {
     const result = await this.gqlRequest<{
       findGalleries: {
         count: number;
-        galleries: Array<{ id: string; title?: string; files: Array<{ path: string }> }>;
+        galleries: Array<{ 
+          id: string; 
+          title?: string; 
+          files: Array<{ path: string }>; 
+          images: Array<{ path: string }>;
+        }>;
       };
     }>(query, {
       filter: {
@@ -634,11 +669,16 @@ class StashService {
       },
     });
 
-    const galleries = result.data?.findGalleries.galleries.map(g => ({
-      id: g.id,
-      title: g.title,
-      path: g.files[0]?.path,
-    })) || [];
+    const galleries = result.data?.findGalleries.galleries.map(g => {
+      // Get first file from either files or images array
+      const firstFile = g.files?.[0]?.path || g.images?.[0]?.path;
+      
+      return {
+        id: g.id,
+        title: g.title,
+        path: firstFile,
+      };
+    }) || [];
 
     return {
       galleries,
