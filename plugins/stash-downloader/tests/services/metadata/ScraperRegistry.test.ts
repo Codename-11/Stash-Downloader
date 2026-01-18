@@ -75,10 +75,19 @@ describe('ScraperRegistry', () => {
     it('should use first matching scraper when no content type specified', () => {
       const registry = new ScraperRegistry();
 
-      // Without content type, YtDlpScraper (first registered, handles all) wins
+      // Without content type, BooruScraper (specialized, registered first) wins for booru URLs
       const scraper = registry.findScraper('https://rule34.xxx/index.php?page=post&s=view&id=123');
       expect(scraper).toBeDefined();
-      // YtDlpScraper is first and handles all URLs
+      // BooruScraper is specialized and registered first for booru domains
+      expect(scraper.name).toBe('Booru');
+    });
+
+    it('should use YtDlpScraper for non-booru URLs when no content type specified', () => {
+      const registry = new ScraperRegistry();
+
+      // For non-booru URLs, YtDlpScraper should be used (general-purpose)
+      const scraper = registry.findScraper('https://www.pornhub.com/view_video.php?viewkey=abc123');
+      expect(scraper).toBeDefined();
       expect(scraper.name).toBe('yt-dlp');
     });
   });
