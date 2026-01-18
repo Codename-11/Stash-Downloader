@@ -42,12 +42,17 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   // Check PRAW availability when modal opens
   const checkPraw = React.useCallback(async () => {
     try {
+      console.log('[RedditImport] Starting PRAW check...');
       const available = await redditService.checkPrawAvailable();
+      console.log('[RedditImport] PRAW check result:', available);
       setPrawAvailable(available);
       if (!available) {
         setError('PRAW is not installed. Install with: pip install praw');
+      } else {
+        setError(null); // Clear error if PRAW is available
       }
     } catch (err) {
+      console.error('[RedditImport] PRAW check failed:', err);
       log.error('Failed to check PRAW:', err instanceof Error ? err.message : String(err));
       setPrawAvailable(false);
       setError('Failed to check PRAW availability');
@@ -56,9 +61,11 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
 
   useEffect(() => {
     if (showModal && prawAvailable === null) {
+      console.log('[RedditImport] Modal opened, clearing cache and checking PRAW...');
+      redditService.clearCache(); // Force fresh check
       checkPraw();
     }
-  }, [showModal, prawAvailable, checkPraw]);
+  }, [showModal, prawAvailable, checkPraw, redditService]);
 
   const handleFetchPosts = async () => {
     setLoading(true);

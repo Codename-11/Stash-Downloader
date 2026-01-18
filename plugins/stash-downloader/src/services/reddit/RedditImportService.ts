@@ -63,6 +63,14 @@ export class RedditImportService {
   private prawAvailable: boolean | null = null;
 
   /**
+   * Clear the cached PRAW availability check
+   */
+  clearCache(): void {
+    console.log('[RedditImportService] Clearing PRAW cache');
+    this.prawAvailable = null;
+  }
+
+  /**
    * Check if PRAW is installed on the system
    */
   async checkPrawAvailable(): Promise<boolean> {
@@ -76,9 +84,18 @@ export class RedditImportService {
         mode: 'check_praw',
       });
 
-      this.prawAvailable = (result?.data as PrawCheckResponse | undefined)?.available === true;
+      console.log('[RedditImportService] PRAW check raw result:', result);
+      console.log('[RedditImportService] PRAW check data:', result?.data);
+
+      const prawResponse = result?.data as PrawCheckResponse | undefined;
+      console.log('[RedditImportService] PRAW response parsed:', prawResponse);
+      
+      this.prawAvailable = prawResponse?.available === true;
+      console.log('[RedditImportService] PRAW available:', this.prawAvailable);
+      
       return this.prawAvailable;
     } catch (error) {
+      console.error('[RedditImportService] PRAW check error:', error);
       log.error('Failed to check PRAW availability:', error instanceof Error ? error.message : String(error));
       this.prawAvailable = false;
       return false;
