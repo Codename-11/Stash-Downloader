@@ -1,0 +1,248 @@
+/**
+ * RedditScraper - Scrapes metadata from Reddit post URLs
+ * 
+ * Extracts metadata from Reddit posts to auto-populate:
+ * - Title: Post title
+ * - Studio: Subreddit (r/subreddit)
+ * - Performers: Post author (u/username)
+ * - Tags: Subreddit name
+ * - Date: Post creation date
+ * - Description: Post selftext/body (if available)
+ * 
+ * Supports:
+ * - reddit.com URLs
+ * - old.reddit.com URLs  
+ * - Direct media URLs (i.redd.it, v.redd.it) - will attempt to extract post ID
+ */
+
+import type { IMetadataScraper, IScrapedMetadata } from '@/types';
+import { ContentType } from '@/types';
+import { createLogger } from '@/utils';
+
+const log = createLogger('RedditScraper');
+
+interface RedditPostData {
+  title?: string;
+  author?: string;
+  subreddit?: string;
+  created_utc?: number;
+  selftext?: string;
+  url?: string;
+  permalink?: string;
+  domain?: string;
+  is_video?: boolean;
+  is_gallery?: boolean;
+  post_hint?: string;
+}
+
+export class RedditScraper implements IMetadataScraper {
+  name = 'Reddit';
+  supportedDomains = [
+    'reddit.com',
+    'www.reddit.com', 
+    'old.reddit.com',
+    'new.reddit.com',
+    'i.redd.it',
+    'v.redd.it',
+  ];
+  contentTypes = [ContentType.Video, ContentType.Image, ContentType.Gallery];
+
+  canHandle(url: string): boolean {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      
+      // Check if it's a Reddit domain
+      return this.supportedDomains.some(domain => 
+        hostname === domain || hostname.endsWith('.' + domain)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async scrape(url: string): Promise<IScrapedMetadata> {
+    log.debug('Scraping Reddit URL:', url);
+
+    try {
+      // For direct media URLs, try to extract post ID and build Reddit API URL
+      const postUrl = this.getRedditPostUrl(url);
+      
+      if (!postUrl) {
+        throw new Error('Could not determine Reddit post URL');
+      }
+
+      // Fetch post data from Reddit's JSON API
+      const postData = await this.fetchRedditPost(postUrl);
+      
+      // Convert to our metadata format
+      return this.convertToMetadata(postData, url);
+    } catch (error) {
+      log.error('Reddit scraping failed:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Get Reddit post URL from various URL formats
+   */
+  private getRedditPostUrl(url: string): string | null {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+
+      // Already a Reddit post URL
+      if (hostname.includes('reddit.com') && urlObj.pathname.includes('/comments/')) {
+        return url;
+      }
+
+      // Direct media URL - try to extract post ID from referrer or URL patterns
+      // This is a limitation - we can't get post info from just i.redd.it URLs
+      // User would need to provide the actual Reddit post URL
+      if (hostname === 'i.redd.it' || hostname === 'v.redd.it') {
+        log.debug('Direct media URL detected - cannot extract post metadata without Reddit post URL');
+        return null;
+      }
+
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Fetch Reddit post data using the JSON API
+   */
+  private async fetchRedditPost(url: string): Promise<RedditPostData> {
+    try {
+      // Convert to JSON API URL
+      const jsonUrl = url.replace(/\/$/, '') + '.json';
+      
+      log.debug('Fetching Reddit post data:', jsonUrl);
+
+      const response = await fetch(jsonUrl, {
+        headers: {
+          'User-Agent': 'Stash-Downloader/1.0',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Reddit API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Reddit returns an array with [0] being the post, [1] being comments
+      const postData = data[0]?.data?.children?.[0]?.data;
+      
+      if (!postData) {
+        throw new Error('Invalid Reddit API response structure');
+      }
+
+      return postData as RedditPostData;
+    } catch (error) {
+      log.error('Failed to fetch Reddit post:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Convert Reddit post data to our metadata format
+   */
+  private convertToMetadata(postData: RedditPostData, originalUrl: string): IScrapedMetadata {
+    // Detect content type from post
+    const contentType = this.detectContentType(postData);
+
+    // Format date
+    let date: string | undefined;
+    if (postData.created_utc) {
+      const dt = new Date(postData.created_utc * 1000);
+      date = dt.toISOString().split('T')[0]; // YYYY-MM-DD
+    }
+
+    // Build description from selftext if available
+    let description: string | undefined;
+    if (postData.selftext && postData.selftext.trim()) {
+      // Limit description length
+      description = postData.selftext.substring(0, 500);
+      if (postData.selftext.length > 500) {
+        description += '...';
+      }
+    }
+
+    // Get media URL
+    let mediaUrl: string | undefined;
+    if (postData.url && postData.url !== originalUrl) {
+      mediaUrl = postData.url;
+    }
+
+    // Build metadata
+    const metadata: IScrapedMetadata = {
+      url: originalUrl,
+      title: postData.title,
+      description: description,
+      date: date,
+      // Use post author as performer
+      performers: postData.author ? [`u/${postData.author}`] : undefined,
+      // Use subreddit as both tag and studio
+      tags: postData.subreddit ? [postData.subreddit] : undefined,
+      studio: postData.subreddit ? `r/${postData.subreddit}` : undefined,
+      contentType: contentType,
+    };
+
+    // Set video/image URL based on content type
+    if (contentType === ContentType.Video && mediaUrl) {
+      metadata.videoUrl = mediaUrl;
+    } else if (contentType === ContentType.Image && mediaUrl) {
+      metadata.imageUrl = mediaUrl;
+    }
+
+    log.debug('Converted Reddit metadata:', JSON.stringify({
+      title: metadata.title,
+      author: postData.author,
+      subreddit: postData.subreddit,
+      contentType: contentType,
+    }));
+
+    return metadata;
+  }
+
+  /**
+   * Detect content type from Reddit post data
+   */
+  private detectContentType(postData: RedditPostData): ContentType {
+    // Check if it's a gallery
+    if (postData.is_gallery) {
+      return ContentType.Gallery;
+    }
+
+    // Check if it's a video
+    if (postData.is_video) {
+      return ContentType.Video;
+    }
+
+    // Check post_hint
+    if (postData.post_hint) {
+      if (postData.post_hint === 'image') {
+        return ContentType.Image;
+      }
+      if (postData.post_hint.includes('video')) {
+        return ContentType.Video;
+      }
+    }
+
+    // Check domain/URL
+    if (postData.url) {
+      const url = postData.url.toLowerCase();
+      if (url.includes('v.redd.it') || url.endsWith('.mp4') || url.endsWith('.webm')) {
+        return ContentType.Video;
+      }
+      if (url.includes('i.redd.it') || url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        return ContentType.Image;
+      }
+    }
+
+    // Default to image for Reddit posts
+    return ContentType.Image;
+  }
+}

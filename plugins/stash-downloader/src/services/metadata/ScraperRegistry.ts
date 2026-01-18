@@ -3,6 +3,7 @@
  *
  * Priority order (specialized scrapers first):
  * - BooruScraper - Image/gallery scraper for booru sites (Rule34, Gelbooru, etc.)
+ * - RedditScraper - Metadata scraper for Reddit posts
  * - YtDlpScraper - General-purpose server-side yt-dlp via Python backend (all content types)
  * - StashScraper (fallback) - Uses Stash's built-in scraper API
  * - GenericScraper (last resort) - URL parsing only
@@ -14,6 +15,7 @@ import { GenericScraper } from './GenericScraper';
 import { YtDlpScraper } from './YtDlpScraper';
 import { StashScraper } from './StashScraper';
 import { BooruScraper } from './BooruScraper';
+import { RedditScraper } from './RedditScraper';
 import { withTimeout, createLogger } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
 import { PLUGIN_ID } from '@/constants';
@@ -32,10 +34,11 @@ export class ScraperRegistry {
     // Register scrapers in priority order
     // Specialized scrapers first (better metadata), then general-purpose scrapers
     this.register(new BooruScraper());   // Primary for booru sites (images/galleries)
+    this.register(new RedditScraper());  // Primary for Reddit posts
     this.register(new YtDlpScraper());   // General-purpose for all content types
     this.register(new StashScraper());   // Fallback (uses Stash's scraper API)
 
-    log.info('Scrapers registered: BooruScraper, YtDlpScraper, StashScraper, GenericScraper (fallback)');
+    log.info('Scrapers registered: BooruScraper, RedditScraper, YtDlpScraper, StashScraper, GenericScraper (fallback)');
 
     // Check yt-dlp version asynchronously (fire and forget)
     this.checkYtDlpVersion();
