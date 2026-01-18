@@ -53,7 +53,7 @@ export class MetadataEmbedderService {
         mode: 'check_metadata_deps',
       });
 
-      const deps = (result?.data as { dependencies?: MetadataEmbedDependencies })?.dependencies || { piexif: false, ffmpeg: false };
+      const deps = (result as { dependencies?: MetadataEmbedDependencies })?.dependencies || { piexif: false, ffmpeg: false };
       this.deps = deps;
       this.depsChecked = true;
 
@@ -104,7 +104,7 @@ export class MetadataEmbedderService {
         post_info: postInfo,
       });
 
-      const result = taskResult?.data as MetadataEmbedResponse | undefined;
+      const result = taskResult as MetadataEmbedResponse | undefined;
 
       if (!result || result.success === false) {
         const error = result?.error || 'Unknown error embedding metadata';
@@ -143,7 +143,7 @@ export class MetadataEmbedderService {
         filepath: filepath,
       });
 
-      const result = taskResult?.data as MetadataCheckResponse | undefined;
+      const result = taskResult as MetadataCheckResponse | undefined;
 
       if (!result || result.success === false) {
         return { hasMetadata: false };

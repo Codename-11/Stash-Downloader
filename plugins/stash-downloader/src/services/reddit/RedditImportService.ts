@@ -85,9 +85,9 @@ export class RedditImportService {
       });
 
       console.log('[RedditImportService] PRAW check raw result:', result);
-      console.log('[RedditImportService] PRAW check data:', result?.data);
-
-      const prawResponse = result?.data as PrawCheckResponse | undefined;
+      
+      // The result IS the data - runPluginOperation doesn't wrap it in {data: ...}
+      const prawResponse = result as PrawCheckResponse | undefined;
       console.log('[RedditImportService] PRAW response parsed:', prawResponse);
       
       this.prawAvailable = prawResponse?.available === true;
@@ -148,7 +148,7 @@ export class RedditImportService {
         limit: limit,
       });
 
-      const result = taskResult?.data as RedditFetchResponse | undefined;
+      const result = taskResult as RedditFetchResponse | undefined;
 
       if (!result || result.success === false) {
         const error = result?.error || 'Unknown error fetching Reddit posts';
