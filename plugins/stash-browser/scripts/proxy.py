@@ -165,6 +165,68 @@ def fetch_xml(url: str, proxy_url: str | None = None) -> ET.Element:
         raise Exception(f"XML parse error: {e}")
 
 
+def autocomplete_subreddits(
+    query: str,
+    limit: int = 10,
+    proxy_url: str | None = None
+) -> dict:
+    """Autocomplete subreddit names.
+    
+    Args:
+        query: Partial subreddit name
+        limit: Max results
+        proxy_url: Optional proxy
+        
+    Returns:
+        Dict with success and suggestions array
+    """
+    try:
+        import requests
+    except ImportError:
+        log("requests library not available")
+        return {'success': True, 'suggestions': []}
+    
+    try:
+        # Use Reddit's subreddit search API
+        # Remove 'r/' prefix if present
+        clean_query = query.replace('r/', '').replace('subreddit:', '').strip()
+        
+        if not clean_query or len(clean_query) < 2:
+            return {'success': True, 'suggestions': []}
+        
+        url = f"https://www.reddit.com/api/search_reddit_names.json"
+        params = {
+            'query': clean_query,
+            'exact': 'false',
+            'include_over_18': 'true',
+            'limit': limit
+        }
+        
+        headers = {'User-Agent': 'Stash-Browser/1.0'}
+        proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+        
+        response = requests.get(url, params=params, headers=headers, proxies=proxies, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # Extract subreddit names
+        suggestions = []
+        if 'names' in data and isinstance(data['names'], list):
+            suggestions = [f"r/{name}" for name in data['names'][:limit]]
+        
+        log(f"Found {len(suggestions)} subreddit suggestions for '{clean_query}'")
+        
+        return {
+            'success': True,
+            'suggestions': suggestions
+        }
+        
+    except Exception as e:
+        log(f"Subreddit autocomplete failed: {e}")
+        return {'success': True, 'suggestions': []}
+
+
 def search_reddit(
     query: str,
     sort: str = 'hot',
@@ -518,8 +580,15 @@ def handle_request(args: dict) -> dict:
             after = args.get('after')
             return search_reddit(query, sort, time, limit, after, proxy_url)
         elif mode == 'autocomplete':
-            # Reddit doesn't have autocomplete - return empty
-            return {'success': True, 'suggestions': []}
+            # Subreddit autocomplete
+            query = args.get('query', '')
+            limit = int(args.get('limit', 10))
+            return autocomplete_subreddits(query, limit, proxy_url)
+        elif mode == 'autocomplete_subreddits':
+            # Explicit subreddit autocomplete
+            query = args.get('query', '')
+            limit = int(args.get('limit', 10))
+            return autocomplete_subreddits(query, limit, proxy_url)
         elif mode == 'post':
             # Reddit post fetching would go here
             raise Exception("Reddit post mode not implemented")

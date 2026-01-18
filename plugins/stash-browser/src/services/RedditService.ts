@@ -1,9 +1,10 @@
 /**
  * RedditService - Search and browse Reddit posts
- * Uses public Reddit JSON API (no authentication required)
+ * Uses Python backend to bypass CSP restrictions
  */
 
 import type { IBooruPost } from '@/types';
+import { PLUGIN_ID } from '@/constants';
 
 const log = {
   debug: (msg: string, ...args: unknown[]) => console.log(`[RedditService] ${msg}`, ...args),
@@ -20,41 +21,48 @@ export interface RedditSearchParams {
   after?: string;          // Pagination cursor
 }
 
-interface RedditPost {
-  id: string;
-  title: string;
-  author: string;
-  subreddit: string;
-  url: string;
-  permalink: string;
-  thumbnail: string;
-  preview?: {
-    images?: Array<{
-      source?: { url?: string };
-      resolutions?: Array<{ url?: string; width?: number; height?: number }>;
-    }>;
-  };
-  is_video: boolean;
-  is_gallery: boolean;
-  post_hint?: string;
-  score: number;
-  num_comments: number;
-  created_utc: number;
-  over_18: boolean;
-  domain: string;
-}
+/**
+ * Helper to call plugin operations
+ */
+async function runPluginOperation(args: Record<string, unknown>): Promise<any> {
+  const mutation = `
+    mutation RunPluginOperation($plugin_id: ID!, $args: Map) {
+      runPluginOperation(plugin_id: $plugin_id, args: $args)
+    }
+  `;
 
-interface RedditResponse {
-  data: {
-    after: string | null;
-    children: Array<{
-      data: RedditPost;
-    }>;
-  };
+  const apiKey = localStorage.getItem('apiKey');
+
+  const response = await fetch('/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify({
+      query: mutation,
+      variables: {
+        plugin_id: PLUGIN_ID,
+        args,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`GraphQL request failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+
+  if (result.errors && result.errors.length > 0) {
+    throw new Error(result.errors[0].message);
+  }
+
+  return result.data?.runPluginOperation || null;
 }
 
 /**
- * Search Reddit posts using public JSON API
+ * Search Reddit posts via Python backend (bypasses CSP)
  */
 export async function searchReddit(params: RedditSearchParams): Promise<{
   posts: IBooruPost[];
@@ -70,142 +78,62 @@ export async function searchReddit(params: RedditSearchParams): Promise<{
       after,
     } = params;
 
-    let url: string;
-
-    if (query) {
-      // Search across Reddit or within subreddit
-      const searchBase = subreddit
-        ? `https://www.reddit.com/r/${subreddit}/search.json`
-        : 'https://www.reddit.com/search.json';
-      
-      const searchParams = new URLSearchParams({
-        q: query,
-        sort: sort === 'top' || sort === 'new' ? sort : 'relevance',
-        t: time,
-        limit: String(limit),
-        restrict_sr: subreddit ? 'true' : 'false',
-      });
-
-      if (after) searchParams.append('after', after);
-      url = `${searchBase}?${searchParams}`;
-    } else if (subreddit) {
-      // Browse subreddit
-      url = `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}${time && sort === 'top' ? `&t=${time}` : ''}${after ? `&after=${after}` : ''}`;
-    } else {
-      // Browse r/all or front page
-      url = `https://www.reddit.com/${sort}.json?limit=${limit}${time && sort === 'top' ? `&t=${time}` : ''}${after ? `&after=${after}` : ''}`;
+    // Build search query
+    let searchQuery = '';
+    if (subreddit) {
+      searchQuery = subreddit.startsWith('r/') ? subreddit : `r/${subreddit}`;
+    } else if (query) {
+      searchQuery = query;
     }
 
-    log.debug('Fetching Reddit:', url);
+    log.debug('Searching Reddit via backend:', { searchQuery, sort, time, limit });
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Stash-Browser/1.0',
-      },
+    // Use Python backend to bypass CSP
+    const result = await runPluginOperation({
+      mode: 'search',
+      source: 'reddit',
+      tags: searchQuery,
+      sort,
+      time,
+      limit,
+      after,
     });
 
-    if (!response.ok) {
-      throw new Error(`Reddit API returned ${response.status}`);
+    if (!result || !result.success) {
+      throw new Error(result?.error || 'Reddit search failed');
     }
 
-    const data: RedditResponse = await response.json();
+    // Convert backend response to IBooruPost format
+    const backendPosts = result.posts || [];
+    const posts: IBooruPost[] = backendPosts.map((post: any) => ({
+      id: hashCode(post.id),
+      source: 'reddit' as const,
+      previewUrl: post.preview_image || post.thumbnail || '/placeholder.png',
+      sampleUrl: post.url,
+      fileUrl: post.url,
+      sourceUrl: post.permalink,
+      rating: post.over_18 ? 'explicit' as const : 'safe' as const,
+      tags: [post.subreddit, `u/${post.author}`],
+      score: post.score,
+      width: 0,
+      height: 0,
+      fileType: post.is_video ? 'video' as const : 'image' as const,
+      createdAt: new Date(post.created_utc * 1000).toISOString(),
+      title: post.title,
+      author: post.author,
+      subreddit: post.subreddit,
+    }));
 
-    // Convert Reddit posts to IBooruPost format
-    const posts: IBooruPost[] = data.data.children
-      .map(child => child.data)
-      .filter(post => {
-        // Filter out text posts and non-media content
-        return post.post_hint === 'image' || 
-               post.is_video || 
-               post.is_gallery ||
-               (post.url && (
-                 post.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
-                 post.url.includes('i.redd.it') ||
-                 post.url.includes('v.redd.it')
-               ));
-      })
-      .map(post => convertToIBooruPost(post));
-
-    log.info(`Found ${posts.length} posts`);
+    log.info(`Found ${posts.length} Reddit posts`);
 
     return {
       posts,
-      after: data.data.after,
+      after: result.after || null,
     };
   } catch (error) {
     log.error('Failed to search Reddit:', error instanceof Error ? error.message : String(error));
     throw error;
   }
-}
-
-/**
- * Convert Reddit post to IBooruPost format
- */
-function convertToIBooruPost(post: RedditPost): IBooruPost {
-  // Get best preview image
-  let previewUrl = post.thumbnail && post.thumbnail.startsWith('http') ? post.thumbnail : '';
-  let sampleUrl = post.url;
-  let fileUrl = post.url;
-
-  if (post.preview?.images?.[0]) {
-    const preview = post.preview.images[0];
-    
-    // Get high quality preview (largest resolution)
-    if (preview.resolutions && preview.resolutions.length > 0) {
-      const largest = preview.resolutions[preview.resolutions.length - 1];
-      if (largest && largest.url) {
-        sampleUrl = decodeHTMLEntities(largest.url);
-        if (!previewUrl) previewUrl = sampleUrl;
-      }
-    }
-    
-    // Get source image
-    if (preview.source?.url) {
-      fileUrl = decodeHTMLEntities(preview.source.url);
-    }
-  }
-
-  // Determine file type
-  let fileType: 'image' | 'video' | 'gif' = 'image';
-  if (post.is_video) {
-    fileType = 'video';
-  } else if (post.url.match(/\.gif$/i)) {
-    fileType = 'gif';
-  }
-
-  return {
-    id: hashCode(post.id),
-    source: 'reddit' as const,
-    // Normalized fields
-    previewUrl: previewUrl || '/placeholder.png',
-    sampleUrl: sampleUrl,
-    fileUrl: fileUrl,
-    sourceUrl: `https://reddit.com${post.permalink}`,
-    rating: post.over_18 ? 'explicit' as const : 'safe' as const,
-    tags: [post.subreddit, `u/${post.author}`],
-    score: post.score,
-    width: 0,
-    height: 0,
-    fileType: fileType,
-    createdAt: new Date(post.created_utc * 1000).toISOString(),
-    // Reddit-specific fields
-    title: post.title,
-    author: post.author,
-    subreddit: post.subreddit,
-    is_video: post.is_video,
-    is_gallery: post.is_gallery,
-  };
-}
-
-/**
- * Decode HTML entities in Reddit URLs
- */
-function decodeHTMLEntities(text: string): string {
-  return text.replace(/&amp;/g, '&')
-             .replace(/&lt;/g, '<')
-             .replace(/&gt;/g, '>')
-             .replace(/&quot;/g, '"')
-             .replace(/&#x27;/g, "'");
 }
 
 /**
@@ -222,8 +150,32 @@ function hashCode(str: string): number {
 }
 
 /**
+ * Search subreddit names for autocomplete
+ */
+export async function searchSubreddits(query: string): Promise<string[]> {
+  try {
+    // Use Reddit's subreddit search API via Python backend
+    const result = await runPluginOperation({
+      mode: 'autocomplete_subreddits',
+      source: 'reddit',
+      query,
+      limit: 10,
+    });
+
+    if (!result || !result.success) {
+      return [];
+    }
+
+    return result.suggestions || [];
+  } catch (error) {
+    log.error('Subreddit autocomplete failed:', error);
+    return [];
+  }
+}
+
+/**
  * Get direct link to Reddit post
  */
 export function getRedditPostUrl(post: IBooruPost): string {
-  return post.source || `https://reddit.com`;
+  return post.sourceUrl || `https://reddit.com`;
 }
