@@ -1373,6 +1373,69 @@ def task_fetch_image(args: dict) -> dict:
         return {"result_error": f"Failed to process image: {str(e)}", "success": False}
 
 
+def delegate_to_reddit_client(args: dict) -> dict:
+    """
+    Delegate Reddit-related tasks to the reddit_client.py script.
+    Supports: check_praw, fetch_posts
+    """
+    try:
+        # Get the reddit_client.py script path
+        reddit_script = os.path.join(SCRIPT_DIR, "reddit_client.py")
+        
+        if not os.path.exists(reddit_script):
+            log.error(f"Reddit client script not found: {reddit_script}")
+            return {
+                "result_error": "Reddit client script not found",
+                "success": False
+            }
+        
+        log.debug(f"Delegating to reddit_client.py: {args.get('mode', 'unknown')}")
+        
+        # Prepare input JSON
+        input_json = json.dumps({"args": args})
+        
+        # Execute reddit_client.py
+        result = subprocess.run(
+            [sys.executable, reddit_script],
+            input=input_json,
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minute timeout for Reddit API calls
+        )
+        
+        # Check for errors
+        if result.returncode != 0:
+            log.error(f"Reddit client failed with exit code {result.returncode}")
+            log.error(f"stderr: {result.stderr}")
+            return {
+                "result_error": f"Reddit client error: {result.stderr}",
+                "success": False
+            }
+        
+        # Parse output
+        if result.stdout:
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                log.error(f"Failed to parse reddit_client output: {e}")
+                log.error(f"stdout: {result.stdout[:500]}")
+                return {
+                    "result_error": "Invalid JSON response from reddit_client",
+                    "success": False
+                }
+        
+        # No output
+        log.warning("reddit_client returned no output")
+        return {"result_error": "No output from reddit_client", "success": False}
+        
+    except subprocess.TimeoutExpired:
+        log.error("Reddit client timed out after 120 seconds")
+        return {"result_error": "Reddit client timed out", "success": False}
+    except Exception as e:
+        log.error(f"Failed to delegate to reddit_client: {e}", exc_info=True)
+        return {"result_error": f"Delegation error: {str(e)}", "success": False}
+
+
 def main():
     """Main entry point."""
     try:
@@ -1407,6 +1470,8 @@ def main():
             "check_ytdlp": task_check_ytdlp,
             "test_proxy": task_test_proxy,
             "fetch_image": task_fetch_image,
+            "check_praw": lambda args: delegate_to_reddit_client(args),
+            "fetch_posts": lambda args: delegate_to_reddit_client(args),
         }
 
         handler = tasks.get(task_name)

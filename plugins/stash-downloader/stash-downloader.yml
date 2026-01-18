@@ -39,6 +39,22 @@ settings:
     displayName: Enable Notifications
     description: Show browser notifications for download completion
     type: BOOLEAN
+  redditClientId:
+    displayName: Reddit Client ID
+    description: "Reddit API client ID (get from https://www.reddit.com/prefs/apps). Required for importing saved/upvoted posts."
+    type: STRING
+  redditClientSecret:
+    displayName: Reddit Client Secret
+    description: "Reddit API client secret (get from https://www.reddit.com/prefs/apps). Required for importing saved/upvoted posts."
+    type: STRING
+  redditUsername:
+    displayName: Reddit Username
+    description: "Your Reddit username. Required for importing saved/upvoted posts."
+    type: STRING
+  redditPassword:
+    displayName: Reddit Password
+    description: "Your Reddit password. Required for importing saved/upvoted posts."
+    type: STRING
 
 # Python backend for server-side downloads (bypasses CORS)
 # Same pattern as PythonDepManager (interface: raw + {pluginDir})
@@ -71,6 +87,14 @@ tasks:
     description: Test proxy connectivity by fetching a URL
     defaultArgs:
       mode: test_proxy
+  - name: Check PRAW
+    description: Check if PRAW (Python Reddit API Wrapper) is installed
+    defaultArgs:
+      mode: check_praw
+  - name: Fetch Reddit Posts
+    description: Fetch saved or upvoted posts from Reddit using PRAW
+    defaultArgs:
+      mode: fetch_posts
 
 ui:
   javascript:

@@ -10,6 +10,7 @@ import { AboutModal } from '@/components/common/AboutModal';
 import { URLInputForm, type ContentTypeOption } from './URLInputForm';
 import { QueueItem } from './QueueItem';
 import { BatchImport } from './BatchImport';
+import { RedditImport } from './RedditImport';
 import { EditMetadataModal } from './EditMetadataModal';
 import { LogViewer } from '@/components/common';
 import { useDownloadQueue, useExternalQueue } from '@/hooks';
@@ -899,13 +900,16 @@ export const QueuePage: React.FC = () => {
           />
 
           {/* Batch Import */}
-          <div className="mb-3">
+          <div className="mb-3 d-flex gap-2 flex-wrap">
             <BatchImport
               onImport={handleBatchImport}
               onSingleUrl={(url) => {
                 setUrlFieldValue(url);
               }}
             />
+            {isStashEnvironment && (
+              <RedditImport onImportPosts={handleBatchImport} />
+            )}
           </div>
 
           {/* Queue Statistics */}

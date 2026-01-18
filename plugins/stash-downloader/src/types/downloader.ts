@@ -184,6 +184,11 @@ export interface IPluginSettings {
   showThumbnailPreviews: boolean;
   /** Auto-import items after scraping without manual confirmation */
   autoImport: boolean;
+  /** Reddit API credentials for accessing saved/upvoted posts */
+  redditClientId?: string;
+  redditClientSecret?: string;
+  redditUsername?: string;
+  redditPassword?: string;
 }
 
 // Metadata scraper interface
