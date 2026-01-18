@@ -503,6 +503,77 @@ class StashService {
       image: imageUrl,
     });
   }
+
+  /**
+   * Find a scene by ID
+   */
+  async findScene(id: string): Promise<{ id: string; files: Array<{ path: string }> } | null> {
+    const query = `
+      query FindScene($id: ID!) {
+        findScene(id: $id) {
+          id
+          files {
+            path
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ findScene: { id: string; files: Array<{ path: string }> } | null }>(
+      query,
+      { id }
+    );
+
+    return result.data?.findScene || null;
+  }
+
+  /**
+   * Find a gallery by ID
+   */
+  async findGallery(id: string): Promise<{ id: string; files: Array<{ path: string }> } | null> {
+    const query = `
+      query FindGallery($id: ID!) {
+        findGallery(id: $id) {
+          id
+          files {
+            path
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ findGallery: { id: string; files: Array<{ path: string }> } | null }>(
+      query,
+      { id }
+    );
+
+    return result.data?.findGallery || null;
+  }
+
+  /**
+   * Run a plugin task
+   */
+  async runPluginTask(
+    pluginId: string,
+    args: Record<string, unknown>
+  ): Promise<{ output: unknown } | null> {
+    const query = `
+      mutation RunPluginTask($plugin_id: ID!, $args: Map!) {
+        runPluginTask(plugin_id: $plugin_id, args: $args) {
+          ... on PluginTaskSuccess {
+            output
+          }
+        }
+      }
+    `;
+
+    const result = await this.gqlRequest<{ runPluginTask: { output: unknown } | null }>(
+      query,
+      { plugin_id: pluginId, args }
+    );
+
+    return result.data?.runPluginTask || null;
+  }
 }
 
 // Export singleton instance

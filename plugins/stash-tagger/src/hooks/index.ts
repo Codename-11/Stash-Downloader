@@ -13,3 +13,5 @@ export {
   usePerformerMatcher,
   useTagMatcher,
 } from './useEntityMatcher';
+export { useRedditMetadataScan } from './useRedditMetadataScan';
+export type { RedditMetadataMatch } from './useRedditMetadataScan';
