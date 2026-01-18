@@ -128,29 +128,20 @@ export const RedditScanner: React.FC = () => {
       {/* Mode Selection */}
       <div className="mb-3">
         <div className="btn-group w-100" role="group">
-          <input
-            type="radio"
-            className="btn-check"
-            name="scanMode"
-            id="modeSingle"
-            checked={batchResults.length === 0}
-            onChange={() => setBatchResults([])}
-          />
-          <label className="btn btn-outline-primary" htmlFor="modeSingle">
+          <button
+            type="button"
+            className={`btn ${batchResults.length === 0 && !batchScanning ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => setBatchResults([])}
+          >
             Single Scan
-          </label>
-          
-          <input
-            type="radio"
-            className="btn-check"
-            name="scanMode"
-            id="modeBatch"
-            checked={batchResults.length > 0 || batchScanning}
-            onChange={() => { /* Will show batch UI */ }}
-          />
-          <label className="btn btn-outline-primary" htmlFor="modeBatch">
+          </button>
+          <button
+            type="button"
+            className={`btn ${batchResults.length > 0 || batchScanning ? 'btn-primary' : 'btn-outline-secondary'}`}
+            onClick={() => { /* Will show batch UI */ }}
+          >
             Batch Scan
-          </label>
+          </button>
         </div>
       </div>
 
@@ -164,29 +155,20 @@ export const RedditScanner: React.FC = () => {
               <div className="mb-3">
                 <label className="form-label small text-muted">Type</label>
                 <div className="btn-group w-100 mb-2" role="group">
-                  <input
-                    type="radio"
-                    className="btn-check"
-                    name="itemType"
-                    id="typeScene"
-                    checked={itemType === 'scene'}
-                    onChange={() => setItemType('scene')}
-                  />
-                  <label className="btn btn-outline-secondary" htmlFor="typeScene">
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === 'scene' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setItemType('scene')}
+                  >
                     Scene
-                  </label>
-                  
-                  <input
-                    type="radio"
-                    className="btn-check"
-                    name="itemType"
-                    id="typeGallery"
-                    checked={itemType === 'gallery'}
-                    onChange={() => setItemType('gallery')}
-                  />
-                  <label className="btn btn-outline-secondary" htmlFor="typeGallery">
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === 'gallery' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setItemType('gallery')}
+                  >
                     Gallery
-                  </label>
+                  </button>
                 </div>
               </div>
 
@@ -334,31 +316,22 @@ export const RedditScanner: React.FC = () => {
               <div className="mb-3">
                 <label className="form-label small text-muted">Type</label>
                 <div className="btn-group w-100 mb-2" role="group">
-                  <input
-                    type="radio"
-                    className="btn-check"
-                    name="batchItemType"
-                    id="batchTypeScene"
-                    checked={itemType === 'scene'}
-                    onChange={() => setItemType('scene')}
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === 'scene' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setItemType('scene')}
                     disabled={batchScanning}
-                  />
-                  <label className="btn btn-outline-secondary" htmlFor="batchTypeScene">
+                  >
                     Scenes
-                  </label>
-                  
-                  <input
-                    type="radio"
-                    className="btn-check"
-                    name="batchItemType"
-                    id="batchTypeGallery"
-                    checked={itemType === 'gallery'}
-                    onChange={() => setItemType('gallery')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${itemType === 'gallery' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                    onClick={() => setItemType('gallery')}
                     disabled={batchScanning}
-                  />
-                  <label className="btn btn-outline-secondary" htmlFor="batchTypeGallery">
+                  >
                     Galleries
-                  </label>
+                  </button>
                 </div>
               </div>
 
