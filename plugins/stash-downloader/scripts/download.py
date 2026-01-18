@@ -1373,6 +1373,101 @@ def task_fetch_image(args: dict) -> dict:
         return {"result_error": f"Failed to process image: {str(e)}", "success": False}
 
 
+def task_scrape_reddit(args: dict) -> dict:
+    """
+    Scrape Reddit post metadata using server-side requests.
+    Bypasses browser CSP restrictions by using Python requests library.
+    
+    Args:
+        args: Dict with 'url' key containing Reddit post URL
+        
+    Returns:
+        Dict with scraped metadata or error
+    """
+    url = args.get("url")
+    if not url:
+        return {"success": False, "result_error": "No URL provided"}
+    
+    try:
+        import requests
+        
+        # Convert to JSON API URL
+        json_url = url.rstrip('/') + '.json'
+        
+        log.info(f"Scraping Reddit URL (server-side): {json_url[:80]}...")
+        
+        # Fetch with proper user agent
+        headers = {
+            'User-Agent': 'Stash-Downloader/1.0 (metadata scraper)',
+        }
+        
+        response = requests.get(json_url, headers=headers, timeout=30)
+        
+        if response.status_code != 200:
+            log.error(f"Reddit API returned {response.status_code}")
+            return {
+                "success": False,
+                "result_error": f"Reddit API returned {response.status_code}"
+            }
+        
+        data = response.json()
+        
+        # Extract post data from Reddit's JSON structure
+        # Reddit returns: [{"data": {"children": [{"data": {...post...}}]}}]
+        if not data or not isinstance(data, list) or len(data) == 0:
+            return {"success": False, "result_error": "Invalid Reddit API response"}
+        
+        post_listing = data[0].get('data', {})
+        children = post_listing.get('children', [])
+        
+        if not children or len(children) == 0:
+            return {"success": False, "result_error": "No post data in response"}
+        
+        post_data = children[0].get('data', {})
+        
+        # Extract metadata
+        result = {
+            "success": True,
+            "title": post_data.get('title'),
+            "author": post_data.get('author'),
+            "subreddit": post_data.get('subreddit'),
+            "created_utc": post_data.get('created_utc'),
+            "selftext": post_data.get('selftext'),
+            "url": post_data.get('url'),
+            "permalink": post_data.get('permalink'),
+            "is_video": post_data.get('is_video', False),
+            "is_gallery": post_data.get('is_gallery', False),
+            "post_hint": post_data.get('post_hint'),
+            "domain": post_data.get('domain'),
+            "thumbnail": post_data.get('thumbnail'),
+            "over_18": post_data.get('over_18', False),
+        }
+        
+        # Extract preview images if available
+        if 'preview' in post_data and 'images' in post_data['preview']:
+            try:
+                images = post_data['preview']['images']
+                if images and len(images) > 0:
+                    source = images[0].get('source', {})
+                    if 'url' in source:
+                        result['preview_url'] = source['url']
+            except Exception as e:
+                log.debug(f"Could not extract preview: {e}")
+        
+        log.info(f"✓ Reddit metadata scraped: {result.get('title', 'Untitled')[:50]}...")
+        return result
+        
+    except ImportError:
+        log.error("requests library not available - install with: pip install requests")
+        return {
+            "success": False,
+            "result_error": "requests library not installed"
+        }
+    except Exception as e:
+        log.error(f"Failed to scrape Reddit URL: {e}", exc_info=True)
+        return {"success": False, "result_error": str(e)}
+
+
 def delegate_to_reddit_client(args: dict) -> dict:
     """
     Delegate Reddit-related tasks to the reddit_client.py script.
@@ -1533,6 +1628,7 @@ def main():
             "check_ytdlp": task_check_ytdlp,
             "test_proxy": task_test_proxy,
             "fetch_image": task_fetch_image,
+            "scrape_reddit": task_scrape_reddit,
             "check_praw": lambda args: delegate_to_reddit_client(args),
             "fetch_posts": lambda args: delegate_to_reddit_client(args),
             "embed_metadata": lambda args: delegate_to_metadata_embedder(args),

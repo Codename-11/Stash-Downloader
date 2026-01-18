@@ -91,6 +91,10 @@ tasks:
     description: Test proxy connectivity by fetching a URL
     defaultArgs:
       mode: test_proxy
+  - name: Scrape Reddit
+    description: Scrape Reddit post metadata (server-side, bypasses CSP)
+    defaultArgs:
+      mode: scrape_reddit
   - name: Check PRAW
     description: Check if PRAW (Python Reddit API Wrapper) is installed
     defaultArgs:

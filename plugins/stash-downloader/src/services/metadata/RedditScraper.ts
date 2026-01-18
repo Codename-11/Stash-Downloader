@@ -34,13 +34,8 @@ interface RedditPostData {
   is_gallery?: boolean;
   post_hint?: string;
   thumbnail?: string;
-  preview?: {
-    images?: Array<{
-      source?: {
-        url?: string;
-      };
-    }>;
-  };
+  preview_url?: string; // From Python backend
+  over_18?: boolean;
 }
 
 export class RedditScraper implements IMetadataScraper {
@@ -70,23 +65,59 @@ export class RedditScraper implements IMetadataScraper {
   }
 
   async scrape(url: string): Promise<IScrapedMetadata> {
-    log.debug('Scraping Reddit URL:', url);
+    log.debug('Scraping Reddit URL (server-side):', url);
 
     try {
-      // For direct media URLs, try to extract post ID and build Reddit API URL
+      // For direct media URLs (i.redd.it, v.redd.it), we can't get post info
+      // User needs to provide the actual Reddit post URL
       const postUrl = this.getRedditPostUrl(url);
       
       if (!postUrl) {
-        throw new Error('Could not determine Reddit post URL');
+        throw new Error('Direct media URLs (i.redd.it, v.redd.it) require the full Reddit post URL');
       }
 
-      // Fetch post data from Reddit's JSON API
-      const postData = await this.fetchRedditPost(postUrl);
+      // Use server-side scraping to bypass CSP restrictions
+      const postData = await this.scrapeServerSide(postUrl);
       
       // Convert to our metadata format
       return this.convertToMetadata(postData, url);
     } catch (error) {
       log.error('Reddit scraping failed:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
+
+  /**
+   * Server-side Reddit scraping using Python backend
+   * Bypasses browser CSP restrictions
+   */
+  private async scrapeServerSide(url: string): Promise<RedditPostData> {
+    const { getStashService } = await import('@/services/stash');
+    const stashService = getStashService();
+    const { PLUGIN_ID } = await import('@/constants');
+
+    log.debug('Calling Python backend to scrape Reddit...');
+
+    try {
+      const result = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'scrape_reddit',
+        url: url,
+      });
+
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response from Reddit scraper');
+      }
+
+      const typedResult = result as { success?: boolean; result_error?: string } & RedditPostData;
+
+      if (!typedResult.success) {
+        throw new Error(typedResult.result_error || 'Reddit scraping failed');
+      }
+
+      log.debug('✓ Server-side Reddit scrape successful');
+      return typedResult;
+    } catch (error) {
+      log.error('Server-side Reddit scraping failed:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   }
@@ -118,41 +149,6 @@ export class RedditScraper implements IMetadataScraper {
     }
   }
 
-  /**
-   * Fetch Reddit post data using the JSON API
-   */
-  private async fetchRedditPost(url: string): Promise<RedditPostData> {
-    try {
-      // Convert to JSON API URL
-      const jsonUrl = url.replace(/\/$/, '') + '.json';
-      
-      log.debug('Fetching Reddit post data:', jsonUrl);
-
-      const response = await fetch(jsonUrl, {
-        headers: {
-          'User-Agent': 'Stash-Downloader/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Reddit API returned ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // Reddit returns an array with [0] being the post, [1] being comments
-      const postData = data[0]?.data?.children?.[0]?.data;
-      
-      if (!postData) {
-        throw new Error('Invalid Reddit API response structure');
-      }
-
-      return postData as RedditPostData;
-    } catch (error) {
-      log.error('Failed to fetch Reddit post:', error instanceof Error ? error.message : String(error));
-      throw error;
-    }
-  }
 
   /**
    * Convert Reddit post data to our metadata format
@@ -184,11 +180,11 @@ export class RedditScraper implements IMetadataScraper {
       mediaUrl = postData.url;
     }
 
-    // Get thumbnail URL from Reddit preview or thumbnail field
+    // Get thumbnail URL from Python backend (preview_url) or fallback to thumbnail field
     let thumbnailUrl: string | undefined;
-    if (postData.preview?.images?.[0]?.source?.url) {
-      // Decode HTML entities in preview URL
-      thumbnailUrl = postData.preview.images[0].source.url.replace(/&amp;/g, '&');
+    if (postData.preview_url) {
+      // Python backend already decoded HTML entities
+      thumbnailUrl = postData.preview_url.replace(/&amp;/g, '&');
     } else if (postData.thumbnail && postData.thumbnail.startsWith('http')) {
       thumbnailUrl = postData.thumbnail;
     } else if (mediaUrl && contentType === ContentType.Image) {

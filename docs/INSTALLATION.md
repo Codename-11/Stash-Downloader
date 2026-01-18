@@ -280,7 +280,7 @@ For all dependencies to persist across container restarts, create a custom Docke
 FROM stashapp/stash:latest
 
 # Install Python packages
-RUN pip install -U yt-dlp praw piexif Pillow --break-system-packages
+RUN pip install -U yt-dlp praw piexif Pillow requests --break-system-packages
 
 # Install ffmpeg
 RUN apk add --no-cache ffmpeg
