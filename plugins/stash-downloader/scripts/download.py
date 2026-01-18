@@ -1436,6 +1436,69 @@ def delegate_to_reddit_client(args: dict) -> dict:
         return {"result_error": f"Delegation error: {str(e)}", "success": False}
 
 
+def delegate_to_metadata_embedder(args: dict) -> dict:
+    """
+    Delegate metadata embedding tasks to the metadata_embedder.py script.
+    Supports: embed_metadata, check_metadata_deps, check
+    """
+    try:
+        # Get the metadata_embedder.py script path
+        embedder_script = os.path.join(SCRIPT_DIR, "metadata_embedder.py")
+        
+        if not os.path.exists(embedder_script):
+            log.error(f"Metadata embedder script not found: {embedder_script}")
+            return {
+                "result_error": "Metadata embedder script not found",
+                "success": False
+            }
+        
+        log.debug(f"Delegating to metadata_embedder.py: {args.get('mode', 'unknown')}")
+        
+        # Prepare input JSON
+        input_json = json.dumps({"args": args})
+        
+        # Execute metadata_embedder.py
+        result = subprocess.run(
+            [sys.executable, embedder_script],
+            input=input_json,
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minute timeout
+        )
+        
+        # Check for errors
+        if result.returncode != 0:
+            log.error(f"Metadata embedder failed with exit code {result.returncode}")
+            log.error(f"stderr: {result.stderr}")
+            return {
+                "result_error": f"Metadata embedder error: {result.stderr}",
+                "success": False
+            }
+        
+        # Parse output
+        if result.stdout:
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                log.error(f"Failed to parse metadata_embedder output: {e}")
+                log.error(f"stdout: {result.stdout[:500]}")
+                return {
+                    "result_error": "Invalid JSON response from metadata_embedder",
+                    "success": False
+                }
+        
+        # No output
+        log.warning("metadata_embedder returned no output")
+        return {"result_error": "No output from metadata_embedder", "success": False}
+        
+    except subprocess.TimeoutExpired:
+        log.error("Metadata embedder timed out after 120 seconds")
+        return {"result_error": "Metadata embedder timed out", "success": False}
+    except Exception as e:
+        log.error(f"Failed to delegate to metadata_embedder: {e}", exc_info=True)
+        return {"result_error": f"Delegation error: {str(e)}", "success": False}
+
+
 def main():
     """Main entry point."""
     try:
@@ -1472,6 +1535,8 @@ def main():
             "fetch_image": task_fetch_image,
             "check_praw": lambda args: delegate_to_reddit_client(args),
             "fetch_posts": lambda args: delegate_to_reddit_client(args),
+            "embed_metadata": lambda args: delegate_to_metadata_embedder(args),
+            "check_metadata_deps": lambda args: delegate_to_metadata_embedder(args),
         }
 
         handler = tasks.get(task_name)

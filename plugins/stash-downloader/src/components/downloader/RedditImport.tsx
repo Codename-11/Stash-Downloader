@@ -20,10 +20,18 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   const [postType, setPostType] = useState<'saved' | 'upvoted'>('saved');
   const [limit, setLimit] = useState(100);
   const [loading, setLoading] = useState(false);
+  const [fetchProgress, setFetchProgress] = useState<{ current: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prawAvailable, setPrawAvailable] = useState<boolean | null>(null);
-  const [posts, setPosts] = useState<RedditPost[]>( []);
+  const [posts, setPosts] = useState<RedditPost[]>([]);
   const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+  
+  // Filter state
+  const [filterNSFW, setFilterNSFW] = useState<'all' | 'sfw' | 'nsfw'>('all');
+  const [filterContentType, setFilterContentType] = useState<'all' | 'video' | 'image' | 'gallery'>('all');
+  const [filterSubreddit, setFilterSubreddit] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  
   const toast = useToast();
   const { settings } = useSettings();
   const redditService = getRedditImportService();
@@ -53,6 +61,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
     setLoading(true);
     setError(null);
     setPosts([]);
+    setFetchProgress({ current: 0, total: limit });
 
     try {
       const credentials: RedditCredentials = {
@@ -62,7 +71,19 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
         password: settings.redditPassword || '',
       };
 
+      // Simulate progress (PRAW doesn't provide real-time progress)
+      const progressInterval = setInterval(() => {
+        setFetchProgress(prev => {
+          if (!prev) return null;
+          const newCurrent = Math.min(prev.current + 10, prev.total - 1);
+          return { ...prev, current: newCurrent };
+        });
+      }, 500);
+
       const result = await redditService.fetchPosts(credentials, postType, limit);
+
+      clearInterval(progressInterval);
+      setFetchProgress(null);
 
       if (!result.success) {
         setError(result.error || 'Failed to fetch posts');
@@ -80,6 +101,7 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
       toast.showToast('error', 'Reddit Import Failed', errorMsg);
     } finally {
       setLoading(false);
+      setFetchProgress(null);
     }
   };
 
@@ -117,15 +139,51 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
   };
 
   const toggleAll = () => {
-    if (selectedPosts.size === posts.length) {
-      setSelectedPosts(new Set());
+    const filteredIds = new Set(filteredPosts.map(p => p.id));
+    const allFilteredSelected = filteredPosts.every(p => selectedPosts.has(p.id));
+    
+    if (allFilteredSelected) {
+      // Deselect all filtered posts
+      setSelectedPosts(prev => {
+        const newSet = new Set(prev);
+        filteredIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
     } else {
-      setSelectedPosts(new Set(posts.map(p => p.id)));
+      // Select all filtered posts
+      setSelectedPosts(prev => {
+        const newSet = new Set(prev);
+        filteredIds.forEach(id => newSet.add(id));
+        return newSet;
+      });
     }
   };
 
   const hasCredentials = settings.redditClientId && settings.redditClientSecret && 
                          settings.redditUsername && settings.redditPassword;
+
+  // Apply filters
+  const filteredPosts = posts.filter(post => {
+    // NSFW filter
+    if (filterNSFW === 'sfw' && post.over_18) return false;
+    if (filterNSFW === 'nsfw' && !post.over_18) return false;
+
+    // Content type filter
+    if (filterContentType === 'video' && !post.is_video) return false;
+    if (filterContentType === 'gallery' && !post.is_gallery) return false;
+    if (filterContentType === 'image' && (post.is_video || post.is_gallery)) return false;
+
+    // Subreddit filter
+    if (filterSubreddit && !post.subreddit.toLowerCase().includes(filterSubreddit.toLowerCase())) return false;
+
+    // Search query
+    if (searchQuery && !post.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+
+    return true;
+  });
+
+  // Get unique subreddits for filter
+  const subreddits = Array.from(new Set(posts.map(p => p.subreddit))).sort();
 
   return (
     <>
@@ -217,6 +275,23 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
                     >
                       {loading ? '⏳ Fetching...' : `Fetch ${postType === 'saved' ? 'Saved' : 'Upvoted'} Posts`}
                     </button>
+                    
+                    {fetchProgress && (
+                      <div className="mt-2">
+                        <div className="progress" style={{ height: '20px' }}>
+                          <div
+                            className="progress-bar progress-bar-striped progress-bar-animated"
+                            role="progressbar"
+                            style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }}
+                            aria-valuenow={fetchProgress.current}
+                            aria-valuemin={0}
+                            aria-valuemax={fetchProgress.total}
+                          >
+                            {fetchProgress.current} / {fetchProgress.total}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {error && (
@@ -227,46 +302,118 @@ export const RedditImport: React.FC<RedditImportProps> = ({ onImportPosts }) => 
 
                   {posts.length > 0 && (
                     <>
+                      {/* Filters */}
+                      <div className="border border-secondary rounded p-3 mb-3">
+                        <h6 className="small text-muted mb-2">Filters</h6>
+                        <div className="row g-2">
+                          <div className="col-md-3">
+                            <select
+                              className="form-select form-select-sm bg-dark text-light border-secondary"
+                              value={filterNSFW}
+                              onChange={(e) => setFilterNSFW(e.target.value as any)}
+                            >
+                              <option value="all">All Posts</option>
+                              <option value="sfw">SFW Only</option>
+                              <option value="nsfw">NSFW Only</option>
+                            </select>
+                          </div>
+                          <div className="col-md-3">
+                            <select
+                              className="form-select form-select-sm bg-dark text-light border-secondary"
+                              value={filterContentType}
+                              onChange={(e) => setFilterContentType(e.target.value as any)}
+                            >
+                              <option value="all">All Types</option>
+                              <option value="video">Videos</option>
+                              <option value="image">Images</option>
+                              <option value="gallery">Galleries</option>
+                            </select>
+                          </div>
+                          <div className="col-md-3">
+                            <select
+                              className="form-select form-select-sm bg-dark text-light border-secondary"
+                              value={filterSubreddit}
+                              onChange={(e) => setFilterSubreddit(e.target.value)}
+                            >
+                              <option value="">All Subreddits</option>
+                              {subreddits.map(sub => (
+                                <option key={sub} value={sub}>r/{sub}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-md-3">
+                            <input
+                              type="text"
+                              className="form-control form-control-sm bg-dark text-light border-secondary"
+                              placeholder="Search titles..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        {(filterNSFW !== 'all' || filterContentType !== 'all' || filterSubreddit || searchQuery) && (
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary btn-sm mt-2"
+                            onClick={() => {
+                              setFilterNSFW('all');
+                              setFilterContentType('all');
+                              setFilterSubreddit('');
+                              setSearchQuery('');
+                            }}
+                          >
+                            Clear Filters
+                          </button>
+                        )}
+                      </div>
+
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <span className="small text-muted">
-                          {selectedPosts.size} of {posts.length} selected
+                          {selectedPosts.size} of {filteredPosts.length} selected
+                          {filteredPosts.length !== posts.length && ` (${posts.length} total)`}
                         </span>
                         <button
                           type="button"
                           className="btn btn-outline-secondary btn-sm"
                           onClick={toggleAll}
                         >
-                          {selectedPosts.size === posts.length ? 'Deselect All' : 'Select All'}
+                          {selectedPosts.size === filteredPosts.length ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
                       <div className="border border-secondary rounded p-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        {posts.map((post) => (
-                          <div
-                            key={post.id}
-                            className="form-check border-bottom border-secondary py-2"
-                          >
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              id={`post-${post.id}`}
-                              checked={selectedPosts.has(post.id)}
-                              onChange={() => togglePostSelection(post.id)}
-                            />
-                            <label
-                              className="form-check-label small"
-                              htmlFor={`post-${post.id}`}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              <div className="fw-bold">{post.title}</div>
-                              <div className="text-muted">
-                                r/{post.subreddit} • u/{post.author} • {post.score} points
-                                {post.is_video && ' • Video'}
-                                {post.is_gallery && ' • Gallery'}
-                                {post.over_18 && ' • NSFW'}
-                              </div>
-                            </label>
+                        {filteredPosts.length === 0 ? (
+                          <div className="text-center text-muted py-4">
+                            No posts match the current filters
                           </div>
-                        ))}
+                        ) : (
+                          filteredPosts.map((post) => (
+                            <div
+                              key={post.id}
+                              className="form-check border-bottom border-secondary py-2"
+                            >
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id={`post-${post.id}`}
+                                checked={selectedPosts.has(post.id)}
+                                onChange={() => togglePostSelection(post.id)}
+                              />
+                              <label
+                                className="form-check-label small"
+                                htmlFor={`post-${post.id}`}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div className="fw-bold">{post.title}</div>
+                                <div className="text-muted">
+                                  r/{post.subreddit} • u/{post.author} • {post.score} points
+                                  {post.is_video && ' • Video'}
+                                  {post.is_gallery && ' • Gallery'}
+                                  {post.over_18 && ' • NSFW'}
+                                </div>
+                              </label>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </>
                   )}

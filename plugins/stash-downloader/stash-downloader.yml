@@ -55,6 +55,10 @@ settings:
     displayName: Reddit Password
     description: "Your Reddit password. Required for importing saved/upvoted posts."
     type: STRING
+  embedRedditMetadata:
+    displayName: Embed Reddit Metadata
+    description: "Embed Reddit post metadata into downloaded files (EXIF for images, FFmpeg for videos). Requires piexif and ffmpeg."
+    type: BOOLEAN
 
 # Python backend for server-side downloads (bypasses CORS)
 # Same pattern as PythonDepManager (interface: raw + {pluginDir})
@@ -95,6 +99,14 @@ tasks:
     description: Fetch saved or upvoted posts from Reddit using PRAW
     defaultArgs:
       mode: fetch_posts
+  - name: Embed Metadata
+    description: Embed Reddit metadata into image/video files (EXIF/FFmpeg)
+    defaultArgs:
+      mode: embed_metadata
+  - name: Check Metadata Dependencies
+    description: Check if piexif and ffmpeg are available for metadata embedding
+    defaultArgs:
+      mode: check_metadata_deps
 
 ui:
   javascript:

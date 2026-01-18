@@ -189,6 +189,8 @@ export interface IPluginSettings {
   redditClientSecret?: string;
   redditUsername?: string;
   redditPassword?: string;
+  /** Embed Reddit metadata into downloaded files (EXIF for images, FFmpeg for videos) */
+  embedRedditMetadata?: boolean;
 }
 
 // Metadata scraper interface
