@@ -194,6 +194,30 @@ export const BrowserMain: React.FC = () => {
     const sourceUrl = getPostUrl(post);
     const contentType = post.fileType === 'video' ? 'Video' : 'Image';
 
+    // Build metadata based on source
+    let metadata: {
+      title?: string;
+      tags?: string[];
+      source?: string;
+      performers?: string[];
+      studio?: string;
+    } = {
+      title: post.title || `${post.source}_${post.id}`,
+      tags: post.tags,
+      source: sourceUrl,
+    };
+
+    // Add Reddit-specific metadata mapping
+    if (post.source === 'reddit' && post.subreddit && post.author) {
+      metadata = {
+        ...metadata,
+        title: post.title,
+        performers: [`u/${post.author}`], // Reddit author → Performer
+        studio: `r/${post.subreddit}`,     // Subreddit → Studio
+        tags: ['Reddit', `r/${post.subreddit}`, post.subreddit], // Include subreddit tags
+      };
+    }
+
     // Use localStorage to communicate with Stash Downloader (works cross-page)
     // This is the same mechanism the browser extension uses
     const EXTERNAL_QUEUE_KEY = 'stash-downloader-external-queue';
@@ -207,11 +231,7 @@ export const BrowserMain: React.FC = () => {
       queue.push({
         url: post.fileUrl,
         contentType,
-        options: {
-          title: `${post.source}_${post.id}`,
-          tags: post.tags,
-          source: sourceUrl,
-        },
+        options: metadata,
         timestamp: Date.now(),
       });
 
@@ -223,11 +243,7 @@ export const BrowserMain: React.FC = () => {
         detail: {
           url: post.fileUrl,
           contentType,
-          options: {
-            title: `${post.source}_${post.id}`,
-            tags: post.tags,
-            source: sourceUrl,
-          },
+          options: metadata,
         },
       });
       window.dispatchEvent(event);

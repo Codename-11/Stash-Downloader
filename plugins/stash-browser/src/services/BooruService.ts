@@ -178,6 +178,44 @@ export async function searchPosts(
 ): Promise<ISearchResult> {
   console.log(`[BooruService] Searching ${source} for "${tags}" (page ${page})`);
 
+  // Handle Reddit separately (client-side, no proxy needed)
+  if (source === SOURCES.REDDIT) {
+    const { searchReddit } = await import('./RedditService');
+    
+    // Parse tags for Reddit-specific params
+    // Format: "subreddit:pics sort:top time:week"
+    const subredditMatch = tags.match(/subreddit:(\w+)/);
+    const sortMatch = tags.match(/sort:(hot|new|top|rising)/);
+    const timeMatch = tags.match(/time:(hour|day|week|month|year|all)/);
+    
+    // Remove Reddit-specific tags from query
+    const query = tags
+      .replace(/subreddit:\w+/g, '')
+      .replace(/sort:\w+/g, '')
+      .replace(/time:\w+/g, '')
+      .trim();
+
+    const result = await searchReddit({
+      subreddit: subredditMatch?.[1],
+      query: query || undefined,
+      sort: (sortMatch?.[1] as 'hot' | 'new' | 'top' | 'rising') || 'hot',
+      time: (timeMatch?.[1] as 'hour' | 'day' | 'week' | 'month' | 'year' | 'all') || 'day',
+      limit,
+      after: page > 0 ? `page_${page}` : undefined, // Simplified pagination
+    });
+
+    return {
+      source: SOURCES.REDDIT,
+      tags,
+      page,
+      limit,
+      count: result.posts.length,
+      posts: result.posts,
+      hasMore: result.after !== null,
+    };
+  }
+
+  // Original Booru logic
   // Fetch settings and get credentials for this source
   const settings = await getPluginSettings();
   const credentials = getCredentialsForSource(settings, source);

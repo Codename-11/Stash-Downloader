@@ -28,6 +28,13 @@ const SORT_OPTIONS: { value: SortOption; label: string; icon: string }[] = [
   { value: 'updated', label: 'Updated', icon: '🔄' },
 ];
 
+const REDDIT_SORT_OPTIONS: { value: SortOption; label: string; icon: string }[] = [
+  { value: 'hot', label: 'Hot', icon: '🔥' },
+  { value: 'new', label: 'New', icon: '🆕' },
+  { value: 'top', label: 'Top', icon: '⭐' },
+  { value: 'rising', label: 'Rising', icon: '📈' },
+];
+
 const RATING_OPTIONS: { value: RatingFilter; label: string; short: string; color: string }[] = [
   { value: 'all', label: 'All', short: 'All', color: 'secondary' },
   { value: 'safe', label: 'Safe', short: 'S', color: 'success' },
@@ -52,9 +59,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onTagsChange,
 }) => {
   const [tags, setTags] = useState<string[]>(searchTags || []);
-  const [sort, setSort] = useState<SortOption>('score');
+  const [sort, setSort] = useState<SortOption>(source === SOURCES.REDDIT ? 'hot' : 'score');
   const [rating, setRating] = useState<RatingFilter>('all');
   const [mediaType, setMediaType] = useState<MediaTypeFilter>('all');
+
+  // Update sort when source changes
+  useEffect(() => {
+    if (source === SOURCES.REDDIT) {
+      setSort('hot');
+    } else {
+      setSort('score');
+    }
+  }, [source]);
 
   // Sync with external tag changes
   useEffect(() => {
@@ -88,6 +104,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         >
           <option value={SOURCES.RULE34}>Rule34</option>
           <option value={SOURCES.GELBOORU}>Gelbooru</option>
+          <option value={SOURCES.REDDIT}>🔴 Reddit</option>
         </select>
       </div>
 
@@ -127,7 +144,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <div className="mb-3">
           <small className="filter-label d-block mb-1">Sort By</small>
           <div className="d-flex flex-column gap-1">
-            {SORT_OPTIONS.map(opt => (
+            {(source === SOURCES.REDDIT ? REDDIT_SORT_OPTIONS : SORT_OPTIONS).map(opt => (
               <button
                 key={opt.value}
                 type="button"

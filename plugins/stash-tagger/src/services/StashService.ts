@@ -64,7 +64,16 @@ class StashService {
       throw new Error(`GraphQL request failed: ${response.statusText}`);
     }
 
-    return response.json();
+    const result: GraphQLResponse<T> = await response.json();
+
+    // Check for GraphQL errors
+    if (result.errors && result.errors.length > 0) {
+      const errorMessages = result.errors.map(e => e.message).join(', ');
+      console.error('[StashService] GraphQL errors:', result.errors);
+      throw new Error(`GraphQL errors: ${errorMessages}`);
+    }
+
+    return result;
   }
 
   /**
@@ -577,17 +586,18 @@ class StashService {
 
   /**
    * Find a gallery by ID
-   * Handles both zip-based galleries (files) and folder galleries (images)
+   * Note: Stash galleries use 'folder' for folder-based, 'files' for zip-based
    */
   async findGallery(id: string): Promise<{ id: string; files: Array<{ path: string }> } | null> {
     const query = `
       query FindGallery($id: ID!) {
         findGallery(id: $id) {
           id
-          files {
+          path
+          folder {
             path
           }
-          images {
+          files {
             path
           }
         }
@@ -596,9 +606,10 @@ class StashService {
 
     const result = await this.gqlRequest<{ 
       findGallery: { 
-        id: string; 
-        files: Array<{ path: string }>; 
-        images: Array<{ path: string }>;
+        id: string;
+        path?: string;
+        folder?: { path: string } | null;
+        files: Array<{ path: string }>;
       } | null 
     }>(
       query,
@@ -611,12 +622,23 @@ class StashService {
 
     const gallery = result.data.findGallery;
     
-    // Merge files and images into a single files array
-    // Prefer files (zip-based), fallback to images (folder-based)
-    const allFiles = [
-      ...(gallery.files || []),
-      ...(gallery.images || [])
-    ];
+    // Build files array from available sources
+    const allFiles: Array<{ path: string }> = [];
+    
+    // Folder-based gallery - use folder.path as the directory
+    if (gallery.folder?.path) {
+      allFiles.push({ path: gallery.folder.path });
+    }
+    
+    // Zip-based gallery - use files array
+    if (gallery.files && gallery.files.length > 0) {
+      allFiles.push(...gallery.files);
+    }
+    
+    // Fallback to gallery path itself
+    if (allFiles.length === 0 && gallery.path) {
+      allFiles.push({ path: gallery.path });
+    }
 
     return {
       id: gallery.id,
@@ -626,7 +648,7 @@ class StashService {
 
   /**
    * Get all galleries with pagination
-   * Handles both zip-based galleries (files) and folder galleries (images)
+   * Note: Stash galleries use 'folder' for folder-based, 'files' for zip-based
    */
   async getGalleries(
     limit = 100,
@@ -639,10 +661,11 @@ class StashService {
           galleries {
             id
             title
-            files {
+            path
+            folder {
               path
             }
-            images {
+            files {
               path
             }
           }
@@ -655,9 +678,10 @@ class StashService {
         count: number;
         galleries: Array<{ 
           id: string; 
-          title?: string; 
-          files: Array<{ path: string }>; 
-          images: Array<{ path: string }>;
+          title?: string;
+          path?: string;
+          folder?: { path: string } | null;
+          files: Array<{ path: string }>;
         }>;
       };
     }>(query, {
@@ -670,13 +694,21 @@ class StashService {
     });
 
     const galleries = result.data?.findGalleries.galleries.map(g => {
-      // Get first file from either files or images array
-      const firstFile = g.files?.[0]?.path || g.images?.[0]?.path;
+      // Get first file path from folder, files, or path
+      let firstPath: string | undefined;
+      
+      if (g.folder?.path) {
+        firstPath = g.folder.path;
+      } else if (g.files?.[0]?.path) {
+        firstPath = g.files[0].path;
+      } else {
+        firstPath = g.path;
+      }
       
       return {
         id: g.id,
         title: g.title,
-        path: firstFile,
+        path: firstPath,
       };
     }) || [];
 

@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
 export const SOURCES = {
   RULE34: 'rule34',
   GELBOORU: 'gelbooru',
+  REDDIT: 'reddit',
 } as const;
 
 export type SourceType = (typeof SOURCES)[keyof typeof SOURCES];

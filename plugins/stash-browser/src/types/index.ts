@@ -93,12 +93,19 @@ export interface IBooruPost {
 
   // Dates
   createdAt?: string;
+
+  // Reddit-specific fields
+  title?: string;
+  author?: string;
+  subreddit?: string;
+  is_video?: boolean;
+  is_gallery?: boolean;
 }
 
 /**
  * Sort options for search
  */
-export type SortOption = 'score' | 'id' | 'updated';
+export type SortOption = 'score' | 'id' | 'updated' | 'hot' | 'new' | 'top' | 'rising';
 
 /**
  * Rating filter options
