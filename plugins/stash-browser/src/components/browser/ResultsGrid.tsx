@@ -66,6 +66,7 @@ const PostCard: React.FC<PostCardProps> = ({
   showThumbnail = true,
 }) => {
   const ratingClass = `rating-${post.rating}`;
+  const isReddit = post.source === 'reddit';
 
   return (
     <div
@@ -133,12 +134,64 @@ const PostCard: React.FC<PostCardProps> = ({
             VIDEO
           </div>
         )}
+        {/* Gallery indicator (Reddit-specific) */}
+        {showThumbnail && isReddit && 'is_gallery' in post && post.is_gallery && (
+          <div
+            className="position-absolute bottom-0 end-0 m-2 px-2 py-1 rounded small"
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              color: '#fff',
+              fontSize: '0.7rem',
+            }}
+          >
+            🖼️ GALLERY
+          </div>
+        )}
       </div>
 
       {/* Card body */}
       <div className="card-body p-2">
-        {/* Clickable tags */}
-        {post.tags && post.tags.length > 0 && (
+        {/* Reddit title */}
+        {isReddit && post.title && (
+          <div className="mb-2" style={{ fontSize: '0.85rem', lineHeight: '1.2' }}>
+            <strong className="d-block text-truncate" title={post.title}>
+              {post.title}
+            </strong>
+          </div>
+        )}
+
+        {/* Reddit metadata badges */}
+        {isReddit && (
+          <div className="d-flex flex-wrap gap-1 mb-2">
+            {/* Subreddit */}
+            {post.subreddit && (
+              <button
+                className="badge bg-primary text-white"
+                style={{ fontSize: '0.7rem', cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTagClick?.(`r/${post.subreddit}`);
+                }}
+                title={`Search r/${post.subreddit}`}
+              >
+                r/{post.subreddit}
+              </button>
+            )}
+            {/* Author */}
+            {post.author && (
+              <span
+                className="badge bg-secondary"
+                style={{ fontSize: '0.7rem' }}
+                title={`Posted by u/${post.author}`}
+              >
+                u/{post.author}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Booru tags (non-Reddit) */}
+        {!isReddit && post.tags && post.tags.length > 0 && (
           <div className="post-tags mb-2">
             {post.tags.slice(0, 4).map((tag) => (
               <button
@@ -162,7 +215,7 @@ const PostCard: React.FC<PostCardProps> = ({
         {/* Info bar */}
         <div className="d-flex justify-content-between align-items-center">
           <div className="post-info">
-            <span className="post-id">#{post.id}</span>
+            {!isReddit && <span className="post-id">#{post.id}</span>}
             {post.score !== undefined && post.score > 0 && (
               <span className="post-score">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16">
