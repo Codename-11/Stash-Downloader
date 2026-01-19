@@ -49,7 +49,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = 'Add tags...',
+  placeholder = 'Type tags...',
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);

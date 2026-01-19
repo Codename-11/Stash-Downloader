@@ -116,7 +116,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           onChange={handleTagsChange}
           onSubmit={handleSubmit}
           disabled={isLoading}
-          placeholder="Type tags..."
+          placeholder={
+            source === SOURCES.REDDIT
+              ? 'r/pics or r/pics+funny or r/pics cats...'
+              : 'Type tags...'
+          }
         />
       </div>
 

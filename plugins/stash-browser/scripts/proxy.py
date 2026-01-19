@@ -274,23 +274,42 @@ def search_reddit(
         # Remove extra whitespace
         cleaned_query = ' '.join(cleaned_query.split())
         
-        # Parse query - check if it's a subreddit
-        is_subreddit = cleaned_query.startswith('r/') or cleaned_query.startswith('subreddit:')
-        
-        if is_subreddit:
-            # Extract subreddit name
-            subreddit = cleaned_query.replace('subreddit:', '').replace('r/', '').strip()
-            url = f"https://www.reddit.com/r/{subreddit}/{sort}.json"
-        else:
-            # General search
-            url = f"https://www.reddit.com/search.json?q={urllib.parse.quote(cleaned_query)}&sort={sort}"
-        
-        # Add parameters
+        # Initialize params
         params = {'limit': limit}
         if sort == 'top' and time:
             params['t'] = time
         if after:
             params['after'] = after
+        
+        # Parse query - check if it's a subreddit
+        is_subreddit = cleaned_query.startswith('r/') or cleaned_query.startswith('subreddit:')
+        
+        if is_subreddit:
+            # Extract subreddit and optional search query
+            # Format: "r/pics" or "r/pics+funny" or "r/pics query"
+            cleaned_query = cleaned_query.replace('subreddit:', '').replace('r/', '').strip()
+            
+            # Split on first space to separate subreddit(s) from search query
+            parts = cleaned_query.split(' ', 1)
+            subreddit = parts[0]
+            search_query = parts[1] if len(parts) > 1 else None
+            
+            if search_query:
+                # Search within subreddit(s)
+                # Use restrict_sr=true for single subreddit, false for multi-subreddit
+                restrict_sr = '+' not in subreddit
+                url = f"https://www.reddit.com/r/{subreddit}/search.json"
+                # Add search query to params
+                params['q'] = search_query
+                params['restrict_sr'] = 'true' if restrict_sr else 'false'
+                log(f"Searching for '{search_query}' in r/{subreddit}")
+            else:
+                # Browse subreddit(s) without search
+                # Multi-subreddit syntax: r/pics+funny+aww
+                url = f"https://www.reddit.com/r/{subreddit}/{sort}.json"
+        else:
+            # General search across all of Reddit
+            url = f"https://www.reddit.com/search.json?q={urllib.parse.quote(cleaned_query)}&sort={sort}"
         
         log(f"Fetching Reddit: {url}")
         
