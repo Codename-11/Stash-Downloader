@@ -61,7 +61,9 @@ class StashService {
     });
 
     if (!response.ok) {
-      throw new Error(`GraphQL request failed: ${response.statusText}`);
+      const errorText = `${response.status} ${response.statusText || 'Unknown Error'}`;
+      console.error(`[StashService] HTTP error:`, errorText);
+      throw new Error(`GraphQL request failed: ${errorText}`);
     }
 
     const result: GraphQLResponse<T> = await response.json();

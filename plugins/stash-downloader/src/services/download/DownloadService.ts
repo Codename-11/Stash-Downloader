@@ -36,8 +36,11 @@ export interface IDownloadOptions {
 
 export interface IServerDownloadResult {
   success: boolean;
-  file_path?: string;
-  file_size?: number;
+  filePath?: string; // Primary file path (first file for galleries)
+  file_path?: string; // Legacy alias
+  fileSize?: number;
+  file_size?: number; // Legacy alias
+  files?: string[]; // For galleries - all downloaded file paths
   error?: string;
   jobId?: string;
 }
@@ -63,6 +66,64 @@ export class DownloadService {
   }
 
   /**
+   * Download Reddit gallery directly (bypasses yt-dlp auth requirement)
+   */
+  private async downloadRedditGallery(
+    url: string,
+    options: IDownloadOptions = {}
+  ): Promise<IServerDownloadResult> {
+    log.info('Downloading Reddit gallery via direct Python download');
+
+    try {
+      const stashService = getStashService();
+      const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+      const serverDownloadPath = settings.serverDownloadPath || options.outputDir || DEFAULT_SETTINGS.serverDownloadPath;
+
+      const taskResult = await stashService.runPluginTaskAndWait(
+        PLUGIN_ID,
+        'Download Reddit Gallery',
+        {
+          mode: 'download_reddit_gallery',
+          url: url,
+          output_dir: serverDownloadPath,
+          title: options.filename || 'reddit_gallery',
+        },
+        {
+          maxWaitMs: 300000, // 5 minutes
+        }
+      ) as { success: boolean; error?: string; jobId?: string; output?: { files?: string[]; count?: number } };
+
+      if (!taskResult.success) {
+        log.error('Reddit gallery download failed:', taskResult.error);
+        return { success: false, error: taskResult.error || 'Reddit gallery download failed' };
+      }
+
+      // The Python script returns files array
+      const files = taskResult.output?.files || [];
+      const count = taskResult.output?.count || 0;
+
+      if (!files || files.length === 0) {
+        log.error('No files downloaded from Reddit gallery');
+        return { success: false, error: 'No images downloaded from gallery' };
+      }
+
+      log.success(`Downloaded ${count} images from Reddit gallery`);
+
+      // Return the first file path for compatibility
+      return {
+        success: true,
+        filePath: String(files[0] || ''),
+        fileSize: 0, // Not tracked for galleries
+        files: files.map(f => String(f)), // Include all file paths
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error('Reddit gallery download error:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
    * Download using server-side plugin task (no CORS issues)
    * This uses Stash's runPluginTask to execute the Python backend
    */
@@ -81,6 +142,13 @@ export class DownloadService {
 
       if (!stashService.isStashEnvironment()) {
         return { success: false, error: 'Not in Stash environment' };
+      }
+
+      // Check if this is a Reddit gallery - use direct download instead of yt-dlp
+      const isRedditGallery = url.includes('reddit.com') && url.includes('/comments/');
+      if (isRedditGallery) {
+        log.info('Detected Reddit gallery URL - using direct gallery download');
+        return await this.downloadRedditGallery(url, options);
       }
 
       // Generate IDs for result and progress tracking
@@ -248,8 +316,8 @@ export class DownloadService {
         return { success: false, error: result.error, jobId };
       }
 
-      const filePath = result.file_path;
-      const fileSize = result.file_size;
+      const filePath = result.file_path || result.filePath;
+      const fileSize = result.file_size || result.fileSize;
 
       if (!filePath) {
         // Log full result for debugging
