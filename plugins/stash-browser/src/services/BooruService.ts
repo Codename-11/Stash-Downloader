@@ -19,6 +19,7 @@ interface PluginOperationResult {
   error?: string;
   source?: string;
   tags?: string | TagSuggestion[];  // string for search, TagSuggestion[] for autocomplete
+  suggestions?: string[]; // Reddit autocomplete returns string[]
   query?: string;
   page?: number;
   limit?: number;
@@ -326,7 +327,17 @@ export async function autocompleteTags(
       return [];
     }
 
-    // Tags come back as array
+    // Reddit returns suggestions as string[], Booru returns tags as TagSuggestion[]
+    if (result.suggestions && Array.isArray(result.suggestions)) {
+      // Reddit format: convert string[] to TagSuggestion[]
+      return (result.suggestions as string[]).map(name => ({
+        name,
+        count: 0,
+        category: 0,
+      }));
+    }
+
+    // Booru format: tags come back as TagSuggestion[]
     const tags = result.tags as TagSuggestion[] | undefined;
     return tags || [];
   } catch (error) {
