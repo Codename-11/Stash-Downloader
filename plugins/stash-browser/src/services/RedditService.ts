@@ -21,10 +21,19 @@ export interface RedditSearchParams {
   after?: string;          // Pagination cursor
 }
 
+interface PluginOperationResult {
+  success?: boolean;
+  error?: string;
+  posts?: unknown[];
+  after?: string | null;
+  suggestions?: string[];
+  [key: string]: unknown;
+}
+
 /**
  * Helper to call plugin operations
  */
-async function runPluginOperation(args: Record<string, unknown>): Promise<any> {
+async function runPluginOperation(args: Record<string, unknown>): Promise<PluginOperationResult | null> {
   const mutation = `
     mutation RunPluginOperation($plugin_id: ID!, $args: Map) {
       runPluginOperation(plugin_id: $plugin_id, args: $args)
@@ -104,24 +113,24 @@ export async function searchReddit(params: RedditSearchParams): Promise<{
     }
 
     // Convert backend response to IBooruPost format
-    const backendPosts = result.posts || [];
-    const posts: IBooruPost[] = backendPosts.map((post: any) => ({
-      id: hashCode(post.id),
+    const backendPosts = (result.posts || []) as Array<Record<string, unknown>>;
+    const posts: IBooruPost[] = backendPosts.map((post) => ({
+      id: hashCode(String(post.id || '')),
       source: 'reddit' as const,
-      previewUrl: post.preview_image || post.thumbnail || '/placeholder.png',
-      sampleUrl: post.url,
-      fileUrl: post.url,
-      sourceUrl: post.permalink,
+      previewUrl: String(post.preview_image || post.thumbnail || '/placeholder.png'),
+      sampleUrl: String(post.url || ''),
+      fileUrl: String(post.url || ''),
+      sourceUrl: String(post.permalink || ''),
       rating: post.over_18 ? 'explicit' as const : 'safe' as const,
-      tags: [post.subreddit, `u/${post.author}`],
-      score: post.score,
+      tags: [String(post.subreddit || ''), `u/${post.author || ''}`],
+      score: Number(post.score || 0),
       width: 0,
       height: 0,
       fileType: post.is_video ? 'video' as const : 'image' as const,
-      createdAt: new Date(post.created_utc * 1000).toISOString(),
-      title: post.title,
-      author: post.author,
-      subreddit: post.subreddit,
+      createdAt: new Date(Number(post.created_utc || 0) * 1000).toISOString(),
+      title: String(post.title || ''),
+      author: String(post.author || ''),
+      subreddit: String(post.subreddit || ''),
     }));
 
     log.info(`Found ${posts.length} Reddit posts`);
