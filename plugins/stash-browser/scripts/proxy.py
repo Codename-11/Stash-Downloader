@@ -260,16 +260,30 @@ def search_reddit(
         }
     
     try:
+        # Strip out booru-specific filters (rating:, sort:)
+        # These don't work on Reddit and cause 404s
+        cleaned_query = query
+        
+        # Remove rating: filters
+        import re
+        cleaned_query = re.sub(r'\brating:\w+\b', '', cleaned_query).strip()
+        
+        # Remove sort: filters (we use the sort parameter instead)
+        cleaned_query = re.sub(r'\bsort:\w+\b', '', cleaned_query).strip()
+        
+        # Remove extra whitespace
+        cleaned_query = ' '.join(cleaned_query.split())
+        
         # Parse query - check if it's a subreddit
-        is_subreddit = query.startswith('r/') or query.startswith('subreddit:')
+        is_subreddit = cleaned_query.startswith('r/') or cleaned_query.startswith('subreddit:')
         
         if is_subreddit:
             # Extract subreddit name
-            subreddit = query.replace('subreddit:', '').replace('r/', '').strip()
+            subreddit = cleaned_query.replace('subreddit:', '').replace('r/', '').strip()
             url = f"https://www.reddit.com/r/{subreddit}/{sort}.json"
         else:
             # General search
-            url = f"https://www.reddit.com/search.json?q={urllib.parse.quote(query)}&sort={sort}"
+            url = f"https://www.reddit.com/search.json?q={urllib.parse.quote(cleaned_query)}&sort={sort}"
         
         # Add parameters
         params = {'limit': limit}

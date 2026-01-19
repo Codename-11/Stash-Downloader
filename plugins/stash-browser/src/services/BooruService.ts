@@ -179,21 +179,23 @@ export async function searchPosts(
 ): Promise<ISearchResult> {
   console.log(`[BooruService] Searching ${source} for "${tags}" (page ${page})`);
 
-  // Handle Reddit separately (client-side, no proxy needed)
+  // Handle Reddit separately (client-side filtering)
   if (source === SOURCES.REDDIT) {
     const { searchReddit } = await import('./RedditService');
     
     // Parse tags for Reddit-specific params
-    // Format: "subreddit:pics sort:top time:week"
+    // Format: "subreddit:pics sort:top time:week rating:explicit"
     const subredditMatch = tags.match(/subreddit:(\w+)/);
     const sortMatch = tags.match(/sort:(hot|new|top|rising)/);
     const timeMatch = tags.match(/time:(hour|day|week|month|year|all)/);
+    const ratingMatch = tags.match(/rating:(safe|explicit|all)/);
     
     // Remove Reddit-specific tags from query
     const query = tags
       .replace(/subreddit:\w+/g, '')
       .replace(/sort:\w+/g, '')
       .replace(/time:\w+/g, '')
+      .replace(/rating:\w+/g, '') // Also strip rating
       .trim();
 
     const result = await searchReddit({
@@ -205,13 +207,26 @@ export async function searchPosts(
       after: page > 0 ? `page_${page}` : undefined, // Simplified pagination
     });
 
+    // Client-side rating filter for Reddit (based on over_18 flag)
+    let filteredPosts = result.posts;
+    const ratingFilter = ratingMatch?.[1] || 'all';
+    
+    if (ratingFilter === 'safe') {
+      // Only SFW posts (over_18 = false)
+      filteredPosts = filteredPosts.filter(p => p.rating === 'safe');
+    } else if (ratingFilter === 'explicit') {
+      // Only NSFW posts (over_18 = true)
+      filteredPosts = filteredPosts.filter(p => p.rating === 'explicit');
+    }
+    // 'all' or no filter = no filtering
+
     return {
       source: SOURCES.REDDIT,
       tags,
       page,
       limit,
-      count: result.posts.length,
-      posts: result.posts,
+      count: filteredPosts.length,
+      posts: filteredPosts,
       hasMore: result.after !== null,
     };
   }
