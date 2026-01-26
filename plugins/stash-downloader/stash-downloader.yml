@@ -95,6 +95,10 @@ tasks:
     description: Scrape Reddit post metadata (server-side, bypasses CSP)
     defaultArgs:
       mode: scrape_reddit
+  - name: Download Reddit Gallery
+    description: Download all images from a Reddit gallery post
+    defaultArgs:
+      mode: download_reddit_gallery
   - name: Check PRAW
     description: Check if PRAW (Python Reddit API Wrapper) is installed
     defaultArgs:
