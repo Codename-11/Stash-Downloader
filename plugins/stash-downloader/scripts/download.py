@@ -1403,8 +1403,14 @@ def task_download_reddit_gallery(args: dict) -> dict:
             return scrape_result
         
         gallery_images = scrape_result.get("gallery_images", [])
-        
+
+        log.info(f"Scrape result returned {len(gallery_images)} gallery images")
+        if gallery_images:
+            log.debug(f"First image URL: {gallery_images[0][:80]}")
+
         if not gallery_images:
+            log.error("No gallery images found in scrape result")
+            log.debug(f"Full scrape result keys: {list(scrape_result.keys())}")
             return {
                 "success": False,
                 "result_error": "No gallery images found in post"
@@ -1556,23 +1562,45 @@ def task_scrape_reddit(args: dict) -> dict:
             try:
                 gallery_data = post_data['gallery_data']
                 media_metadata = post_data.get('media_metadata', {})
-                
+
+                log.info(f"Processing gallery with {len(gallery_data.get('items', []))} items")
+                log.debug(f"media_metadata keys: {list(media_metadata.keys())}")
+
                 gallery_images = []
-                for item in gallery_data.get('items', []):
+                for idx, item in enumerate(gallery_data.get('items', []), 1):
                     media_id = item.get('media_id')
+                    log.debug(f"Item {idx}: media_id={media_id}")
+
                     if media_id and media_id in media_metadata:
                         media = media_metadata[media_id]
+                        log.debug(f"Media structure keys: {list(media.keys())}")
+
                         # Get the highest quality image
+                        # Try different paths: 's' for source, or check 'p' for previews
+                        image_url = None
+
                         if 's' in media and 'u' in media['s']:
-                            # Decode HTML entities
                             image_url = media['s']['u'].replace('&amp;', '&')
+                            log.debug(f"Found image URL in s.u: {image_url[:80]}")
+                        elif 'p' in media and media['p']:
+                            # Fallback: use highest res preview
+                            image_url = media['p'][-1].get('u', '').replace('&amp;', '&')
+                            log.debug(f"Found image URL in p[-1].u: {image_url[:80]}")
+
+                        if image_url:
                             gallery_images.append(image_url)
-                
+                        else:
+                            log.warning(f"Could not find image URL for media_id {media_id}")
+                    else:
+                        log.warning(f"media_id {media_id} not found in media_metadata")
+
                 if gallery_images:
                     result['gallery_images'] = gallery_images
                     log.info(f"✓ Extracted {len(gallery_images)} gallery images")
+                else:
+                    log.warning(f"No gallery images extracted from {len(gallery_data.get('items', []))} items")
             except Exception as e:
-                log.warning(f"Could not extract gallery images: {e}")
+                log.error(f"Could not extract gallery images: {e}", exc_info=True)
         
         log.info(f"✓ Reddit metadata scraped: {result.get('title', 'Untitled')[:50]}...")
         return result
