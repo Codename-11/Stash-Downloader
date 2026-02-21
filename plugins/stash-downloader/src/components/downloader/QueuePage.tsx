@@ -581,6 +581,19 @@ export const QueuePage: React.FC = () => {
     }
   };
 
+  // Handle retry all failed items
+  const handleRetryAll = async () => {
+    const failedItems = queue.items.filter((i) => i.status === DownloadStatus.Failed);
+    if (failedItems.length === 0) return;
+
+    toast.showToast('info', 'Retry All', `Retrying ${failedItems.length} failed item(s)...`);
+    log.addLog('info', 'retry', `Retrying all ${failedItems.length} failed items`);
+
+    for (const item of failedItems) {
+      await handleRetry(item.id);
+    }
+  };
+
   // Handle cancel for active downloads
   const handleCancel = async (itemId: string) => {
     const item = queue.items.find((i) => i.id === itemId);
@@ -980,6 +993,16 @@ export const QueuePage: React.FC = () => {
                   title="Cancel all active downloads"
                 >
                   ⏹️ Cancel All
+                </button>
+              )}
+              {queue.stats.failed > 0 && (
+                <button
+                  className="btn btn-outline-warning btn-sm"
+                  onClick={handleRetryAll}
+                  disabled={isBatchImporting}
+                  title="Reset all failed items to pending and re-scrape if needed"
+                >
+                  🔄 Retry All Failed ({queue.stats.failed})
                 </button>
               )}
               <button

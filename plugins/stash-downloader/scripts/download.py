@@ -1513,9 +1513,15 @@ def task_download_reddit_gallery(args: dict) -> dict:
         if not gallery_images:
             log.error("No gallery images found in scrape result")
             log.debug(f"Full scrape result keys: {list(scrape_result.keys())}")
+            # Provide more context about why no images were found
+            is_gallery = scrape_result.get('is_gallery', False)
+            if not is_gallery:
+                hint = "Post is not a gallery (no is_gallery flag). It may be a single image or video post."
+            else:
+                hint = "Post is marked as gallery but gallery data is missing. The post may have been edited or partially removed."
             return {
                 "success": False,
-                "result_error": "No gallery images found in post"
+                "result_error": f"No gallery images found in post. {hint}"
             }
         
         # Create output directory if needed
@@ -1629,7 +1635,33 @@ def task_scrape_reddit(args: dict) -> dict:
             return {"success": False, "result_error": "No post data in response"}
         
         post_data = children[0].get('data', {})
-        
+
+        # Detect deleted/removed posts early
+        author = post_data.get('author')
+        removed_by = post_data.get('removed_by_category')
+        is_deleted = (author == '[deleted]' or removed_by == 'deleted')
+        is_removed = (removed_by is not None and removed_by != 'deleted')
+
+        if is_deleted:
+            log.warning("Post has been deleted by its author - media is no longer available")
+            return {
+                "success": False,
+                "result_error": "This Reddit post has been deleted by its author. Media is no longer available on Reddit."
+            }
+
+        if is_removed:
+            log.warning(f"Post has been removed (reason: {removed_by}) - media may not be available")
+            # Don't fail immediately for moderator removals - some still have media
+
+        # For crossposts, use the original post's data for media/gallery fields
+        # The top-level post may lack gallery_data/media_metadata but the crosspost parent has it
+        media_source = post_data
+        if 'crosspost_parent_list' in post_data and post_data['crosspost_parent_list']:
+            crosspost_parent = post_data['crosspost_parent_list'][0]
+            log.info("Post is a crosspost - using original post's media data")
+            # Use parent for media fields, but keep top-level post's title/author/subreddit
+            media_source = crosspost_parent
+
         # Extract metadata
         result = {
             "success": True,
@@ -1638,32 +1670,39 @@ def task_scrape_reddit(args: dict) -> dict:
             "subreddit": post_data.get('subreddit'),
             "created_utc": post_data.get('created_utc'),
             "selftext": post_data.get('selftext'),
-            "url": post_data.get('url'),
+            "url": media_source.get('url'),
             "permalink": post_data.get('permalink'),
-            "is_video": post_data.get('is_video', False),
-            "is_gallery": post_data.get('is_gallery', False),
-            "post_hint": post_data.get('post_hint'),
-            "domain": post_data.get('domain'),
-            "thumbnail": post_data.get('thumbnail'),
+            "is_video": media_source.get('is_video', False),
+            "is_gallery": media_source.get('is_gallery', False),
+            "post_hint": media_source.get('post_hint'),
+            "domain": media_source.get('domain'),
+            "thumbnail": media_source.get('thumbnail'),
             "over_18": post_data.get('over_18', False),
         }
-        
+
         # Extract preview images if available
-        if 'preview' in post_data and 'images' in post_data['preview']:
+        preview_source = media_source if 'preview' in media_source else post_data
+        if 'preview' in preview_source and 'images' in preview_source['preview']:
             try:
-                images = post_data['preview']['images']
+                images = preview_source['preview']['images']
                 if images and len(images) > 0:
                     source = images[0].get('source', {})
                     if 'url' in source:
                         result['preview_url'] = source['url']
             except Exception as e:
                 log.debug(f"Could not extract preview: {e}")
-        
-        # Extract gallery images if it's a gallery post
-        if result.get('is_gallery') and 'gallery_data' in post_data:
+
+        # Extract gallery images - check both top-level post and crosspost parent
+        gallery_source = None
+        if media_source.get('is_gallery') and 'gallery_data' in media_source:
+            gallery_source = media_source
+        elif post_data.get('is_gallery') and 'gallery_data' in post_data:
+            gallery_source = post_data
+
+        if gallery_source:
             try:
-                gallery_data = post_data['gallery_data']
-                media_metadata = post_data.get('media_metadata', {})
+                gallery_data = gallery_source['gallery_data']
+                media_metadata = gallery_source.get('media_metadata', {})
 
                 log.info(f"Processing gallery with {len(gallery_data.get('items', []))} items")
                 log.debug(f"media_metadata keys: {list(media_metadata.keys())}")

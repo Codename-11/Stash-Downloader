@@ -199,8 +199,8 @@ export class RedditScraper implements IMetadataScraper {
       title: postData.title,
       description: description,
       date: date,
-      // Use post author as performer
-      performers: postData.author ? [`u/${postData.author}`] : undefined,
+      // Use post author as performer (skip deleted/removed authors)
+      performers: postData.author && postData.author !== '[deleted]' ? [`u/${postData.author}`] : undefined,
       // Use subreddit as both tag and studio
       tags: postData.subreddit ? [postData.subreddit] : undefined,
       studio: postData.subreddit ? `r/${postData.subreddit}` : undefined,
