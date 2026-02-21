@@ -401,9 +401,11 @@ export const QueuePage: React.FC = () => {
   };
 
   const handleCompleteImport = (itemId: string, stashId: string) => {
+    // Filter out placeholder IDs (pending-scan-*) that aren't real Stash IDs
+    const realStashId = stashId?.startsWith('pending-scan-') ? undefined : stashId;
     queue.updateItem(itemId, {
       status: DownloadStatus.Complete,
-      stashId,
+      stashId: realStashId,
       completedAt: new Date(),
     });
 
@@ -723,9 +725,11 @@ export const QueuePage: React.FC = () => {
             const result = await importService.importToStash(itemForImport, callbacks);
 
             // Mark as complete and update progress
+            // Filter out placeholder IDs (pending-scan-*) that aren't real Stash IDs
+            const realStashId = result.id?.startsWith('pending-scan-') ? undefined : result.id;
             queue.updateItem(item.id, {
               status: DownloadStatus.Complete,
-              stashId: result.id,
+              stashId: realStashId,
               completedAt: new Date(),
             });
 

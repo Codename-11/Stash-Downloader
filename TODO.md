@@ -24,6 +24,12 @@
 - [ ] Add integration tests for download flow
 
 ## Completed
+- [x] Reddit download bypass - Route Reddit URLs through public .json API instead of yt-dlp (avoids NSFW auth requirement)
+- [x] Reddit gallery downloads - Handle galleries, crosspost detection, deleted post detection
+- [x] SOCKS proxy fallback for direct file downloads (retry without proxy when PySocks missing)
+- [x] Compact terminal-style per-item log viewer with level filtering
+- [x] Error pipeline improvements - Surface detailed error messages through Python → TypeScript → UI
+- [x] Fix "View in Stash" button linking to placeholder IDs for pending-scan items
 - [x] Stash Tagger plugin - Match studios, performers, and tags from StashBox instances (like StashDB)
 - [x] Firefox extension published on [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/stash-downloader-extension/)
 - [x] Proper job cancellation via Stash jobQueue (cancels all queued + running jobs)
