@@ -951,6 +951,123 @@ def download_video(
         return None
 
 
+def is_reddit_post_url(url: str) -> bool:
+    """Check if URL is a Reddit post URL (not a direct media URL like i.redd.it)."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        host = parsed.netloc.lower().replace('www.', '').replace('old.', '').replace('new.', '')
+        return host in ('reddit.com', 'redd.it') and '/comments/' in parsed.path
+    except Exception:
+        return False
+
+
+def download_reddit_media(
+    url: str,
+    output_dir: str,
+    filename: Optional[str] = None,
+    proxy: Optional[str] = None,
+    progress_id: Optional[str] = None,
+    quality: str = "best",
+    ytdlp_path: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Download media from a Reddit post by scraping the JSON API first.
+    Bypasses yt-dlp's Reddit extractor which requires authentication for NSFW.
+
+    For images: downloads directly via HTTP (i.redd.it doesn't need auth).
+    For videos: passes v.redd.it URL to yt-dlp (v.redd.it doesn't need auth).
+
+    Returns file path on success, None on failure.
+    """
+    log.info(f"Downloading Reddit media via scrape_reddit + direct download")
+
+    # Scrape post metadata via Reddit's .json API (no auth needed)
+    scrape_result = task_scrape_reddit({"url": url})
+
+    if not scrape_result.get("success"):
+        error = scrape_result.get("result_error", "Failed to scrape Reddit post")
+        log.error(f"Reddit scrape failed: {error}")
+        return None
+
+    is_video = scrape_result.get("is_video", False)
+    is_gallery = scrape_result.get("is_gallery", False)
+    media_url = scrape_result.get("url", "")
+    title = scrape_result.get("title", "reddit_post")
+
+    # Use provided filename or derive from title
+    if not filename:
+        filename = sanitize_filename(title)
+
+    if is_gallery:
+        log.info("Post is a gallery - should use gallery download path instead")
+        return None
+
+    if is_video:
+        # Reddit videos are hosted on v.redd.it with DASH manifests
+        # yt-dlp handles v.redd.it perfectly without auth
+        log.info(f"Reddit video detected, using yt-dlp with v.redd.it URL")
+
+        # The media_url for videos is typically https://v.redd.it/<id>
+        # But sometimes it's the full DASH URL; either way yt-dlp handles it
+        video_url = media_url
+        if not video_url or 'v.redd.it' not in video_url:
+            # Fallback: try to construct from post data
+            log.warning(f"No v.redd.it URL found (got: {media_url[:80]}), trying yt-dlp with v.redd.it URL from media")
+            # Some posts have the video URL in different places
+            if media_url and media_url.startswith('http'):
+                video_url = media_url
+            else:
+                log.error("Could not find video URL in Reddit post data")
+                return None
+
+        # Use yt-dlp for v.redd.it (handles DASH video+audio merge)
+        if check_ytdlp(ytdlp_path):
+            template = f"{sanitize_filename(filename)}.%(ext)s"
+            file_path = download_video(
+                video_url, output_dir, template, quality,
+                proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path
+            )
+            if file_path:
+                return file_path
+
+        log.error("yt-dlp failed for Reddit video")
+        return None
+
+    else:
+        # Single image post - download directly
+        image_url = media_url
+        if not image_url:
+            # Try preview URL as fallback
+            image_url = scrape_result.get("preview_url", "")
+
+        if not image_url:
+            log.error("No image URL found in Reddit post data")
+            return None
+
+        # Unescape HTML entities in preview URLs
+        image_url = image_url.replace('&amp;', '&')
+
+        log.info(f"Reddit image detected, downloading directly: {image_url[:80]}...")
+
+        # Determine extension from URL
+        try:
+            from urllib.parse import urlparse as _urlparse
+            ext = os.path.splitext(_urlparse(image_url).path)[1]
+            if not ext:
+                ext = '.jpg'
+        except Exception:
+            ext = '.jpg'
+
+        if not filename.endswith(ext):
+            filename = f"{filename}{ext}"
+
+        file_path = download_direct_file(
+            image_url, output_dir, filename, proxy=proxy, progress_id=progress_id
+        )
+        return file_path
+
+
 def task_download(args: dict) -> dict:
     """
     Handle download task.
@@ -996,6 +1113,31 @@ def task_download(args: dict) -> dict:
         if result_id:
             save_result(result_id, result)
         return result
+
+    # Reddit post URLs: bypass yt-dlp entirely (auth required for NSFW)
+    # Use scrape_reddit + direct download instead
+    # Check both the primary URL and fallback URL for Reddit post detection
+    reddit_url = None
+    if is_reddit_post_url(url):
+        reddit_url = url
+    elif fallback_url and is_reddit_post_url(fallback_url):
+        reddit_url = fallback_url
+    if reddit_url:
+        log.info("Detected Reddit post URL - bypassing yt-dlp (auth bypass)")
+        file_path = download_reddit_media(
+            reddit_url, output_dir, filename,
+            proxy=proxy, progress_id=progress_id,
+            quality=quality, ytdlp_path=ytdlp_path,
+        )
+        if file_path:
+            file_size = os.path.getsize(file_path)
+            result = {"file_path": file_path, "file_size": file_size, "success": True}
+            if result_id:
+                save_result(result_id, result)
+            return result
+        else:
+            log.warning("Reddit direct download failed, falling through to yt-dlp")
+            # Fall through to yt-dlp as last resort
 
     # Track which URL to use for yt-dlp fallback
     ytdlp_url = url
@@ -1084,6 +1226,50 @@ def task_extract_metadata(args: dict) -> dict:
         if result_id:
             save_result(result_id, result)
         return result
+
+    # Reddit post URLs: use scrape_reddit instead of yt-dlp (auth bypass)
+    if is_reddit_post_url(url):
+        log.info("Detected Reddit post URL - using scrape_reddit for metadata (auth bypass)")
+        scrape_result = task_scrape_reddit({"url": url})
+        if scrape_result.get("success"):
+            # Convert Reddit scrape result to yt-dlp-like metadata format
+            is_video = scrape_result.get("is_video", False)
+            is_gallery = scrape_result.get("is_gallery", False)
+
+            if is_gallery:
+                content_type = "gallery"
+            elif is_video:
+                content_type = "video"
+            else:
+                content_type = "image"
+
+            result = {
+                "success": True,
+                "detected_content_type": content_type,
+                "title": scrape_result.get("title"),
+                "description": scrape_result.get("selftext"),
+                "uploader": scrape_result.get("author"),
+                "channel": f"r/{scrape_result.get('subreddit', '')}",
+                "thumbnail": scrape_result.get("preview_url") or scrape_result.get("thumbnail"),
+                "url": scrape_result.get("url"),
+                "webpage_url": url,
+                "original_url": url,
+                "tags": [],
+                "categories": [f"r/{scrape_result.get('subreddit', '')}"] if scrape_result.get("subreddit") else [],
+                "cast": [],
+                "creators": [scrape_result.get("author")] if scrape_result.get("author") else [],
+                "formats": [],
+                # Pass through gallery images for gallery content type
+                "gallery_images": scrape_result.get("gallery_images", []),
+            }
+
+            if result_id:
+                save_result(result_id, result)
+            return result
+        else:
+            error_msg = scrape_result.get("result_error", "Reddit scrape failed")
+            log.warning(f"Reddit scrape failed: {error_msg}, falling through to yt-dlp")
+            # Fall through to yt-dlp as last resort
 
     if not check_ytdlp(ytdlp_path):
         result = {"result_error": "yt-dlp is not installed. Install with: pip install yt-dlp (or set ytdlpPath in plugin settings)", "success": False}
