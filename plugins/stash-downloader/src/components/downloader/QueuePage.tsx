@@ -43,6 +43,7 @@ export const QueuePage: React.FC = () => {
   const [serverConfigExpanded, setServerConfigExpanded] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [ytDlpVersion, setYtDlpVersion] = useState<string | null>(null);
+  const [ytDlpResolutionMethod, setYtDlpResolutionMethod] = useState<string | null>(null);
 
   // Batch import state
   const [isBatchImporting, setIsBatchImporting] = useState(false);
@@ -154,9 +155,11 @@ export const QueuePage: React.FC = () => {
         const result = await downloadService.checkServerYtDlp();
         if (result.available && result.version) {
           setYtDlpVersion(result.version);
-          debugLog.debug(`yt-dlp version: ${result.version}`);
+          setYtDlpResolutionMethod(result.resolutionMethod || null);
+          debugLog.debug(`yt-dlp version: ${result.version}${result.resolutionMethod ? ` (${result.resolutionMethod})` : ''}`);
         } else {
           setYtDlpVersion(null);
+          setYtDlpResolutionMethod(null);
         }
       } catch (error) {
         debugLog.warn('Could not check yt-dlp:', String(error));
@@ -839,9 +842,15 @@ export const QueuePage: React.FC = () => {
                         <div className="d-flex align-items-center gap-2">
                           <span className="badge bg-success">Installed</span>
                           <code className="text-light" style={{ fontSize: '0.85em' }}>{ytDlpVersion}</code>
+                          {ytDlpResolutionMethod && (
+                            <small style={{ color: '#8b9fad' }}>({ytDlpResolutionMethod})</small>
+                          )}
                         </div>
                       ) : (
-                        <span className="badge bg-danger">Not Installed</span>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="badge bg-danger">Not Found</span>
+                          <small style={{ color: '#8b9fad' }}>pip install yt-dlp, or set path in settings</small>
+                        </div>
                       )}
                     </div>
                     <div className="d-flex justify-content-between align-items-center">
@@ -1108,37 +1117,39 @@ export const QueuePage: React.FC = () => {
             <strong>What's happening:</strong>
           </p>
           <div>
-            • yt-dlp is not detected on your system<br />
-            • The app will fall back to built-in scrapers (YouPornScraper, PornhubScraper)<br />
+            • yt-dlp was not detected via Python module or system PATH<br />
+            • The app will fall back to built-in scrapers<br />
             • Built-in scrapers may only extract <strong>lower quality videos</strong> (360p-480p)<br />
             • Some sites may not work at all without yt-dlp
           </div>
 
           <p className="mb-0 mt-2">
-            <strong>To install yt-dlp:</strong>
+            <strong>Option 1: Install via pip (recommended)</strong>
           </p>
           <pre className="bg-dark text-light p-3 rounded" style={{ overflow: 'auto' }}>
             <code>
-              # Using pip (recommended){'\n'}
+              # Install in the same Python environment as Stash{'\n'}
               pip install yt-dlp{'\n\n'}
-              # Or using pipx (isolated install){'\n'}
-              pipx install yt-dlp{'\n\n'}
-              # Verify installation{'\n'}
-              yt-dlp --version
+              # Docker (Alpine-based Stash image){'\n'}
+              docker exec -it stash pip install yt-dlp --break-system-packages{'\n\n'}
+              # Verify{'\n'}
+              python -m yt_dlp --version
             </code>
           </pre>
 
-          <small className="text-muted">
-            <strong>Note:</strong> You may need to restart the dev server after installing yt-dlp for changes to take effect.
-          </small>
+          <p className="mb-0 mt-2">
+            <strong>Option 2: Set custom path in plugin settings</strong>
+          </p>
+          <div>
+            If yt-dlp is installed but not detected, set the <strong>yt-dlp Path</strong> setting
+            in Stash &rarr; Settings &rarr; Plugins &rarr; Stash Downloader to the full path
+            (e.g., <code>/usr/local/bin/yt-dlp</code> or <code>C:\tools\yt-dlp.exe</code>).
+          </div>
 
-          <div className="alert alert-success">
+          <div className="alert alert-success mt-2">
             <small>
-              <strong>Alternative:</strong> Download the standalone executable from{' '}
-              <a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noopener noreferrer">
-                github.com/yt-dlp/yt-dlp/releases
-              </a>
-              {' '}and add it to your system PATH.
+              <strong>How detection works:</strong> The plugin first tries <code>python -m yt_dlp</code> (same Python environment),
+              then falls back to the <code>yt-dlp</code> CLI on PATH. A custom path in settings overrides both.
             </small>
           </div>
         </div>

@@ -163,6 +163,7 @@ export class DownloadService {
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const serverDownloadPath = settings.serverDownloadPath || options.outputDir || DEFAULT_SETTINGS.serverDownloadPath;
       const httpProxy = settings.httpProxy;
+      const ytdlpPath = settings.ytdlpPath;
 
       // Log which path was determined and why (debug only - visible in UI)
       if (settings.serverDownloadPath) {
@@ -176,6 +177,9 @@ export class DownloadService {
       if (httpProxy) {
         log.debug(`Using HTTP proxy: ${httpProxy}`);
       }
+      if (ytdlpPath) {
+        log.debug(`Using custom yt-dlp path: ${ytdlpPath}`);
+      }
 
       // Run the download task and wait for completion
       log.info('Starting download task with parameters:', JSON.stringify({
@@ -184,6 +188,7 @@ export class DownloadService {
         output_dir: serverDownloadPath,
         quality: options.quality || 'best',
         has_proxy: !!httpProxy,
+        has_ytdlp_path: !!ytdlpPath,
       }));
 
       // Start progress polling in background
@@ -246,6 +251,7 @@ export class DownloadService {
           result_id: resultId,
           progress_id: progressId, // For real-time progress updates
           proxy: httpProxy,
+          ytdlp_path: ytdlpPath, // Custom yt-dlp binary path
         },
         {
           maxWaitMs: 600000, // 10 minutes for large downloads
@@ -351,7 +357,7 @@ export class DownloadService {
   /**
    * Check if yt-dlp is available on the server and get version
    */
-  async checkServerYtDlp(): Promise<{ available: boolean; version?: string }> {
+  async checkServerYtDlp(): Promise<{ available: boolean; version?: string; resolutionMethod?: string }> {
     try {
       const stashService = getStashService();
 
@@ -359,13 +365,18 @@ export class DownloadService {
         return { available: false };
       }
 
+      // Pass ytdlpPath setting if configured
+      const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      }) as { available?: boolean; version?: string } | null;
+        ytdlp_path: settings.ytdlpPath,
+      }) as { available?: boolean; version?: string; resolution_method?: string } | null;
 
       return {
         available: result?.available === true,
         version: result?.version || undefined,
+        resolutionMethod: result?.resolution_method || undefined,
       };
     } catch {
       return { available: false };

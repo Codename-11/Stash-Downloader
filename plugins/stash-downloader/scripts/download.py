@@ -206,46 +206,123 @@ def sanitize_filename(filename: str) -> str:
     return sanitized[:200] if len(sanitized) > 200 else sanitized
 
 
-def install_ytdlp() -> bool:
-    """Attempt to install yt-dlp using pip."""
-    log.debug("Attempting to install yt-dlp...")
+# Cached yt-dlp command (resolved once, reused for all calls)
+_ytdlp_cmd: Optional[list] = None
+
+
+def get_ytdlp_cmd(custom_path: Optional[str] = None) -> list:
+    """
+    Resolve the yt-dlp command to use.
+
+    Resolution order:
+    1. Custom path from plugin settings (ytdlpPath)
+    2. Python module: sys.executable -m yt_dlp (same Python env, no PATH needed)
+    3. CLI binary: yt-dlp on PATH (legacy fallback)
+
+    Returns list of command parts, e.g. ["yt-dlp"] or ["/usr/bin/python3", "-m", "yt_dlp"]
+    """
+    global _ytdlp_cmd
+
+    # If a custom path is provided, always use it (don't cache - may change between calls)
+    if custom_path:
+        log.info(f"Using custom yt-dlp path from settings: {custom_path}")
+        return [custom_path]
+
+    # Return cached result if available
+    if _ytdlp_cmd is not None:
+        return _ytdlp_cmd
+
+    # Strategy 1: Python module (most reliable - uses same Python that runs this script)
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "yt-dlp"], capture_output=True, text=True, timeout=120
+            [sys.executable, "-m", "yt_dlp", "--version"],
+            capture_output=True, text=True, timeout=10
         )
         if result.returncode == 0:
-            log.debug("yt-dlp installed successfully")
-            return True
-        else:
-            log.error(f"Failed to install yt-dlp: {result.stderr}")
-            return False
-    except Exception as e:
-        log.error(f"Error installing yt-dlp: {e}")
-        return False
+            version = result.stdout.strip()
+            log.info(f"Found yt-dlp as Python module (v{version}) via {sys.executable}")
+            _ytdlp_cmd = [sys.executable, "-m", "yt_dlp"]
+            return _ytdlp_cmd
+    except (subprocess.TimeoutExpired, Exception) as e:
+        log.debug(f"Python module check failed: {e}")
 
-
-def check_ytdlp() -> bool:
-    """Check if yt-dlp is installed, auto-install if missing."""
+    # Strategy 2: CLI binary on PATH (fallback)
     try:
-        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
-        log.debug(f"yt-dlp version: {result.stdout.strip()}")
-        return result.returncode == 0
+        result = subprocess.run(
+            ["yt-dlp", "--version"],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            log.info(f"Found yt-dlp CLI on PATH (v{version})")
+            _ytdlp_cmd = ["yt-dlp"]
+            return _ytdlp_cmd
     except FileNotFoundError:
-        log.warning("yt-dlp not found, attempting auto-install...")
-        if install_ytdlp():
-            # Verify installation worked
-            try:
-                result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
-                if result.returncode == 0:
-                    log.debug(f"yt-dlp now available: {result.stdout.strip()}")
-                    return True
-            except Exception:
-                pass
-        log.error("yt-dlp installation failed")
-        return False
+        log.debug("yt-dlp CLI not found on PATH")
     except subprocess.TimeoutExpired:
-        log.error("yt-dlp version check timed out")
-        return False
+        log.debug("yt-dlp CLI version check timed out")
+
+    # Not found anywhere
+    _ytdlp_cmd = None
+    return []
+
+
+def install_ytdlp() -> bool:
+    """Attempt to install yt-dlp using pip, with fallbacks for restricted environments."""
+    global _ytdlp_cmd
+    log.info("Attempting to install yt-dlp...")
+
+    # Try standard pip install first
+    install_commands = [
+        [sys.executable, "-m", "pip", "install", "yt-dlp"],
+        # Fallback for externally-managed environments (Docker Alpine, etc.)
+        [sys.executable, "-m", "pip", "install", "--user", "yt-dlp"],
+        [sys.executable, "-m", "pip", "install", "--break-system-packages", "yt-dlp"],
+    ]
+
+    for cmd in install_commands:
+        try:
+            log.debug(f"Trying: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            if result.returncode == 0:
+                log.info("yt-dlp installed successfully")
+                # Clear cached command so it gets re-resolved
+                _ytdlp_cmd = None
+                return True
+            else:
+                log.debug(f"Install attempt failed: {result.stderr[:200]}")
+        except Exception as e:
+            log.debug(f"Install attempt error: {e}")
+
+    log.error("All yt-dlp installation attempts failed")
+    return False
+
+
+def check_ytdlp(custom_path: Optional[str] = None) -> bool:
+    """
+    Check if yt-dlp is available, auto-install if missing.
+
+    Args:
+        custom_path: Optional custom path to yt-dlp binary (from plugin settings)
+    """
+    cmd = get_ytdlp_cmd(custom_path)
+    if cmd:
+        return True
+
+    # Not found - attempt auto-install
+    log.warning("yt-dlp not found via Python module or PATH, attempting auto-install...")
+    if install_ytdlp():
+        # Verify installation worked
+        cmd = get_ytdlp_cmd(custom_path)
+        if cmd:
+            log.info("yt-dlp now available after auto-install")
+            return True
+
+    log.error(
+        "yt-dlp is not installed. Install it with: pip install yt-dlp\n"
+        "Or set a custom path in plugin settings (ytdlpPath)."
+    )
+    return False
 
 
 def detect_content_type(metadata: dict) -> str:
@@ -317,19 +394,19 @@ def detect_content_type(metadata: dict) -> str:
     return "video"
 
 
-def extract_metadata(url: str, proxy: Optional[str] = None) -> dict:
+def extract_metadata(url: str, proxy: Optional[str] = None, ytdlp_path: Optional[str] = None) -> dict:
     """
     Extract metadata using yt-dlp without downloading.
 
     Args:
         url: URL to extract metadata from
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
+        ytdlp_path: Optional custom path to yt-dlp binary
 
     Returns:
         dict with metadata on success, or dict with 'extraction_error' key on failure
     """
-    cmd = [
-        "yt-dlp",
+    cmd = get_ytdlp_cmd(ytdlp_path) + [
         "--dump-json",
         "--no-download",
         "--no-playlist",
@@ -631,6 +708,7 @@ def download_video(
     progress_callback: Optional[callable] = None,
     proxy: Optional[str] = None,
     progress_id: Optional[str] = None,
+    ytdlp_path: Optional[str] = None,
 ) -> Optional[str]:
     """
     Download video using yt-dlp with real-time progress reporting.
@@ -643,6 +721,7 @@ def download_video(
         progress_callback: Optional callback for progress updates
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         progress_id: Optional ID for progress file updates (for frontend polling)
+        ytdlp_path: Optional custom path to yt-dlp binary
 
     Returns:
         Path to downloaded file, or None if failed
@@ -661,8 +740,7 @@ def download_video(
 
     output_template = os.path.join(output_dir, filename_template)
 
-    cmd = [
-        "yt-dlp",
+    cmd = get_ytdlp_cmd(ytdlp_path) + [
         "-f",
         format_str,
         "-o",
@@ -898,6 +976,7 @@ def task_download(args: dict) -> dict:
     filename = args.get("filename")
     quality = args.get("quality", "best")
     proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
+    ytdlp_path = args.get("ytdlp_path")  # Optional custom path to yt-dlp binary
     result_id = args.get("result_id")
     progress_id = args.get("progress_id")  # For real-time progress updates
 
@@ -943,8 +1022,8 @@ def task_download(args: dict) -> dict:
                 log.warning("[task_download] Direct download failed, no fallback URL - trying yt-dlp with direct URL")
 
     # Check yt-dlp availability
-    if not check_ytdlp():
-        result = {"result_error": "yt-dlp is not installed or not accessible", "success": False}
+    if not check_ytdlp(ytdlp_path):
+        result = {"result_error": "yt-dlp is not installed or not accessible. Install with: pip install yt-dlp (or set ytdlpPath in plugin settings)", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
@@ -959,7 +1038,7 @@ def task_download(args: dict) -> dict:
 
     # Download using yt-dlp (with proxy if provided)
     # Use ytdlp_url which may be the original page URL if direct download failed
-    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id)
+    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path)
 
     if file_path:
         file_size = os.path.getsize(file_path)
@@ -991,6 +1070,7 @@ def task_extract_metadata(args: dict) -> dict:
     """
     url = args.get("url")
     proxy = args.get("proxy")  # Optional proxy for bypassing restrictions
+    ytdlp_path = args.get("ytdlp_path")  # Optional custom path to yt-dlp binary
     result_id = args.get("result_id")
 
     # Log proxy configuration for troubleshooting
@@ -1005,13 +1085,13 @@ def task_extract_metadata(args: dict) -> dict:
             save_result(result_id, result)
         return result
 
-    if not check_ytdlp():
-        result = {"result_error": "yt-dlp is not installed", "success": False}
+    if not check_ytdlp(ytdlp_path):
+        result = {"result_error": "yt-dlp is not installed. Install with: pip install yt-dlp (or set ytdlpPath in plugin settings)", "success": False}
         if result_id:
             save_result(result_id, result)
         return result
 
-    metadata = extract_metadata(url, proxy=proxy)
+    metadata = extract_metadata(url, proxy=proxy, ytdlp_path=ytdlp_path)
 
     # Check if extraction returned an error
     if "extraction_error" in metadata:
@@ -1208,17 +1288,39 @@ def task_check_ytdlp(args: dict) -> dict:
     would cause write_output to set PluginOutput.error, which Stash
     interprets as a GraphQL error and returns null data.
     """
+    custom_path = args.get("ytdlp_path")
+    cmd = get_ytdlp_cmd(custom_path)
+
+    if not cmd:
+        log.warning("yt-dlp not found via Python module or PATH")
+        return {
+            "available": False,
+            "success": True,
+            "version": None,
+            "status_message": "yt-dlp not installed. Install with: pip install yt-dlp",
+            "resolution_method": None,
+        }
+
     try:
-        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(cmd + ["--version"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             version = result.stdout.strip()
-            log.debug(f"yt-dlp version: {version}")
-            return {"available": True, "success": True, "version": version}
+            # Determine how yt-dlp was found for status reporting
+            if custom_path:
+                method = f"custom path ({custom_path})"
+            elif cmd[0] == sys.executable:
+                method = f"Python module ({sys.executable})"
+            else:
+                method = "CLI on PATH"
+            log.debug(f"yt-dlp version: {version} (via {method})")
+            return {
+                "available": True,
+                "success": True,
+                "version": version,
+                "resolution_method": method,
+            }
         else:
             return {"available": False, "success": True, "version": None, "status_message": "yt-dlp check failed"}
-    except FileNotFoundError:
-        log.warning("yt-dlp not found")
-        return {"available": False, "success": True, "version": None, "status_message": "yt-dlp not installed"}
     except subprocess.TimeoutExpired:
         log.error("yt-dlp version check timed out")
         return {"available": False, "success": True, "version": None, "status_message": "yt-dlp check timed out"}
@@ -1245,8 +1347,8 @@ def task_test_proxy(args: dict) -> dict:
 
     try:
         # Use yt-dlp to test the proxy (it handles SOCKS proxies natively)
-        cmd = [
-            "yt-dlp",
+        ytdlp_path = args.get("ytdlp_path")
+        cmd = get_ytdlp_cmd(ytdlp_path) + [
             "--proxy",
             proxy,
             "--no-download",

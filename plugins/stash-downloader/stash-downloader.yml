@@ -7,6 +7,10 @@ settings:
     displayName: Download Path
     description: "Absolute path for downloaded files (relative to Stash server/container). Overrides Stash library if set. Examples: /data/downloads, /mnt/media/videos. Default: /data/StashDownloader. Leave empty to use your Stash video library."
     type: STRING
+  ytdlpPath:
+    displayName: yt-dlp Path
+    description: "Custom path to yt-dlp binary. Leave empty for auto-detection (tries Python module first, then PATH). Examples: /usr/local/bin/yt-dlp, C:\\tools\\yt-dlp.exe"
+    type: STRING
   httpProxy:
     displayName: HTTP Proxy
     description: HTTP/HTTPS proxy for server-side downloads (e.g., http://proxy.example.com:8080 or socks5://proxy.example.com:1080)

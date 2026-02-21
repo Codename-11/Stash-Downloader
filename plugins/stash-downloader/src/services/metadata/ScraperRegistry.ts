@@ -18,7 +18,9 @@ import { BooruScraper } from './BooruScraper';
 import { RedditScraper } from './RedditScraper';
 import { withTimeout, createLogger } from '@/utils';
 import { getStashService } from '@/services/stash/StashGraphQLService';
-import { PLUGIN_ID } from '@/constants';
+import { getStorageItem } from '@/utils';
+import { PLUGIN_ID, STORAGE_KEYS, DEFAULT_SETTINGS } from '@/constants';
+import type { IPluginSettings } from '@/types';
 
 const log = createLogger('ScraperRegistry');
 
@@ -58,12 +60,15 @@ export class ScraperRegistry {
         return;
       }
 
+      const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const result = await stashService.runPluginOperation(PLUGIN_ID, {
         mode: 'check_ytdlp',
-      }) as { available?: boolean; version?: string; status_message?: string } | null;
+        ytdlp_path: settings.ytdlpPath,
+      }) as { available?: boolean; version?: string; status_message?: string; resolution_method?: string } | null;
 
       if (result?.available && result?.version) {
-        log.debug(`yt-dlp installed: v${result.version}`);
+        const method = result.resolution_method ? ` (${result.resolution_method})` : '';
+        log.debug(`yt-dlp installed: v${result.version}${method}`);
       } else if (result?.available === false) {
         log.warn(`yt-dlp not available: ${result.status_message || 'not installed'}`);
       } else {
