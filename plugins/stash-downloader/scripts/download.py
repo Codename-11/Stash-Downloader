@@ -972,15 +972,16 @@ def download_reddit_media(
     progress_id: Optional[str] = None,
     quality: str = "best",
     ytdlp_path: Optional[str] = None,
-) -> Optional[str]:
+) -> tuple:
     """
     Download media from a Reddit post by scraping the JSON API first.
     Bypasses yt-dlp's Reddit extractor which requires authentication for NSFW.
 
     For images: downloads directly via HTTP (i.redd.it doesn't need auth).
     For videos: passes v.redd.it URL to yt-dlp (v.redd.it doesn't need auth).
+    For galleries: downloads all images directly.
 
-    Returns file path on success, None on failure.
+    Returns tuple of (file_path_or_None, error_message_or_None).
     """
     log.info(f"Downloading Reddit media via scrape_reddit + direct download")
 
@@ -990,20 +991,56 @@ def download_reddit_media(
     if not scrape_result.get("success"):
         error = scrape_result.get("result_error", "Failed to scrape Reddit post")
         log.error(f"Reddit scrape failed: {error}")
-        return None
+        return None, f"Reddit scrape failed: {error}"
 
     is_video = scrape_result.get("is_video", False)
     is_gallery = scrape_result.get("is_gallery", False)
     media_url = scrape_result.get("url", "")
+    post_hint = scrape_result.get("post_hint", "")
+    domain = scrape_result.get("domain", "")
     title = scrape_result.get("title", "reddit_post")
+
+    log.info(f"Reddit post type: is_video={is_video}, is_gallery={is_gallery}, "
+             f"post_hint={post_hint}, domain={domain}, media_url={media_url[:80] if media_url else 'None'}")
 
     # Use provided filename or derive from title
     if not filename:
         filename = sanitize_filename(title)
 
     if is_gallery:
-        log.info("Post is a gallery - should use gallery download path instead")
-        return None
+        # Download gallery images directly
+        gallery_images = scrape_result.get("gallery_images", [])
+        if not gallery_images:
+            return None, "Reddit gallery has no images (gallery_data may be missing)"
+
+        log.info(f"Reddit gallery with {len(gallery_images)} images, downloading directly")
+        import requests
+        os.makedirs(output_dir, exist_ok=True)
+        safe_title = re.sub(r'[<>:"/\\|?*]', '', filename)[:100]
+        downloaded_files = []
+
+        for idx, image_url in enumerate(gallery_images, 1):
+            try:
+                from urllib.parse import urlparse as _urlparse
+                ext = os.path.splitext(_urlparse(image_url).path)[1] or '.jpg'
+                img_filename = f"{safe_title}_{idx:02d}{ext}" if len(gallery_images) > 1 else f"{safe_title}{ext}"
+                filepath = os.path.join(output_dir, img_filename)
+
+                log.info(f"Downloading gallery image {idx}/{len(gallery_images)}: {img_filename}")
+                response = requests.get(image_url, headers={'User-Agent': 'Stash-Downloader/1.0'}, timeout=60)
+                if response.status_code == 200:
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    downloaded_files.append(filepath)
+                else:
+                    log.warning(f"Gallery image {idx} failed: HTTP {response.status_code}")
+            except Exception as e:
+                log.error(f"Gallery image {idx} error: {e}")
+
+        if downloaded_files:
+            log.info(f"Downloaded {len(downloaded_files)}/{len(gallery_images)} gallery images")
+            return downloaded_files[0], None  # Return first image path
+        return None, f"Failed to download any of {len(gallery_images)} gallery images"
 
     if is_video:
         # Reddit videos are hosted on v.redd.it with DASH manifests
@@ -1014,14 +1051,11 @@ def download_reddit_media(
         # But sometimes it's the full DASH URL; either way yt-dlp handles it
         video_url = media_url
         if not video_url or 'v.redd.it' not in video_url:
-            # Fallback: try to construct from post data
-            log.warning(f"No v.redd.it URL found (got: {media_url[:80]}), trying yt-dlp with v.redd.it URL from media")
-            # Some posts have the video URL in different places
+            log.warning(f"No v.redd.it URL found (got: {media_url[:80] if media_url else 'None'})")
             if media_url and media_url.startswith('http'):
                 video_url = media_url
             else:
-                log.error("Could not find video URL in Reddit post data")
-                return None
+                return None, f"Could not find video URL in Reddit post (domain={domain}, url={media_url[:80] if media_url else 'None'})"
 
         # Use yt-dlp for v.redd.it (handles DASH video+audio merge)
         if check_ytdlp(ytdlp_path):
@@ -1031,43 +1065,44 @@ def download_reddit_media(
                 proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path
             )
             if file_path:
-                return file_path
+                return file_path, None
+            return None, f"yt-dlp failed for v.redd.it video: {video_error or 'unknown error'}"
 
-        log.error(f"yt-dlp failed for Reddit video: {video_error or 'unknown error'}")
-        return None
+        return None, "yt-dlp not available for Reddit video download"
 
-    else:
-        # Single image post - download directly
-        image_url = media_url
-        if not image_url:
-            # Try preview URL as fallback
-            image_url = scrape_result.get("preview_url", "")
+    # Single image or link post
+    image_url = media_url
+    if not image_url or not image_url.startswith('http'):
+        # Try preview URL as fallback
+        image_url = scrape_result.get("preview_url", "")
 
-        if not image_url:
-            log.error("No image URL found in Reddit post data")
-            return None
+    if not image_url:
+        return None, (f"No downloadable media URL found in Reddit post "
+                      f"(post_hint={post_hint}, domain={domain}, is_video={is_video})")
 
-        # Unescape HTML entities in preview URLs
-        image_url = image_url.replace('&amp;', '&')
+    # Unescape HTML entities in preview URLs
+    image_url = image_url.replace('&amp;', '&')
 
-        log.info(f"Reddit image detected, downloading directly: {image_url[:80]}...")
+    log.info(f"Reddit image/link detected, downloading directly: {image_url[:80]}...")
 
-        # Determine extension from URL
-        try:
-            from urllib.parse import urlparse as _urlparse
-            ext = os.path.splitext(_urlparse(image_url).path)[1]
-            if not ext:
-                ext = '.jpg'
-        except Exception:
+    # Determine extension from URL
+    try:
+        from urllib.parse import urlparse as _urlparse
+        ext = os.path.splitext(_urlparse(image_url).path)[1]
+        if not ext:
             ext = '.jpg'
+    except Exception:
+        ext = '.jpg'
 
-        if not filename.endswith(ext):
-            filename = f"{filename}{ext}"
+    if not filename.endswith(ext):
+        filename = f"{filename}{ext}"
 
-        file_path = download_direct_file(
-            image_url, output_dir, filename, proxy=proxy, progress_id=progress_id
-        )
-        return file_path
+    file_path = download_direct_file(
+        image_url, output_dir, filename, proxy=proxy, progress_id=progress_id
+    )
+    if file_path:
+        return file_path, None
+    return None, f"Direct download failed for: {image_url[:100]}"
 
 
 def task_download(args: dict) -> dict:
@@ -1126,7 +1161,7 @@ def task_download(args: dict) -> dict:
         reddit_url = fallback_url
     if reddit_url:
         log.info("Detected Reddit post URL - bypassing yt-dlp (auth bypass)")
-        file_path = download_reddit_media(
+        file_path, reddit_error = download_reddit_media(
             reddit_url, output_dir, filename,
             proxy=proxy, progress_id=progress_id,
             quality=quality, ytdlp_path=ytdlp_path,
@@ -1138,8 +1173,13 @@ def task_download(args: dict) -> dict:
                 save_result(result_id, result)
             return result
         else:
-            log.warning("Reddit direct download failed, falling through to yt-dlp")
-            # Fall through to yt-dlp as last resort
+            # Do NOT fall through to yt-dlp for Reddit - it requires auth for NSFW
+            error_msg = reddit_error or "Reddit download failed (unknown reason)"
+            log.error(f"Reddit download failed: {error_msg}")
+            result = {"result_error": error_msg, "success": False}
+            if result_id:
+                save_result(result_id, result)
+            return result
 
     # Track which URL to use for yt-dlp fallback
     ytdlp_url = url
