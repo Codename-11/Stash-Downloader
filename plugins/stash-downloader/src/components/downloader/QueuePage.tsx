@@ -747,10 +747,17 @@ export const QueuePage: React.FC = () => {
             const errorMessage = importError instanceof Error ? importError.message : 'Unknown error';
             debugLog.error(`Batch import failed for ${item.url}:`, errorMessage);
 
-            queue.updateItem(item.id, {
+            // Log the error to the item's per-item logs so it's visible in the log viewer
+            queue.updateItem(item.id, (currentItem) => ({
               status: DownloadStatus.Failed,
               error: `Import failed: ${errorMessage}`,
-            });
+              logs: [...(currentItem.logs || []), {
+                timestamp: new Date(),
+                level: 'error' as const,
+                message: `Import failed: ${errorMessage}`,
+                details: importError instanceof Error ? importError.stack : undefined,
+              }],
+            }));
 
             completedCount++;
             setBatchImportProgress((prev) => ({ ...prev, current: completedCount }));
