@@ -65,25 +65,30 @@ export class YtDlpScraper implements IMetadataScraper {
     try {
       log.debug('Calling runPluginTaskAndWait...');
 
-      // Get proxy setting from localStorage if available
+      // Get proxy and ytdlpPath settings from localStorage if available
       let proxy: string | undefined;
+      let ytdlpPath: string | undefined;
       if (typeof window !== 'undefined') {
         const settings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (settings) {
           try {
             const parsed = JSON.parse(settings);
             proxy = parsed.httpProxy;
+            ytdlpPath = parsed.ytdlpPath;
           } catch {
             // Ignore parse errors
           }
         }
       }
 
-      // Log proxy configuration for troubleshooting
+      // Log configuration for troubleshooting
       if (proxy) {
         log.debug(`Using HTTP proxy for metadata extraction: ${proxy}`);
       } else {
         log.debug('No HTTP proxy configured - using direct connection');
+      }
+      if (ytdlpPath) {
+        log.debug(`Using custom yt-dlp path: ${ytdlpPath}`);
       }
 
       // Check if Stash is busy with long-running tasks (Scan, Generate) that could block us
@@ -107,6 +112,7 @@ export class YtDlpScraper implements IMetadataScraper {
           url: url,
           result_id: resultId,
           proxy: proxy, // Pass proxy if configured
+          ytdlp_path: ytdlpPath, // Pass custom yt-dlp path if configured
         },
         {
           maxWaitMs: this.timeoutMs,

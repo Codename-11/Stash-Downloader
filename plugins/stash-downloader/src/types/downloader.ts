@@ -173,6 +173,8 @@ export type LogLevelSetting = 'off' | 'error' | 'warning' | 'info' | 'debug';
 export interface IPluginSettings {
   /** Fallback directory if no Stash library is configured. Downloads normally go to Stash video library. */
   serverDownloadPath?: string;
+  /** Custom path to yt-dlp binary. Leave empty for auto-detection (Python module first, then PATH). */
+  ytdlpPath?: string;
   httpProxy?: string;
   autoCreatePerformers: boolean;
   autoCreateTags: boolean;

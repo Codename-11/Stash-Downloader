@@ -422,6 +422,7 @@ class ScraperRegistry {
 1. **YtDlpScraper** - PRIMARY for Video: Server-side yt-dlp via Python backend
    - Uses `runPluginTask` to extract metadata (saves to temp file)
    - Uses `runPluginOperation` to read result from temp file
+   - **yt-dlp resolution**: Python module (`sys.executable -m yt_dlp`) → CLI on PATH → custom `ytdlpPath` setting → auto-install
    - Supports HTTP/SOCKS proxy via `httpProxy` setting (passed to yt-dlp via `--proxy` flag)
    - Extracts best quality video URL from formats array or top-level URL
 2. **BooruScraper** - PRIMARY for Image/Gallery: Booru site API scraper
