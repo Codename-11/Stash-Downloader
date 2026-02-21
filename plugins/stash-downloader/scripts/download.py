@@ -508,7 +508,7 @@ def is_direct_file_url(url: str) -> bool:
 def download_direct_file(
     url: str, output_dir: str, filename: Optional[str] = None, proxy: Optional[str] = None,
     progress_id: Optional[str] = None
-) -> Optional[str]:
+) -> tuple:
     """
     Download a direct file URL using requests (no yt-dlp).
 
@@ -520,7 +520,7 @@ def download_direct_file(
         progress_id: Optional ID for progress file updates (for frontend polling)
 
     Returns:
-        Path to downloaded file, or None if failed
+        Tuple of (file_path, error_message). file_path is None on failure.
     """
     import requests
     from urllib.parse import urlparse, unquote, parse_qs
@@ -558,15 +558,6 @@ def download_direct_file(
 
         output_path = os.path.join(output_dir, filename)
 
-        # Configure proxy
-        proxies = None
-        if proxy:
-            log.debug(f"Using proxy for direct download: {proxy}")
-            proxies = {
-                "http": proxy,
-                "https": proxy,
-            }
-
         # Download with streaming
         log.debug(f"Downloading to: {output_path}")
 
@@ -583,15 +574,39 @@ def download_direct_file(
 
         log.debug(f"Using Referer: {referer}")
 
-        response = requests.get(
-            url,
-            headers=headers,
-            proxies=proxies,
-            stream=True,
-            timeout=300,  # 5 minute timeout
-            allow_redirects=True,
-        )
-        response.raise_for_status()
+        def do_download(use_proxy: bool) -> requests.Response:
+            """Helper to download with or without proxy."""
+            proxies = None
+            if use_proxy and proxy:
+                log.debug(f"Using proxy for direct download: {proxy}")
+                proxies = {"http": proxy, "https": proxy}
+            return requests.get(
+                url,
+                headers=headers,
+                proxies=proxies,
+                stream=True,
+                timeout=300,  # 5 minute timeout
+                allow_redirects=True,
+            )
+
+        # Try with proxy first, fallback to direct if SOCKS fails
+        try:
+            response = do_download(use_proxy=bool(proxy))
+            response.raise_for_status()
+        except Exception as e:
+            error_msg = str(e).lower()
+            # If SOCKS proxy failed (missing PySocks), retry without proxy
+            # Image CDNs (i.redd.it, etc.) usually don't need proxies
+            if proxy and ("socks" in error_msg or "missing dependencies" in error_msg):
+                log.warning(f"Proxy failed for direct download (SOCKS issue), retrying without proxy...")
+                try:
+                    response = do_download(use_proxy=False)
+                    response.raise_for_status()
+                    log.info("Direct download succeeded without proxy")
+                except Exception as retry_e:
+                    return None, f"Direct download failed (retry without proxy): {retry_e}"
+            else:
+                return None, f"Direct download failed: {e}"
 
         # Get content length for progress
         total_size = int(response.headers.get("content-length", 0))
@@ -633,14 +648,14 @@ def download_direct_file(
                         log.debug(f"Download progress: {(downloaded / total_size) * 100:.1f}% ({downloaded}/{total_size} bytes)")
 
         log.debug(f"Direct download complete: {output_path} ({downloaded} bytes)")
-        return output_path
+        return output_path, None
 
     except requests.exceptions.RequestException as e:
         log.error(f"Direct download failed (network error): {e}")
-        return None
+        return None, f"Direct download failed (network error): {e}"
     except Exception as e:
         log.error(f"Direct download failed: {e}", exc_info=True)
-        return None
+        return None, f"Direct download failed: {e}"
 
 
 def parse_ytdlp_progress(line: str) -> Optional[dict]:
@@ -1097,12 +1112,12 @@ def download_reddit_media(
     if not filename.endswith(ext):
         filename = f"{filename}{ext}"
 
-    file_path = download_direct_file(
+    file_path, dl_error = download_direct_file(
         image_url, output_dir, filename, proxy=proxy, progress_id=progress_id
     )
     if file_path:
         return file_path, None
-    return None, f"Direct download failed for: {image_url[:100]}"
+    return None, dl_error or f"Direct download failed for: {image_url[:100]}"
 
 
 def task_download(args: dict) -> dict:
@@ -1187,7 +1202,7 @@ def task_download(args: dict) -> dict:
     # Check if this is a direct file URL (try direct download first, fallback to yt-dlp)
     if is_direct_file_url(url):
         log.info(f"Detected direct file URL, trying direct download first")
-        file_path = download_direct_file(url, output_dir, filename, proxy=proxy, progress_id=progress_id)
+        file_path, direct_error = download_direct_file(url, output_dir, filename, proxy=proxy, progress_id=progress_id)
 
         if file_path:
             file_size = os.path.getsize(file_path)
@@ -1200,10 +1215,10 @@ def task_download(args: dict) -> dict:
             # Direct download failed (likely 403/hotlink protection)
             # Fall back to yt-dlp with the original page URL (if provided)
             if fallback_url:
-                log.info(f"Direct download failed, using yt-dlp fallback")
+                log.info(f"Direct download failed ({direct_error}), using yt-dlp fallback")
                 ytdlp_url = fallback_url
             else:
-                log.warning("[task_download] Direct download failed, no fallback URL - trying yt-dlp with direct URL")
+                log.warning(f"[task_download] Direct download failed ({direct_error}), no fallback URL - trying yt-dlp with direct URL")
 
     # Check yt-dlp availability
     if not check_ytdlp(ytdlp_path):
