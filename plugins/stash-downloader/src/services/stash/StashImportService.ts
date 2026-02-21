@@ -133,20 +133,28 @@ export class StashImportService {
       log.debug('Using custom filename for download:', downloadFilename);
     }
 
-    const blob = await this.downloadService.download(downloadUrl, {
-      onProgress: (progress) => {
-        log.debug('Download progress:',
-          `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
-        );
-        if (onProgress) onProgress(progress);
-      },
-      onJobStart: (jobId) => {
-        log.debug('Download job started:', jobId);
-        if (onJobStart) onJobStart(jobId);
-      },
-      fallbackUrl, // Original page URL for yt-dlp if direct download fails
-      filename: downloadFilename, // Use scraped title as filename
-    });
+    let blob: Blob;
+    try {
+      blob = await this.downloadService.download(downloadUrl, {
+        onProgress: (progress) => {
+          log.debug('Download progress:',
+            `${progress.percentage.toFixed(1)}% - ${progress.bytesDownloaded}/${progress.totalBytes} bytes`
+          );
+          if (onProgress) onProgress(progress);
+        },
+        onJobStart: (jobId) => {
+          log.debug('Download job started:', jobId);
+          if (onLog) onLog('info', `Download job started (ID: ${jobId})`);
+          if (onJobStart) onJobStart(jobId);
+        },
+        fallbackUrl, // Original page URL for yt-dlp if direct download fails
+        filename: downloadFilename, // Use scraped title as filename
+      });
+    } catch (downloadError) {
+      const errMsg = downloadError instanceof Error ? downloadError.message : String(downloadError);
+      if (onLog) onLog('error', `Download failed: ${errMsg}`, downloadUrl);
+      throw downloadError;
+    }
 
     // Check if this was a server-side download (file already on disk)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Custom properties added to Blob for server download info

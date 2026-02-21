@@ -709,7 +709,7 @@ def download_video(
     proxy: Optional[str] = None,
     progress_id: Optional[str] = None,
     ytdlp_path: Optional[str] = None,
-) -> Optional[str]:
+) -> tuple:
     """
     Download video using yt-dlp with real-time progress reporting.
 
@@ -724,7 +724,7 @@ def download_video(
         ytdlp_path: Optional custom path to yt-dlp binary
 
     Returns:
-        Path to downloaded file, or None if failed
+        Tuple of (file_path, error_message). file_path is None on failure.
     """
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
@@ -803,6 +803,7 @@ def download_video(
         )
 
         stdout_lines = []  # To capture the final file path
+        error_lines = []   # Capture yt-dlp ERROR lines for reporting
         last_progress_update = 0
         progress_update_interval = 0.5  # Update progress file every 0.5 seconds
 
@@ -879,8 +880,9 @@ def download_video(
                                     "message": line[:100],  # Include last status message
                                 })
                                 last_progress_update = current_time
-                        elif "ERROR" in line or "error" in line.lower():
+                        elif "ERROR" in line:
                             log.error(f"yt-dlp: {line}")
+                            error_lines.append(line)
 
         log.info(f"Finished reading output: {lines_read} lines, {progress_updates} progress updates")
 
@@ -901,7 +903,7 @@ def download_video(
                         "file_path": file_path,
                         "last_updated": time.time(),
                     })
-                return file_path
+                return file_path, None
             else:
                 # Try to find the file in output directory
                 log.warning("Could not determine output path, searching directory...")
@@ -916,10 +918,10 @@ def download_video(
                             "file_path": str(newest),
                             "last_updated": time.time(),
                         })
-                    return str(newest)
+                    return str(newest), None
 
-        # Failed - update progress with error
-        error_msg = "Download failed"
+        # Failed - build descriptive error from yt-dlp output
+        error_msg = "; ".join(error_lines) if error_lines else "yt-dlp download failed (no output)"
         if progress_id:
             save_result(f"progress-{progress_id}", {
                 "status": "error",
@@ -928,10 +930,10 @@ def download_video(
             })
 
         if proxy:
-            log.error(f"yt-dlp download failed (using proxy {proxy})")
+            log.error(f"yt-dlp download failed (using proxy {proxy}): {error_msg}")
         else:
-            log.error(f"yt-dlp download failed (no proxy)")
-        return None
+            log.error(f"yt-dlp download failed (no proxy): {error_msg}")
+        return None, error_msg
 
     except subprocess.TimeoutExpired:
         timeout_msg = f"Download timed out after 1 hour"
@@ -940,7 +942,7 @@ def download_video(
         log.error(timeout_msg)
         if progress_id:
             save_result(f"progress-{progress_id}", {"status": "error", "error": timeout_msg, "last_updated": time.time()})
-        return None
+        return None, timeout_msg
     except Exception as e:
         error_msg = f"Download error: {e}"
         if proxy:
@@ -948,7 +950,7 @@ def download_video(
         log.error(error_msg, exc_info=True)
         if progress_id:
             save_result(f"progress-{progress_id}", {"status": "error", "error": str(e), "last_updated": time.time()})
-        return None
+        return None, error_msg
 
 
 def is_reddit_post_url(url: str) -> bool:
@@ -1024,14 +1026,14 @@ def download_reddit_media(
         # Use yt-dlp for v.redd.it (handles DASH video+audio merge)
         if check_ytdlp(ytdlp_path):
             template = f"{sanitize_filename(filename)}.%(ext)s"
-            file_path = download_video(
+            file_path, video_error = download_video(
                 video_url, output_dir, template, quality,
                 proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path
             )
             if file_path:
                 return file_path
 
-        log.error("yt-dlp failed for Reddit video")
+        log.error(f"yt-dlp failed for Reddit video: {video_error or 'unknown error'}")
         return None
 
     else:
@@ -1180,7 +1182,7 @@ def task_download(args: dict) -> dict:
 
     # Download using yt-dlp (with proxy if provided)
     # Use ytdlp_url which may be the original page URL if direct download failed
-    file_path = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path)
+    file_path, ytdlp_error = download_video(ytdlp_url, output_dir, template, quality, proxy=proxy, progress_id=progress_id, ytdlp_path=ytdlp_path)
 
     if file_path:
         file_size = os.path.getsize(file_path)
@@ -1191,7 +1193,8 @@ def task_download(args: dict) -> dict:
             log.debug(f"Download result saved with result_id: {result_id}")
         return result
     else:
-        result = {"result_error": "Download failed", "success": False}
+        error_detail = ytdlp_error or "Download failed (unknown reason)"
+        result = {"result_error": error_detail, "success": False}
         if result_id:
             save_result(result_id, result)
         return result
