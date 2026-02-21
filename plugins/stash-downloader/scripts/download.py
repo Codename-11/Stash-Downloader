@@ -1059,20 +1059,33 @@ def download_reddit_media(
 
     if is_video:
         # Reddit videos are hosted on v.redd.it with DASH manifests
-        # yt-dlp handles v.redd.it perfectly without auth
-        log.info(f"Reddit video detected, using yt-dlp with v.redd.it URL")
+        # Prefer the fallback_url (direct MP4) from Reddit's JSON API - no auth needed
+        video_fallback = scrape_result.get("video_fallback_url")
 
-        # The media_url for videos is typically https://v.redd.it/<id>
-        # But sometimes it's the full DASH URL; either way yt-dlp handles it
+        if video_fallback:
+            log.info(f"Reddit video detected, using direct fallback URL: {video_fallback[:80]}...")
+
+            # Determine filename with .mp4 extension
+            video_filename = sanitize_filename(filename)
+            if not video_filename.endswith('.mp4'):
+                video_filename = f"{video_filename}.mp4"
+
+            file_path, dl_error = download_direct_file(
+                video_fallback, output_dir, video_filename, proxy=proxy, progress_id=progress_id
+            )
+            if file_path:
+                return file_path, None
+            # If direct download of fallback URL fails, try yt-dlp as last resort
+            log.warning(f"Direct download of fallback URL failed ({dl_error}), trying yt-dlp...")
+
+        # Fallback: try yt-dlp with the v.redd.it or media URL
         video_url = media_url
-        if not video_url or 'v.redd.it' not in video_url:
-            log.warning(f"No v.redd.it URL found (got: {media_url[:80] if media_url else 'None'})")
-            if media_url and media_url.startswith('http'):
-                video_url = media_url
-            else:
-                return None, f"Could not find video URL in Reddit post (domain={domain}, url={media_url[:80] if media_url else 'None'})"
+        if not video_url or not video_url.startswith('http'):
+            if video_fallback:
+                return None, f"Reddit video download failed: {dl_error or 'unknown error'}"
+            return None, f"Could not find video URL in Reddit post (domain={domain})"
 
-        # Use yt-dlp for v.redd.it (handles DASH video+audio merge)
+        log.info(f"Reddit video: trying yt-dlp with URL: {video_url[:80]}...")
         if check_ytdlp(ytdlp_path):
             template = f"{sanitize_filename(filename)}.%(ext)s"
             file_path, video_error = download_video(
@@ -1081,7 +1094,7 @@ def download_reddit_media(
             )
             if file_path:
                 return file_path, None
-            return None, f"yt-dlp failed for v.redd.it video: {video_error or 'unknown error'}"
+            return None, f"yt-dlp failed for Reddit video: {video_error or 'unknown error'}"
 
         return None, "yt-dlp not available for Reddit video download"
 
@@ -1319,6 +1332,9 @@ def task_extract_metadata(args: dict) -> dict:
                 "formats": [],
                 # Pass through gallery images for gallery content type
                 "gallery_images": scrape_result.get("gallery_images", []),
+                # Pass through video info for direct download (bypasses yt-dlp auth)
+                "video_fallback_url": scrape_result.get("video_fallback_url"),
+                "duration": scrape_result.get("video_duration"),
             }
 
             if result_id:
@@ -2038,6 +2054,19 @@ def task_scrape_reddit(args: dict) -> dict:
             except Exception as e:
                 log.error(f"Could not extract gallery images: {e}", exc_info=True)
         
+        # Extract reddit video data (fallback_url is a direct MP4 - no auth/yt-dlp needed)
+        video_source = media_source if 'media' in media_source else post_data
+        reddit_video = (video_source.get('media') or {}).get('reddit_video') or \
+                       (video_source.get('secure_media') or {}).get('reddit_video')
+        if reddit_video:
+            fallback = reddit_video.get('fallback_url', '')
+            if fallback:
+                result['video_fallback_url'] = fallback
+                result['video_duration'] = reddit_video.get('duration')
+                result['video_height'] = reddit_video.get('height')
+                result['video_width'] = reddit_video.get('width')
+                log.info(f"✓ Found video fallback URL: {fallback[:80]}...")
+
         log.info(f"✓ Reddit metadata scraped: {result.get('title', 'Untitled')[:50]}...")
         return result
         
