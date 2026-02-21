@@ -1478,32 +1478,50 @@ def task_fetch_image(args: dict) -> dict:
 def task_download_reddit_gallery(args: dict) -> dict:
     """
     Download Reddit gallery images directly (bypasses yt-dlp auth requirement).
-    
+
     Args:
-        args: Dict with 'url', 'output_dir', and optional 'title'
-        
+        args: Dict with 'url', 'output_dir', optional 'title', 'result_id', 'progress_id'
+
     Returns:
-        Dict with success status and file paths
+        Dict with success status and file paths.
+        If result_id is provided, also saves to file for async retrieval.
     """
     url = args.get("url")
     output_dir = args.get("output_dir", ".")
     title = args.get("title", "reddit_gallery")
-    
+    result_id = args.get("result_id")
+    progress_id = args.get("progress_id")
+
     if not url:
-        return {"success": False, "result_error": "No URL provided"}
-    
+        result = {"success": False, "result_error": "No URL provided"}
+        if result_id:
+            save_result(result_id, result)
+        return result
+
     try:
         import requests
         import os
         import re
         from urllib.parse import urlparse
-        
+
+        # Write initial progress
+        if progress_id:
+            save_result(f"progress-{progress_id}", {
+                "status": "scraping",
+                "downloaded": 0,
+                "total": 0,
+                "current_image": "",
+                "last_updated": time.time(),
+            })
+
         # First, scrape the post to get gallery images
         scrape_result = task_scrape_reddit({"url": url})
-        
+
         if not scrape_result.get("success"):
+            if result_id:
+                save_result(result_id, scrape_result)
             return scrape_result
-        
+
         gallery_images = scrape_result.get("gallery_images", [])
 
         log.info(f"Scrape result returned {len(gallery_images)} gallery images")
@@ -1519,38 +1537,52 @@ def task_download_reddit_gallery(args: dict) -> dict:
                 hint = "Post is not a gallery (no is_gallery flag). It may be a single image or video post."
             else:
                 hint = "Post is marked as gallery but gallery data is missing. The post may have been edited or partially removed."
-            return {
+            result = {
                 "success": False,
                 "result_error": f"No gallery images found in post. {hint}"
             }
-        
+            if result_id:
+                save_result(result_id, result)
+            return result
+
         # Create output directory if needed
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Sanitize title for filename
         safe_title = re.sub(r'[<>:"/\\|?*]', '', title)[:100]
-        
+
         downloaded_files = []
-        log.info(f"Downloading {len(gallery_images)} gallery images...")
-        
+        total_images = len(gallery_images)
+        log.info(f"Downloading {total_images} gallery images...")
+
         for idx, image_url in enumerate(gallery_images, 1):
             try:
+                # Update progress before downloading each image
+                if progress_id:
+                    save_result(f"progress-{progress_id}", {
+                        "status": "downloading",
+                        "downloaded": idx - 1,
+                        "total": total_images,
+                        "current_image": image_url[:100],
+                        "last_updated": time.time(),
+                    })
+
                 # Get file extension from URL
                 parsed = urlparse(image_url)
                 ext = os.path.splitext(parsed.path)[1] or '.jpg'
-                
+
                 # Build output filename
-                if len(gallery_images) == 1:
+                if total_images == 1:
                     filename = f"{safe_title}{ext}"
                 else:
                     filename = f"{safe_title}_{idx:02d}{ext}"
-                
+
                 filepath = os.path.join(output_dir, filename)
-                
+
                 # Download image
-                log.info(f"Downloading image {idx}/{len(gallery_images)}: {filename}")
+                log.info(f"Downloading image {idx}/{total_images}: {filename}")
                 response = requests.get(image_url, headers={'User-Agent': 'Stash-Downloader/1.0'}, timeout=60)
-                
+
                 if response.status_code == 200:
                     with open(filepath, 'wb') as f:
                         f.write(response.content)
@@ -1558,30 +1590,49 @@ def task_download_reddit_gallery(args: dict) -> dict:
                     log.info(f"✓ Downloaded: {filename}")
                 else:
                     log.warning(f"Failed to download image {idx}: HTTP {response.status_code}")
-                    
+
             except Exception as e:
                 log.error(f"Error downloading image {idx}: {e}")
                 continue
-        
+
+        # Final progress update
+        if progress_id:
+            save_result(f"progress-{progress_id}", {
+                "status": "complete",
+                "downloaded": len(downloaded_files),
+                "total": total_images,
+                "last_updated": time.time(),
+            })
+
         if downloaded_files:
-            log.info(f"✓ Successfully downloaded {len(downloaded_files)}/{len(gallery_images)} images")
-            return {
+            log.info(f"✓ Successfully downloaded {len(downloaded_files)}/{total_images} images")
+            result = {
                 "success": True,
                 "files": downloaded_files,
                 "count": len(downloaded_files),
             }
         else:
-            return {
+            result = {
                 "success": False,
                 "result_error": "Failed to download any images"
             }
-            
+
+        if result_id:
+            save_result(result_id, result)
+        return result
+
     except ImportError:
         log.error("requests library not available")
-        return {"success": False, "result_error": "requests library not installed"}
+        result = {"success": False, "result_error": "requests library not installed"}
+        if result_id:
+            save_result(result_id, result)
+        return result
     except Exception as e:
         log.error(f"Failed to download Reddit gallery: {e}", exc_info=True)
-        return {"success": False, "result_error": str(e)}
+        result = {"success": False, "result_error": str(e)}
+        if result_id:
+            save_result(result_id, result)
+        return result
 
 
 def task_scrape_reddit(args: dict) -> dict:

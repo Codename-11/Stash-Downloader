@@ -66,11 +66,13 @@ export class DownloadService {
   }
 
   /**
-   * Download Reddit gallery directly (bypasses yt-dlp auth requirement)
+   * Download Reddit gallery directly (bypasses yt-dlp auth requirement).
+   * Uses the result_id + progress_id pattern for async result retrieval.
    */
   private async downloadRedditGallery(
     url: string,
-    options: IDownloadOptions = {}
+    options: IDownloadOptions = {},
+    onGalleryProgress?: (progress: IGalleryProgress) => void
   ): Promise<IServerDownloadResult> {
     log.info('Downloading Reddit gallery via direct Python download');
 
@@ -78,6 +80,38 @@ export class DownloadService {
       const stashService = getStashService();
       const settings = getStorageItem<IPluginSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
       const serverDownloadPath = settings.serverDownloadPath || options.outputDir || DEFAULT_SETTINGS.serverDownloadPath;
+
+      // Generate IDs for result and progress tracking (same pattern as video downloads)
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const resultId = `gallery-${uniqueId}`;
+      const progressId = uniqueId;
+      log.debug('Gallery Result ID:', resultId);
+      log.debug('Gallery Progress ID:', progressId);
+
+      // Start progress polling for per-image updates
+      let progressPollInterval: ReturnType<typeof setInterval> | null = null;
+      if (onGalleryProgress || options.onProgress) {
+        progressPollInterval = setInterval(async () => {
+          try {
+            const progressResult = await stashService.runPluginOperation(PLUGIN_ID, {
+              mode: 'read_result',
+              result_id: `progress-${progressId}`,
+            }) as any;
+
+            if (progressResult?.retrieved && progressResult.status) {
+              if (onGalleryProgress) {
+                onGalleryProgress({
+                  totalImages: progressResult.total || 0,
+                  downloadedImages: progressResult.downloaded || 0,
+                  currentImageUrl: progressResult.current_image || undefined,
+                });
+              }
+            }
+          } catch {
+            // Ignore progress poll errors
+          }
+        }, 1500); // Poll every 1.5s (gallery images download quickly)
+      }
 
       const taskResult = await stashService.runPluginTaskAndWait(
         PLUGIN_ID,
@@ -87,34 +121,77 @@ export class DownloadService {
           url: url,
           output_dir: serverDownloadPath,
           title: options.filename || 'reddit_gallery',
+          result_id: resultId,
+          progress_id: progressId,
         },
         {
           maxWaitMs: 300000, // 5 minutes
+          onJobStart: (jobId) => {
+            log.debug(`Gallery download job started: ${jobId}`);
+            if (options.onJobStart) options.onJobStart(jobId);
+          },
         }
-      ) as { success: boolean; error?: string; jobId?: string; output?: { files?: string[]; count?: number } };
+      );
 
-      if (!taskResult.success) {
-        log.error('Reddit gallery download failed:', taskResult.error);
-        return { success: false, error: taskResult.error || 'Reddit gallery download failed' };
+      // Stop progress polling
+      if (progressPollInterval) {
+        clearInterval(progressPollInterval);
       }
 
-      // The Python script returns files array
-      const files = taskResult.output?.files || [];
-      const count = taskResult.output?.count || 0;
+      // Cleanup progress file
+      stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'cleanup_result',
+        result_id: `progress-${progressId}`,
+      }).catch(() => { /* ignore cleanup errors */ });
 
-      if (!files || files.length === 0) {
-        log.error('No files downloaded from Reddit gallery');
+      if (!taskResult.success) {
+        log.error('Reddit gallery download task failed:', taskResult.error);
+        return { success: false, error: taskResult.error || 'Reddit gallery download failed', jobId: taskResult.jobId };
+      }
+
+      // Read the result file to get file paths (same pattern as video downloads)
+      log.info('Gallery download task completed, reading result...');
+      const result = await stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'read_result',
+        result_id: resultId,
+      }) as any;
+
+      log.debug('Gallery read result:', JSON.stringify(result));
+
+      if (!result || result.retrieved === false || result.not_found) {
+        log.error('Gallery result file not found');
+        return { success: false, error: 'Gallery download failed - no result file created. Check Stash logs.' };
+      }
+
+      // Check for errors in the result
+      if (result.task_error || result.result_error) {
+        const errorMsg = result.task_error || result.result_error;
+        log.error('Gallery download error:', errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      const files: string[] = result.files || [];
+      const count = result.count || 0;
+
+      // Cleanup result file
+      stashService.runPluginOperation(PLUGIN_ID, {
+        mode: 'cleanup_result',
+        result_id: resultId,
+      }).catch(() => { /* ignore cleanup errors */ });
+
+      if (files.length === 0) {
+        log.error('No files in gallery download result');
         return { success: false, error: 'No images downloaded from gallery' };
       }
 
       log.success(`Downloaded ${count} images from Reddit gallery`);
 
-      // Return the first file path for compatibility
       return {
         success: true,
         filePath: String(files[0] || ''),
         fileSize: 0, // Not tracked for galleries
-        files: files.map(f => String(f)), // Include all file paths
+        files: files.map(f => String(f)),
+        jobId: taskResult.jobId,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -129,7 +206,9 @@ export class DownloadService {
    */
   async downloadServerSide(
     url: string,
-    options: IDownloadOptions = {}
+    options: IDownloadOptions = {},
+    contentType?: ContentType,
+    onGalleryProgress?: (progress: IGalleryProgress) => void
   ): Promise<IServerDownloadResult> {
     log.info('Attempting server-side download via plugin task');
     log.debug('Download URL:', url);
@@ -144,11 +223,10 @@ export class DownloadService {
         return { success: false, error: 'Not in Stash environment' };
       }
 
-      // Check if this is a Reddit gallery - use direct download instead of yt-dlp
-      const isRedditGallery = url.includes('reddit.com') && url.includes('/comments/');
-      if (isRedditGallery) {
-        log.info('Detected Reddit gallery URL - using direct gallery download');
-        return await this.downloadRedditGallery(url, options);
+      // Only route to gallery download when the item is explicitly a Gallery content type
+      if (contentType === ContentType.Gallery && url.includes('reddit.com')) {
+        log.info('Content type is Gallery + Reddit URL - using direct gallery download');
+        return await this.downloadRedditGallery(url, options, onGalleryProgress);
       }
 
       // Generate IDs for result and progress tracking
@@ -573,7 +651,7 @@ export class DownloadService {
           }
 
           // Pass original page URL as fallback for yt-dlp if direct download fails
-          const serverResult = await this.downloadServerSide(videoUrl, { ...options, fallbackUrl: url });
+          const serverResult = await this.downloadServerSide(videoUrl, { ...options, fallbackUrl: url }, contentType);
           if (serverResult.success && serverResult.file_path) {
             log.debug('Server-side download complete:', serverResult.file_path);
 
@@ -629,7 +707,7 @@ export class DownloadService {
         }
 
         // Pass fallbackUrl for yt-dlp if direct download fails
-        const serverResult = await this.downloadServerSide(url, options);
+        const serverResult = await this.downloadServerSide(url, options, contentType);
         if (serverResult.success && serverResult.file_path) {
           log.debug('Server-side download complete:', serverResult.file_path);
 

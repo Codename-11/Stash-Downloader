@@ -4,7 +4,7 @@
  */
 
 import { DownloadStatus } from '@/types';
-import type { IDownloadProgress, IItemLogEntry } from '@/types';
+import type { IDownloadProgress, IGalleryProgress, IItemLogEntry } from '@/types';
 import type { IDownloadItem } from '@/types';
 
 type UpdateItemFn = (
@@ -51,6 +51,13 @@ export function createImportCallbacks({ itemId, updateItem, debugLog }: ImportCa
       debugLog?.debug('Import job started with ID:', jobId);
       updateItem(itemId, {
         stashJobId: jobId,
+        lastActivityAt: new Date(),
+      });
+    },
+    onGalleryProgress: (progress: IGalleryProgress) => {
+      updateItem(itemId, {
+        galleryProgress: progress,
+        status: DownloadStatus.Downloading,
         lastActivityAt: new Date(),
       });
     },

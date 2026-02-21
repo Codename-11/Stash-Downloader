@@ -10,6 +10,7 @@ import type {
   IStashTag,
   IStashStudio,
   IDownloadProgress,
+  IGalleryProgress,
   IItemLogEntry,
   PostImportAction,
 } from '@/types';
@@ -47,9 +48,11 @@ export class StashImportService {
       onLog?: (level: IItemLogEntry['level'], message: string, details?: string) => void;
       /** Called when the Stash job starts, with the jobId for potential cancellation */
       onJobStart?: (jobId: string) => void;
+      /** Called during gallery downloads with per-image progress */
+      onGalleryProgress?: (progress: IGalleryProgress) => void;
     }
   ): Promise<IStashScene | IStashImage> {
-    const { onProgress, onStatusChange, onLog, onJobStart } = callbacks || {};
+    const { onProgress, onStatusChange, onLog, onJobStart, onGalleryProgress } = callbacks || {};
     if (!item.editedMetadata) {
       throw new Error('Item must have edited metadata before import');
     }
@@ -60,9 +63,16 @@ export class StashImportService {
       title: itemTitle,
       hasMetadata: !!item.metadata,
       hasVideoUrl: !!item.metadata?.videoUrl,
+      contentType: item.metadata?.contentType,
     }));
 
     if (onLog) onLog('info', `Starting import for: ${itemTitle}`);
+
+    // Gallery-specific import path
+    const detectedContentType = item.metadata?.contentType;
+    if (detectedContentType === ContentType.Gallery) {
+      return this.importGallery(item, { onProgress, onStatusChange, onLog, onJobStart, onGalleryProgress });
+    }
 
     // Determine which URL to download from
     // For yt-dlp sites, always use the original page URL (yt-dlp handles finding the video)
@@ -417,6 +427,165 @@ export class StashImportService {
 
     if (onLog) onLog('success', 'Import completed successfully');
     return result;
+  }
+
+  /**
+   * Import a gallery (multiple images) to Stash via server-side download
+   */
+  private async importGallery(
+    item: IDownloadItem,
+    callbacks: {
+      onProgress?: (progress: IDownloadProgress) => void;
+      onStatusChange?: (status: string) => void;
+      onLog?: (level: IItemLogEntry['level'], message: string, details?: string) => void;
+      onJobStart?: (jobId: string) => void;
+      onGalleryProgress?: (progress: IGalleryProgress) => void;
+    }
+  ): Promise<IStashScene | IStashImage> {
+    const { onStatusChange, onLog, onJobStart, onGalleryProgress } = callbacks;
+
+    if (onStatusChange) onStatusChange('Downloading gallery...');
+    if (onLog) onLog('info', 'Starting gallery download via server-side...');
+
+    // Use server-side download which routes galleries to downloadRedditGallery
+    const galleryResult = await this.downloadService.downloadServerSide(
+      item.url,
+      {
+        filename: item.editedMetadata?.title || item.metadata?.title || 'gallery',
+        onJobStart,
+      },
+      ContentType.Gallery,
+      onGalleryProgress
+    );
+
+    if (!galleryResult.success || !galleryResult.files || galleryResult.files.length === 0) {
+      throw new Error(galleryResult.error || 'Gallery download failed - no files downloaded');
+    }
+
+    const filePaths = galleryResult.files;
+    if (onLog) onLog('success', `Downloaded ${filePaths.length} gallery images`);
+
+    // Trigger scan for the directory containing the files
+    if (onStatusChange) onStatusChange('Scanning files...');
+    if (onLog) onLog('info', 'Triggering Stash scan for downloaded files...');
+
+    // Get directory from first file path
+    const firstFile = filePaths[0]!;
+    const scanJobId = await this.stashService.triggerScanForFile(firstFile);
+
+    if (scanJobId) {
+      if (onLog) onLog('info', `Scan job started (ID: ${scanJobId})`);
+      const scanResult = await this.stashService.waitForJob(scanJobId, {
+        pollIntervalMs: 1000,
+        maxWaitMs: 60000,
+      });
+      if (!scanResult.success) {
+        log.warn('Scan job did not complete successfully:', scanResult.error);
+        if (onLog) onLog('warning', `Scan may not have completed: ${scanResult.error}`);
+      } else {
+        if (onLog) onLog('success', 'Scan completed');
+      }
+    }
+
+    // Find the first image by path to use as the "result"
+    if (onStatusChange) onStatusChange('Finding images in Stash...');
+    if (onLog) onLog('info', 'Looking for scanned images in Stash...');
+
+    let foundScene: IStashScene | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      foundScene = await this.stashService.findSceneByPath(firstFile);
+      if (foundScene) break;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      log.debug(`Retry ${attempt + 1}/5 finding image by path`);
+    }
+
+    if (!foundScene) {
+      log.warn('Could not find gallery image by path after scan');
+      if (onLog) onLog('warning', 'Images not found in Stash after scan - metadata will not be applied');
+
+      return {
+        id: `pending-scan-${Date.now()}`,
+        title: item.editedMetadata?.title || 'Gallery (pending scan)',
+        path: firstFile,
+        organized: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        files: [],
+        paths: { screenshot: '', preview: '', stream: '', webp: '', vtt: '', chapters_vtt: '' },
+      } as IStashScene;
+    }
+
+    if (onLog) onLog('success', `Found image in Stash (ID: ${foundScene.id})`);
+
+    // Apply metadata to the found scene/image
+    if (onStatusChange) onStatusChange('Applying metadata...');
+    if (onLog) onLog('info', 'Applying metadata (performers, tags, studio)...');
+
+    const editedMeta = item.editedMetadata;
+    const scrapedMeta = item.metadata;
+    const updateInput: Record<string, unknown> = {
+      title: editedMeta?.title || scrapedMeta?.title,
+      details: editedMeta?.description || scrapedMeta?.description,
+      url: item.url,
+      date: editedMeta?.date || scrapedMeta?.date,
+    };
+
+    // Resolve performers
+    const performerNames = editedMeta?.performerNames || scrapedMeta?.performers || [];
+    if (performerNames.length > 0) {
+      if (onLog) onLog('info', `Resolving ${performerNames.length} performer(s)...`);
+      const performerIds: string[] = [];
+      for (const name of performerNames) {
+        try {
+          const performer = await this.stashService.getOrCreatePerformer(name);
+          performerIds.push(performer.id);
+        } catch (err) {
+          log.warn(`Failed to resolve performer "${name}": ${String(err)}`);
+        }
+      }
+      if (performerIds.length > 0) {
+        updateInput.performer_ids = performerIds;
+        if (onLog) onLog('success', `Linked ${performerIds.length} performer(s)`);
+      }
+    }
+
+    // Resolve tags
+    const tagNames = editedMeta?.tagNames || scrapedMeta?.tags || [];
+    if (tagNames.length > 0) {
+      if (onLog) onLog('info', `Resolving ${tagNames.length} tag(s)...`);
+      const tagIds: string[] = [];
+      for (const name of tagNames) {
+        try {
+          const tag = await this.stashService.getOrCreateTag(name);
+          tagIds.push(tag.id);
+        } catch (err) {
+          log.warn(`Failed to resolve tag "${name}": ${String(err)}`);
+        }
+      }
+      if (tagIds.length > 0) {
+        updateInput.tag_ids = tagIds;
+        if (onLog) onLog('success', `Linked ${tagIds.length} tag(s)`);
+      }
+    }
+
+    // Resolve studio
+    const studioName = editedMeta?.studioName || scrapedMeta?.studio;
+    if (studioName) {
+      if (onLog) onLog('info', `Resolving studio: ${studioName}...`);
+      try {
+        const studio = await this.stashService.getOrCreateStudio(studioName);
+        updateInput.studio_id = studio.id;
+        if (onLog) onLog('success', `Linked studio: ${studio.name}`);
+      } catch (err) {
+        log.warn(`Failed to resolve studio "${studioName}": ${String(err)}`);
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- updateInput built dynamically
+    const updatedScene = await this.stashService.updateScene(foundScene.id, updateInput as any);
+    if (onLog) onLog('success', `Gallery import completed! ${filePaths.length} images imported`);
+
+    return updatedScene;
   }
 
   /**
