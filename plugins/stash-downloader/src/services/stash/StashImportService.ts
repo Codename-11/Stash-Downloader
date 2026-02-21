@@ -108,7 +108,9 @@ export class StashImportService {
       }
     } else {
       log.debug('Using page URL (no direct video URL found):', downloadUrl);
-      if (onLog) onLog('info', 'No direct video URL found, using page URL');
+      // Reddit URLs are handled server-side via scrape_reddit — this is normal
+      const isReddit = item.url.toLowerCase().includes('reddit.com/');
+      if (onLog) onLog('info', isReddit ? 'Using Reddit URL (server-side download)' : 'No direct video URL found, using page URL');
     }
 
     // Download the file
