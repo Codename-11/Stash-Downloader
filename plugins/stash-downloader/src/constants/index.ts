@@ -2,16 +2,47 @@
  * Application constants
  */
 
-export const PLUGIN_ID = 'stash-downloader';
-export const PLUGIN_NAME = 'Stash Downloader';
+/**
+ * Detect plugin ID dynamically.
+ * When installed as dev build, the YAML is renamed to stash-downloader-dev.yml,
+ * so Stash assigns plugin ID "stash-downloader-dev". We detect this from the
+ * script URL path (/plugin/stash-downloader-dev/javascript) to ensure
+ * runPluginTask targets the correct plugin instance.
+ */
+function detectPluginId(): string {
+  try {
+    // Check current page URL for plugin route
+    if (typeof window !== 'undefined' && window.location?.pathname) {
+      if (window.location.pathname.includes('/plugin/stash-downloader-dev')) {
+        return 'stash-downloader-dev';
+      }
+    }
+    // Check if our JS was loaded from the dev plugin path
+    if (typeof document !== 'undefined') {
+      const scripts = document.querySelectorAll('script[src*="stash-downloader"]');
+      for (const script of scripts) {
+        const src = script.getAttribute('src') || '';
+        if (src.includes('stash-downloader-dev')) {
+          return 'stash-downloader-dev';
+        }
+      }
+    }
+  } catch {
+    // Fallback to stable ID
+  }
+  return 'stash-downloader';
+}
+
+export const PLUGIN_ID = detectPluginId();
+export const PLUGIN_NAME = PLUGIN_ID === 'stash-downloader-dev' ? 'Stash Downloader (Dev)' : 'Stash Downloader';
 // Version is injected at build time via __APP_VERSION__ (from package.json)
 
 export const ROUTES = {
-  MAIN: '/plugin/stash-downloader',
-  QUEUE: '/plugin/stash-downloader/queue',
-  METADATA: '/plugin/stash-downloader/metadata',
-  SETTINGS: '/plugin/stash-downloader/settings',
-} as const;
+  MAIN: `/plugin/${PLUGIN_ID}`,
+  QUEUE: `/plugin/${PLUGIN_ID}/queue`,
+  METADATA: `/plugin/${PLUGIN_ID}/metadata`,
+  SETTINGS: `/plugin/${PLUGIN_ID}/settings`,
+};
 
 export const DEFAULT_SETTINGS = {
   serverDownloadPath: '/data/StashDownloader',
