@@ -581,16 +581,41 @@ export const QueuePage: React.FC = () => {
     }
   };
 
-  // Handle retry all failed items
-  const handleRetryAll = async () => {
+  // Handle retry all failed items - resets all immediately, then scrapes in background
+  const handleRetryAll = () => {
     const failedItems = queue.items.filter((i) => i.status === DownloadStatus.Failed);
     if (failedItems.length === 0) return;
 
-    toast.showToast('info', 'Retry All', `Retrying ${failedItems.length} failed item(s)...`);
+    toast.showToast('info', 'Retry All', `Resetting ${failedItems.length} failed item(s)...`);
     log.addLog('info', 'retry', `Retrying all ${failedItems.length} failed items`);
 
+    // Reset all items to pending immediately (instant visual feedback)
     for (const item of failedItems) {
-      await handleRetry(item.id);
+      queue.updateItem(item.id, {
+        status: DownloadStatus.Pending,
+        error: undefined,
+        progress: undefined,
+      });
+    }
+
+    // Fire off scrapes in background for items that need metadata
+    const needsScrape = failedItems.filter((item) => !item.metadata);
+    if (needsScrape.length > 0) {
+      log.addLog('info', 'retry', `Re-scraping ${needsScrape.length} item(s) without metadata...`);
+      for (const item of needsScrape) {
+        // Fire-and-forget — don't await each scrape
+        scraperRegistry.scrapeWithEnhancement(item.url, undefined).then((metadata) => {
+          queue.updateItem(item.id, { metadata, error: undefined });
+          log.addLog('success', 'retry', `Re-scraped: ${metadata.title || item.url}`);
+        }).catch((error) => {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          queue.updateItem(item.id, {
+            error: `Retry scrape failed: ${errorMessage}`,
+            status: DownloadStatus.Failed,
+          });
+          log.addLog('error', 'retry', `Re-scrape failed: ${errorMessage}`);
+        });
+      }
     }
   };
 
@@ -1006,11 +1031,11 @@ export const QueuePage: React.FC = () => {
                 </button>
               )}
               <button
-                className="btn btn-outline-secondary btn-sm"
+                className="btn btn-outline-success btn-sm"
                 onClick={queue.clearCompleted}
                 disabled={queue.stats.complete === 0}
               >
-                Clear Completed
+                Clear Completed ({queue.stats.complete})
               </button>
               <button
                 className="btn btn-outline-danger btn-sm"
