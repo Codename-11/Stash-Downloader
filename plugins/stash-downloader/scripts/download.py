@@ -1948,17 +1948,31 @@ def task_scrape_reddit(args: dict) -> dict:
         post_data = children[0].get('data', {})
 
         # Detect deleted/removed posts early
+        # Note: author == '[deleted]' alone does NOT mean the post is gone —
+        # it can mean the account was deleted while the post+media remain accessible.
+        # A truly deleted post has no media URL AND author is [deleted].
         author = post_data.get('author')
         removed_by = post_data.get('removed_by_category')
-        is_deleted = (author == '[deleted]' or removed_by == 'deleted')
+        post_url = post_data.get('url', '')
+        post_selftext = post_data.get('selftext', '')
+        has_media = bool(post_url and post_url.startswith('http'))
+
+        is_truly_deleted = (
+            (author == '[deleted]' or removed_by == 'deleted')
+            and not has_media
+            and post_selftext in ('', '[deleted]', '[removed]')
+        )
         is_removed = (removed_by is not None and removed_by != 'deleted')
 
-        if is_deleted:
+        if is_truly_deleted:
             log.warning("Post has been deleted by its author - media is no longer available")
             return {
                 "success": False,
                 "result_error": "This Reddit post has been deleted by its author. Media is no longer available on Reddit."
             }
+
+        if author == '[deleted]':
+            log.info("Post author deleted their account, but media may still be available")
 
         if is_removed:
             log.warning(f"Post has been removed (reason: {removed_by}) - media may not be available")
