@@ -47,11 +47,14 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
   const [newPerformer, setNewPerformer] = useState('');
   const [newTag, setNewTag] = useState('');
 
-  // Expanded sections state
+  // Expanded sections state - auto-expand when data exists
   const [expandedSections, setExpandedSections] = useState({
-    performers: false,
-    tags: false,
+    performers: (item.metadata?.performers?.length ?? 0) > 0,
+    tags: (item.metadata?.tags?.length ?? 0) > 0,
   });
+
+  // Description expand state
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const handlePreview = (url: string, type: 'image' | 'video') => {
     setPreviewUrl(url);
@@ -179,50 +182,117 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
             {/* Preview Section */}
             <div className="d-flex gap-3 align-items-start">
               {/* Thumbnail */}
-              {item.metadata?.thumbnailUrl && settings.showThumbnailPreviews ? (
-                <img
-                  src={item.metadata.thumbnailUrl}
-                  alt="Preview"
-                  style={{
-                    width: '160px',
-                    height: '100px',
-                    objectFit: 'cover',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    border: '1px solid #394b59',
-                    flexShrink: 0,
-                  }}
-                  onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                  title="Click to view full size"
-                />
-              ) : (
-                <div
-                  className="d-flex align-items-center justify-content-center"
-                  style={{
-                    width: '160px',
-                    height: '100px',
-                    backgroundColor: '#243340',
-                    borderRadius: '4px',
-                    border: '1px solid #394b59',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span style={{ fontSize: '32px', opacity: 0.5 }}>
-                    {item.metadata?.contentType === ContentType.Image ? '🖼️' :
-                     item.metadata?.contentType === ContentType.Gallery ? '📁' : '🎬'}
-                  </span>
-                </div>
-              )}
+              <div style={{ flexShrink: 0 }}>
+                {item.metadata?.thumbnailUrl && settings.showThumbnailPreviews ? (
+                  <img
+                    src={item.metadata.thumbnailUrl}
+                    alt="Preview"
+                    style={{
+                      width: '160px',
+                      height: '100px',
+                      objectFit: 'cover',
+                      cursor: 'pointer',
+                      borderRadius: '4px',
+                      border: '1px solid #394b59',
+                    }}
+                    onClick={() => item.metadata?.thumbnailUrl && handlePreview(item.metadata.thumbnailUrl, 'image')}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                    title="Click to view full size"
+                  />
+                ) : (
+                  <div
+                    className="d-flex align-items-center justify-content-center"
+                    style={{
+                      width: '160px',
+                      height: '100px',
+                      backgroundColor: '#243340',
+                      borderRadius: '4px',
+                      border: '1px solid #394b59',
+                    }}
+                  >
+                    <span style={{ fontSize: '32px', opacity: 0.5 }}>
+                      {item.metadata?.contentType === ContentType.Image ? '🖼️' :
+                       item.metadata?.contentType === ContentType.Gallery ? '📁' : '🎬'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Gallery thumbnail grid */}
+                {item.metadata?.contentType === ContentType.Gallery
+                  && item.metadata.galleryImages
+                  && item.metadata.galleryImages.length > 1
+                  && settings.showThumbnailPreviews && (
+                  <div className="d-flex flex-wrap gap-1 mt-1" style={{ width: '160px' }}>
+                    {item.metadata.galleryImages.slice(0, 6).map((img, i) => {
+                      const isLast = i === 5 && item.metadata!.galleryImages!.length > 6;
+                      const remaining = item.metadata!.galleryImages!.length - 6;
+                      return (
+                        <div
+                          key={img.url}
+                          style={{
+                            width: '50px',
+                            height: '50px',
+                            position: 'relative',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => handlePreview(img.url, 'image')}
+                          title={isLast ? `+${remaining} more` : `Image ${i + 1}`}
+                        >
+                          <img
+                            src={img.url}
+                            alt={`Gallery ${i + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              borderRadius: '3px',
+                              border: '1px solid #394b59',
+                              opacity: isLast ? 0.4 : 1,
+                            }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          {isLast && (
+                            <span style={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fff',
+                              fontWeight: 'bold',
+                              fontSize: '0.75rem',
+                            }}>
+                              +{remaining}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Info */}
               <div className="flex-grow-1">
                 <h5 className="mb-1" style={{ wordBreak: 'break-word' }}>
                   {item.metadata?.title || 'Untitled'}
                 </h5>
-                <div className="d-flex gap-2 flex-wrap mb-2">
+
+                {/* Subreddit / Author line */}
+                {(item.metadata?.studio || (item.metadata?.performers?.length ?? 0) > 0) && (
+                  <div className="mb-1" style={{ color: '#8b9fad', fontSize: '0.85rem' }}>
+                    {item.metadata?.studio && <span>{item.metadata.studio}</span>}
+                    {item.metadata?.studio && (item.metadata?.performers?.length ?? 0) > 0 && ' · '}
+                    {(item.metadata?.performers?.length ?? 0) > 0 && (
+                      <span>{item.metadata!.performers![0]}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Badges row */}
+                <div className="d-flex gap-2 flex-wrap mb-1">
                   {item.metadata?.duration && (
                     <span className="badge bg-secondary">
                       ⏱ {formatDuration(item.metadata.duration)}
@@ -236,26 +306,53 @@ export const MetadataEditorForm: React.FC<MetadataEditorFormProps> = ({
                   {item.metadata?.contentType && (
                     <span className="badge bg-info">
                       {item.metadata.contentType === ContentType.Video ? '🎥 Video' :
-                       item.metadata.contentType === ContentType.Image ? '🖼️ Image' : '📁 Gallery'}
+                       item.metadata.contentType === ContentType.Image ? '🖼️ Image' :
+                       `📁 Gallery${item.metadata.galleryImages ? ` (${item.metadata.galleryImages.length})` : ''}`}
+                    </span>
+                  )}
+                  {item.metadata?.date && (
+                    <span className="badge bg-secondary">
+                      📅 {item.metadata.date}
                     </span>
                   )}
                 </div>
+
                 <small className="text-muted d-block">
                   Source: {getHostname(item.url)}
                 </small>
-              </div>
-            </div>
 
-            {/* URL Display */}
-            <div>
-              <label className="form-label" style={{ color: '#8b9fad' }}>Source URL</label>
-              <input
-                type="text"
-                className="form-control text-light"
-                style={{ backgroundColor: '#243340', borderColor: '#394b59' }}
-                value={item.url}
-                disabled
-              />
+                {/* Description preview */}
+                {item.metadata?.description && (
+                  <div className="mt-1">
+                    <small
+                      className="d-block"
+                      style={{
+                        color: '#8b9fad',
+                        fontSize: '0.8rem',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: descriptionExpanded ? undefined : 2,
+                        WebkitBoxOrient: 'vertical',
+                        cursor: 'pointer',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                      onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+                      title={descriptionExpanded ? 'Click to collapse' : 'Click to expand'}
+                    >
+                      {item.metadata.description}
+                    </small>
+                    {item.metadata.description.length > 100 && !descriptionExpanded && (
+                      <small
+                        style={{ color: '#6c8da0', cursor: 'pointer', fontSize: '0.75rem' }}
+                        onClick={() => setDescriptionExpanded(true)}
+                      >
+                        show more
+                      </small>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Title (editable unless readOnly) */}
