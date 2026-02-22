@@ -1,5 +1,48 @@
 // Stash Downloader - Background Script
 
+// === URL Detection Helpers ===
+
+function isRedditMediaUrl(url) {
+  return /^https?:\/\/(i\.redd\.it|v\.redd\.it|preview\.redd\.it)\//i.test(url);
+}
+
+function isRedditPostUrl(url) {
+  return /^https?:\/\/(www\.|old\.|new\.)?reddit\.com\/r\/[^/]+\/comments\//i.test(url);
+}
+
+/**
+ * Auto-detect content type from URL patterns.
+ * Shared between popup and context menu.
+ */
+function autoDetectContentTypeForUrl(url) {
+  if (!url) return 'Video';
+
+  // Reddit-specific patterns (check first)
+  if (/reddit\.com\/gallery\//i.test(url)) return 'Gallery';
+  if (/i\.redd\.it\/.+\.(jpg|jpeg|png|gif|webp)/i.test(url)) return 'Image';
+  if (/v\.redd\.it\//i.test(url)) return 'Video';
+  if (/reddit\.com\/r\/[^/]+\/comments\//i.test(url)) return 'Video';
+  if (/^https?:\/\/redd\.it\//i.test(url)) return 'Video';
+
+  // Image patterns
+  if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url)) return 'Image';
+  if (/rule34\.xxx.*\/images\//i.test(url)) return 'Image';
+  if (/gelbooru\.com.*\/images\//i.test(url)) return 'Image';
+  if (/danbooru\.donmai\.us.*\/data\//i.test(url)) return 'Image';
+
+  // Gallery patterns
+  if (/rule34\.xxx\/index\.php\?.*id=/i.test(url)) return 'Gallery';
+  if (/gelbooru\.com\/index\.php\?.*id=/i.test(url)) return 'Gallery';
+  if (/danbooru\.donmai\.us\/posts\//i.test(url)) return 'Gallery';
+  if (/imgur\.com\/a\//i.test(url)) return 'Gallery';
+  if (/imgur\.com\/gallery\//i.test(url)) return 'Gallery';
+
+  // Default
+  return 'Video';
+}
+
+// === Context Menus ===
+
 // Create context menus - runs on every background script load
 // Using removeAll first to avoid duplicate ID errors
 function createContextMenus() {
@@ -65,9 +108,24 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     url = info.linkUrl || info.srcUrl || info.pageUrl;
   }
 
-  let contentType = 'Video';
-  if (info.menuItemId === 'send-to-stash-image') contentType = 'Image';
-  if (info.menuItemId === 'send-to-stash-gallery') contentType = 'Gallery';
+  // For Reddit media URLs (i.redd.it, v.redd.it), prefer the post URL for metadata
+  if (url && isRedditMediaUrl(url) && info.pageUrl && isRedditPostUrl(info.pageUrl)) {
+    console.log('[Stash Downloader] Reddit media URL detected, using post URL instead:', info.pageUrl);
+    url = info.pageUrl;
+  }
+
+  // Determine content type
+  let contentType;
+  if (info.menuItemId === 'send-to-stash-image') {
+    contentType = 'Image';
+  } else if (info.menuItemId === 'send-to-stash-gallery') {
+    contentType = 'Gallery';
+  } else if (info.menuItemId === 'send-to-stash-video') {
+    contentType = 'Video';
+  } else {
+    // Parent menu item - auto-detect from URL
+    contentType = autoDetectContentTypeForUrl(url);
+  }
 
   await sendToStash(url, contentType);
 });
@@ -85,7 +143,12 @@ browser.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     return tabs[0] || null;
   }
+  if (message.action === 'autoDetectContentType') {
+    return { contentType: autoDetectContentTypeForUrl(message.url) };
+  }
 });
+
+// === Settings ===
 
 async function getSettings() {
   return await browser.storage.sync.get({
@@ -105,6 +168,24 @@ function getPluginIdentifiers(targetVersion) {
     eventName: isDev ? 'stash-downloader-dev-add-url' : 'stash-downloader-add-url',
   };
 }
+
+// === Content Script Injection ===
+
+/**
+ * Ensure content script is loaded on a tab before sending messages.
+ * Uses programmatic injection instead of manifest-declared content_scripts
+ * so the script only runs on Stash pages when actually needed.
+ */
+async function ensureContentScript(tabId) {
+  try {
+    await browser.tabs.sendMessage(tabId, { action: 'ping' });
+  } catch {
+    // Content script not loaded — inject it now
+    await browser.tabs.executeScript(tabId, { file: 'content.js' });
+  }
+}
+
+// === Send to Stash ===
 
 async function sendToStash(url, contentType = 'Video', options = {}) {
   const settings = await getSettings();
@@ -133,10 +214,11 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
   let sent = false;
 
   if (stashTabs.length > 0) {
-    // Try to send to content script on Stash tab(s)
+    // Send to the first Stash tab only (avoid duplicate sends to multiple tabs)
     for (const tab of stashTabs) {
       try {
         console.log('[Stash Downloader] Sending to tab', tab.id, tab.url);
+        await ensureContentScript(tab.id);
         await browser.tabs.sendMessage(tab.id, {
           action: 'addToQueue',
           url: url,
@@ -145,8 +227,10 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
         });
         sent = true;
         console.log('[Stash Downloader] Successfully sent to tab', tab.id);
+        break; // Stop after first successful send
       } catch (e) {
         console.warn('[Stash Downloader] Failed to send to tab', tab.id, ':', e.message);
+        // Try next tab if this one failed
       }
     }
   } else {
@@ -238,6 +322,8 @@ async function sendToStash(url, contentType = 'Video', options = {}) {
 
   return { success: true, method: 'redirect' };
 }
+
+// === Helpers ===
 
 function truncateUrl(url, maxLength = 50) {
   if (url.length <= maxLength) return url;

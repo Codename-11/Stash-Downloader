@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // Elements
   const urlDisplay = document.getElementById('urlDisplay');
+  const urlContext = document.getElementById('urlContext');
   const contentType = document.getElementById('contentType');
   const customUrl = document.getElementById('customUrl');
   const moreOptionsToggle = document.getElementById('moreOptionsToggle');
@@ -27,7 +28,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkStatus();
 
     // Auto-detect content type based on URL
-    autoDetectContentType();
+    await autoDetectContentType(currentUrl);
+
+    // Show URL context info
+    updateUrlContext(currentUrl);
   }
 
   async function loadCurrentUrl() {
@@ -88,46 +92,76 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function autoDetectContentType() {
-    if (!currentUrl) return;
-
-    const url = currentUrl.toLowerCase();
-
-    // Image patterns
-    const imagePatterns = [
-      /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i,
-      /rule34\.xxx.*\/images\//i,
-      /gelbooru\.com.*\/images\//i,
-      /danbooru\.donmai\.us.*\/data\//i
-    ];
-
-    // Gallery patterns
-    const galleryPatterns = [
-      /rule34\.xxx\/index\.php\?.*id=/i,
-      /gelbooru\.com\/index\.php\?.*id=/i,
-      /danbooru\.donmai\.us\/posts\//i,
-      /imgur\.com\/a\//i,
-      /imgur\.com\/gallery\//i
-    ];
-
-    // Check image first
-    for (const pattern of imagePatterns) {
-      if (pattern.test(url)) {
-        contentType.value = 'Image';
-        return;
+  /**
+   * Auto-detect content type by delegating to background script's shared function.
+   */
+  async function autoDetectContentType(url) {
+    if (!url) return;
+    try {
+      const result = await browser.runtime.sendMessage({
+        action: 'autoDetectContentType',
+        url: url
+      });
+      if (result && result.contentType) {
+        contentType.value = result.contentType;
       }
+    } catch (e) {
+      console.error('Failed to auto-detect content type:', e);
+      contentType.value = 'Video';
+    }
+  }
+
+  /**
+   * Show contextual info below the URL display for recognized sources.
+   * For Reddit: shows subreddit name. For booru sites: shows site name.
+   */
+  function updateUrlContext(url) {
+    if (!url) {
+      urlContext.style.display = 'none';
+      return;
     }
 
-    // Check gallery
-    for (const pattern of galleryPatterns) {
-      if (pattern.test(url)) {
-        contentType.value = 'Gallery';
-        return;
+    let context = '';
+
+    // Reddit context
+    const subredditMatch = url.match(/reddit\.com\/r\/([^/?#]+)/i);
+    if (subredditMatch) {
+      context = 'r/' + subredditMatch[1];
+
+      // Also extract post title slug if present
+      const titleMatch = url.match(/\/comments\/[^/]+\/([^/?#]+)/i);
+      if (titleMatch) {
+        const titleSlug = titleMatch[1].replace(/_/g, ' ');
+        context += ' \u00B7 ' + titleSlug;
       }
+    } else if (/reddit\.com\/gallery\//i.test(url)) {
+      context = 'Reddit Gallery';
+    } else if (/i\.redd\.it\//i.test(url)) {
+      context = 'Reddit Image (direct)';
+    } else if (/v\.redd\.it\//i.test(url)) {
+      context = 'Reddit Video (direct)';
+    } else if (/^https?:\/\/redd\.it\//i.test(url)) {
+      context = 'Reddit (short link)';
     }
 
-    // Default to Video
-    contentType.value = 'Video';
+    if (context) {
+      urlContext.textContent = context;
+      urlContext.style.display = 'block';
+    } else {
+      urlContext.style.display = 'none';
+    }
+  }
+
+  /**
+   * Validate URL format. Returns true for valid URLs.
+   */
+  function isValidUrl(str) {
+    try {
+      new URL(str);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // More Options Toggle
@@ -140,7 +174,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('loading');
     await loadCurrentUrl();
-    autoDetectContentType();
+    await autoDetectContentType(currentUrl);
+    updateUrlContext(currentUrl);
     await checkStatus();
     refreshBtn.classList.remove('loading');
   });
@@ -151,12 +186,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     browser.runtime.openOptionsPage();
   });
 
+  // Custom URL input validation
+  customUrl.addEventListener('input', () => {
+    const val = customUrl.value.trim();
+    if (val && !isValidUrl(val)) {
+      customUrl.style.borderColor = '#ef4444';
+    } else {
+      customUrl.style.borderColor = '';
+      // Re-detect content type when custom URL changes
+      if (val) {
+        autoDetectContentType(val);
+        updateUrlContext(val);
+      } else {
+        autoDetectContentType(currentUrl);
+        updateUrlContext(currentUrl);
+      }
+    }
+  });
+
   // Save button
   saveBtn.addEventListener('click', async () => {
     const urlToSend = customUrl.value.trim() || currentUrl;
 
     if (!urlToSend) {
       showToast('No URL to save', 'error');
+      return;
+    }
+
+    // Validate custom URL format
+    if (customUrl.value.trim() && !isValidUrl(customUrl.value.trim())) {
+      showToast('Invalid URL format', 'error');
       return;
     }
 

@@ -126,6 +126,18 @@
       font-style: italic;
     }
 
+    .url-context {
+      display: none;
+      font-size: 12px;
+      color: #737373;
+      padding: 0 2px;
+      margin-top: -12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     /* Form Group */
     .form-group {
       margin-bottom: 16px;
@@ -346,6 +358,7 @@
 
   <main class="content">
     <div class="url-display" id="urlDisplay">Loading...</div>
+    <div class="url-context" id="urlContext"></div>
 
     <div class="form-group">
       <label class="form-label">Content Type</label>

@@ -1,5 +1,5 @@
 // Stash Downloader - Content Script
-// Runs on Stash domain to enable real-time queue updates
+// Injected programmatically on Stash pages to enable real-time queue updates
 
 // Storage keys for both stable and dev versions
 const STORAGE_KEYS = {
@@ -14,6 +14,11 @@ const EVENT_NAMES = {
 };
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'ping') {
+    sendResponse({ pong: true });
+    return;
+  }
+
   if (message.action === 'addToQueue') {
     // Dispatch custom events for BOTH stable and dev versions
     // This ensures whichever plugin is installed will receive the URL
