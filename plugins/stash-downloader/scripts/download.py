@@ -717,7 +717,7 @@ def download_video(
         url: Video URL to download
         output_dir: Directory to save the video
         filename_template: yt-dlp output template
-        quality: Quality preference (best, 1080p, 720p, 480p)
+        quality: Quality preference (best, original, 1080p, 720p, 480p, "CUSTOM_YT-DLP_QUALITY")
         progress_callback: Optional callback for progress updates
         proxy: Optional HTTP/HTTPS/SOCKS proxy (e.g., http://proxy.example.com:8080)
         progress_id: Optional ID for progress file updates (for frontend polling)
@@ -731,12 +731,19 @@ def download_video(
 
     # Build format string based on quality preference
     format_str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-    if quality == "1080p":
+    if quality == "original":
+        format_str = "bestvideo+bestaudio/best"
+    elif quality == "best":
+        # this has to be pass so that "best" doesn't just go into "else"
+        pass
+    elif quality == "1080p":
         format_str = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best"
     elif quality == "720p":
         format_str = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
     elif quality == "480p":
         format_str = "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
+    else:
+        format_str = quality
 
     output_template = os.path.join(output_dir, filename_template)
 
