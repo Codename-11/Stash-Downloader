@@ -33,7 +33,7 @@ settings:
     type: BOOLEAN
   downloadQuality:
     displayName: Download Quality
-    description: "Preferred quality for video downloads (best, 1080p, 720p, 480p)"
+    description: "Preferred quality for video downloads (best, original, 1080p, 720p, 480p, \"CUSTOM_YT-DLP_QUALITY\")"
     type: STRING
   filenameTemplate:
     displayName: Filename Template
