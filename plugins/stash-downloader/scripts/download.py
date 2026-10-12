@@ -209,6 +209,22 @@ def sanitize_filename(filename: str) -> str:
 # Cached yt-dlp command (resolved once, reused for all calls)
 _ytdlp_cmd: Optional[list] = None
 
+# Standalone yt-dlp binaries checked when neither the Python module nor PATH has it.
+# ~/.stash is the Stash config dir on the official Docker image (/root/.stash).
+YTDLP_CANDIDATE_PATHS = [
+    "/usr/local/bin/yt-dlp",
+    "/usr/bin/yt-dlp",
+    os.path.expanduser("~/.stash/bin/yt-dlp"),
+    "/config/bin/yt-dlp",
+]
+
+# The official stashapp/stash image is Alpine (musl): the yt-dlp_linux release binary
+# is built for glibc and fails with "not found" there.
+MUSL_HINT = (
+    "On the official Docker image (Alpine/musl) use the yt-dlp_musllinux release build, "
+    "e.g. save it as /root/.stash/bin/yt-dlp (chmod +x) and set ytdlpPath to that path."
+)
+
 
 def get_ytdlp_cmd(custom_path: Optional[str] = None) -> list:
     """
@@ -261,6 +277,28 @@ def get_ytdlp_cmd(custom_path: Optional[str] = None) -> list:
         log.debug("yt-dlp CLI not found on PATH")
     except subprocess.TimeoutExpired:
         log.debug("yt-dlp CLI version check timed out")
+
+    # Strategy 3: standalone binary in a common location that may not be on the
+    # Stash process's PATH (e.g. /usr/local/bin, or the Stash config dir, which
+    # persists across container updates on the official Docker image)
+    for candidate in YTDLP_CANDIDATE_PATHS:
+        if not (os.path.isfile(candidate) and os.access(candidate, os.X_OK)):
+            continue
+        try:
+            result = subprocess.run(
+                [candidate, "--version"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                log.info(f"Found yt-dlp binary at {candidate} (v{result.stdout.strip()})")
+                _ytdlp_cmd = [candidate]
+                return _ytdlp_cmd
+        except FileNotFoundError:
+            # The file exists but cannot be executed: on Alpine/musl this means a
+            # glibc build (yt-dlp_linux) was installed instead of yt-dlp_musllinux
+            log.warning(f"{candidate} exists but cannot run. {MUSL_HINT}")
+        except subprocess.TimeoutExpired:
+            log.debug(f"yt-dlp version check timed out for {candidate}")
 
     # Not found anywhere
     _ytdlp_cmd = None
@@ -320,7 +358,8 @@ def check_ytdlp(custom_path: Optional[str] = None) -> bool:
 
     log.error(
         "yt-dlp is not installed. Install it with: pip install yt-dlp\n"
-        "Or set a custom path in plugin settings (ytdlpPath)."
+        "Or set a custom path in plugin settings (ytdlpPath).\n"
+        + MUSL_HINT
     )
     return False
 
